@@ -163,6 +163,12 @@ large.cut <- log(pi)*3
 med.cut <- log(pi)
 small.cut <- log(1)
 
+exp(small.cut)
+exp(med.cut)
+exp(large.cut)
+exp(big.cut)
+exp(bigger.cut)
+
 # Split into more equal parts young, med, bigger, biggest...
 scgl.size$status <- "biggest"
 scgl.size$status[scgl.size$logVol < biggest.cut] <- "bigger"
@@ -198,10 +204,32 @@ table(sg$stage, sg$survive)
 sg$logVOLt[is.infinite(sg$logVOLt)] <- 0
 
 #Log-linear model of survival vs. stage
-summary(glm(survive ~ stage, family = poisson, data = sg))
+scgl.glm <- glm(survive ~ stage, family = poisson, data = sg)
 
-surv.table <- data.frame(table(sg$stage, sg$survive))
+# with random variable as the site?? No, won't converge
+library(lme4)
+scgl.glm <- glmer(survive ~ stage + (stage - 1 | Site), family = poisson, data = sg)
+
+loglin <- data.frame(table(sg$stage, sg$survive))
+glm(Var2 ~ Var1, offset = log(Freq), family = poisson, data = subset(loglin, Var1 != "dead"))
+
+# likelihood raio test 
+anova(scgl.glm, test = "Chisq")
+
+# Check oversipersion
+summary(scgl.glm)$dispersion
+
+sites <- unique(sg$Site)
+sur <- c()
+for(s in sites){
+  sur <- rbind(sur,data.frame(table(sg$stage[sg$Site == s], sg$survive[sg$Site == s]),Site = s))
+} 
 
 # Different sizes do not have significantly different suvival rates
 ggplot(surv.table, aes(as.factor(Var1), Freq, fill = Var2)) +
   geom_bar(stat="identity")
+
+# How many survive despite stage/age by site
+table(sg$Site, sg$survive)
+
+

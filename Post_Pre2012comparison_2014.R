@@ -116,6 +116,8 @@ ct.all$Genetic[ct.all$Site == "Atwell Gulch" |
 			ct.all$Site == "T-Junction" |
 			ct.all$Site == "Pyramid Rock"] <- "North"
 
+table(ct.all$Site, ct.all$Year)
+
 # Same and changing sites
 ct.all$SiteSame <- ct.all$Site
 ct.all$SiteSame[ct.all$Site == "Atwell Gulch" |ct.all$Site == "Atwell Gulch (old)"] <- "Atwell Gulch"
