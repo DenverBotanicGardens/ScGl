@@ -1,0 +1,95 @@
+---
+title: "Check_ScGl_data"
+author: "Michelle DePrenger-Levin"
+date: "Monday, August 31, 2015"
+output: pdf_document
+---
+
+There seems to be a problem with holding the data for the same plant in two different plots
+like happens in Pond and to a lesser extent at Oil Pad and T-Junction <https://research.botanicgardens.org/admin/demographics/scgl/reports/rawdata.php>.
+
+check the raw data
+
+```{r}
+setwd(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Excel/2015_ScGl/"))
+test.scgl <- read.csv("RawData_scgl2015.csv", header = TRUE, as.is = TRUE)
+head(test.scgl)
+
+table(test.scgl$Site, test.scgl$Year)
+
+#Sent resquest to Zeth to fix these in the upload
+subset(test.scgl, Site == "")
+
+
+# Change Fl and Br to 1s and 0s, add a volume column
+test.scgl$Fl2 <- 0
+test.scgl$Fl2[test.scgl$Fl == "y"] <- 1
+test.scgl$Br2 <- 0
+test.scgl$Br2[test.scgl$Br == "y"] <- 1
+test.scgl$vol <- pi*(test.scgl$Width.cm.^2)*test.scgl$Height.cm.
+
+library(plyr)
+test.scgl.alive <- subset(test.scgl, Height.cm. >0)
+scgl.raw <- ddply(test.scgl.alive, .(Site, Year), summarise,
+  X = length(Height.cm.),
+	Rep = sum(Fl2),
+	Brs = sum(Br2),
+	avgH = mean(Height.cm., na.rm = T),
+	sdH = sd(Height.cm., na.rm = T),
+	avgW = mean(Width.cm., na.rm = T),
+	sdW = sd(Width.cm., na.rm = T),
+	avgvol = mean(vol, na.rm = T),
+	sdvol = sd(vol, na.rm = T))
+
+head(scgl.raw)
+
+scgl.pond <- subset(test.scgl, Site == "Pond" & Height.cm. > 0)
+rowSums(table(scgl.pond$Year, scgl.pond$Transect))
+
+lapply(split(test.scgl,test.scgl$Year),function(x){
+table(test.scgl$Tag[test.scgl$Site == "Pond" | test.scgl$Site == "Pond (old)" ],
+      test.scgl$Transect[test.scgl$Site == "Pond" | test.scgl$Site == "Pond (old)"])
+})
+
+#Did all the plants from old just get taken away? arn't pulled out?
+scgl.pondold <- subset(test.scgl, Site == "Pond (old)" & Height.cm. > 0)
+rowSums(table(scgl.pondold$Year, scgl.pondold$Transect))
+
+```
+
+
+
+All plots:
+
+```{r, echo=FALSE}
+library(ggplot2)
+ggplot(scgl.raw, aes(Year, X, colour = Site)) +
+	geom_line() +
+	ylab("Total Individuals") +
+	theme_bw() +
+	theme(plot.background = element_blank(),
+		panel.grid.major = element_blank())
+```
+
+
+Only plots with old and new:
+
+```{r, echo=FALSE}
+ggplot(subset(scgl.raw, Site == "Pond" | Site == "Pond (old)"), aes(Year, X, colour = Site)) +
+  geom_line() +
+	ylab("Total Individuals") +
+	theme_bw() +
+	theme(plot.background = element_blank(),
+		panel.grid.major = element_blank())
+```
+
+
+```{r}
+
+
+```
+
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

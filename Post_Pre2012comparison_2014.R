@@ -14,6 +14,38 @@ setwd(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Scle
 sg <- read.csv("2014_scgl_rawdata.csv", header = T, as.is = T)
 head(sg)
 
+# Check on Pond, something seems off
+head(sg)
+unique(sg$Site)
+Pond.check <- subset(sg, Site == "Pond" | Site == "Pond (old)")
+table(Pond.check$Transect, Pond.check$Year)
+
+expand.grid(unique(Pond.check$Site),unique(Pond.check$Transect))
+
+pond.fix <- read.csv("FixPondCheck.csv")
+names(pond.fix)
+table(pond.fix$Site)
+
+table(pond.fix$Transect, pond.fix$Year)
+
+# for only living individuals
+
+Pond.check.alive <- subset(Pond.check, Height.cm. > 0)
+
+tapply(Pond.check.alive$Tag, 
+       list(Pond.check.alive$Transect, Pond.check.alive$Site, Pond.check.alive$Year),
+       FUN = function(x) length(x))
+
+pond.summary <- tapply(Pond.check.alive$Tag, 
+       list(Pond.check.alive$Transect, Pond.check.alive$Year),
+       FUN = function(x) length(x))
+
+library(reshape2)
+pond.sum.melt <- melt(pond.summary)
+names(pond.sum.melt)
+
+ggplot(pond.sum.melt, aes(Var2,value,colour = as.character(Var1))) +
+  geom_line()
 
 #Chose All2008
 ScGl08<-read.delim("All2008.txt", as.is=FALSE, sep=",",
@@ -129,7 +161,6 @@ ct.all$SiteSame[ct.all$Site == "Oil Pad (old)" |ct.all$Site == "Oil Pad"] <- "Oi
 ggplot(subset(ct.all, Site != "Road T-East (old)"),
 		aes(Year, X, label = Site, colour = Site )) +
 	geom_line() +
-#	geom_point() +
 	ylab("Total Individuals") +
 	theme_bw() +
 	theme(plot.background = element_blank(),
@@ -155,6 +186,12 @@ ggplot(subset(ct.all, Site != "Road T-East (old)"),
 		panel.grid.major = element_blank()) +
 	facet_wrap(~SiteSame, ncol = 5) +
 	theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) #
+
+# Why does Pond seem wrong?
+table(ct.all$Site, ct.all$SiteSame)
+
+pond <- subset(ct.all, Site == "Pond" | Site == "Pond (old)")
+head(pond)
 
 ## Run the CountPVASimple_Funcation from
 #	"Q:\Research\Stats & Software\R CODE\Functions\CountPVASimple_Function.r"
