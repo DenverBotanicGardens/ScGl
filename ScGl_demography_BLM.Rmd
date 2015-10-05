@@ -1,0 +1,57 @@
+---
+title: "ScGl_demography_BLM"
+author: "Michelle DePrenger-Levin"
+date: "Monday, October 05, 2015"
+output: html_document
+---
+Need 2008 data seperate from the MySQL database due to lack of measuring hight and width. Will need to get length tagged individuals for number alive instead of number of individuals with a heigth/width in later years. <https://research.botanicgardens.org/admin/>      
+
+In 2012 we switched from measuring the height and width indiviudals under 0.5 cm in width to counting them as "minis". 
+
+```{r}
+scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
+
+scgl08_2 <- data.frame(scgl08[,c(1:3)], AverageHeight = as.numeric(NA), AverageWidth = as.numeric(NA),
+  		scgl08[,c(4:8)],
+			Minis = as.numeric(scgl08[,9]), scgl08[,c(10:12)],
+			AprRain = scgl08[,c(13)], scgl08[,c(14:21)],
+			PrYrRain = scgl08[,c(22)], scgl08[,c(23:34)])
+str(scgl08_2)
+head(scgl08_2)
+names(scgl08_2)
+```
+
+2015 data
+### Need to update after upload process fixed
+```{r}
+sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Excel/2015_ScGl/RawData_scgl2015.csv"))
+
+head(sg)
+names(sg)
+```
+
+
+Why did "(old)" get added to all Oil Pad, T-junction/Road, and Pond sites? 
+```{r}
+table(sg$Site)
+table(sg$Site,sg$Transect)
+
+sort(unique(sg$Y.coord.m.[grep("Atwell",sg$Site)]))
+
+```
+
+
+
+#Old and New data     
+Atwell Gulch old is everything with a Y less than 30    
+Atwell Gulch new is everything Atwell Gulch    
+```{r}
+
+head(sg[grep("Atwell",sg$Site),])
+
+ag_old <- subset(sg[grep("Atwell",sg$Site),], Y.coord.m. < 30)
+table(ag_old$Site)
+```
+
+
+

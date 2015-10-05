@@ -1,0 +1,351 @@
+---
+title: "Pollinator_outline"
+author: "Michelle DePrenger-Levin"
+date: "Monday, September 28, 2015"
+output: html_document
+---
+```{r, echo=FALSE}
+library(ggplot2)
+```
+
+
+
+DBG's data     
+look at NMDS for distance to disturbance or ADD IN scales of disturbance within different circles around the populaiton     
+lm(richness~contour lines*distance)     
+at some threshold of surrounding disturbance does proximity to disturbance have an effect so a buffer should be put into effect at some threshold? 
+
+```{r}
+dbg_demo <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/2012_Black Hills/2012_data/Demographic data to Disturbance datacsv.csv"))
+
+head(dbg_demo)
+```
+
+
+# DBG pollination 2012
+```{r}
+pol <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/2012_Black Hills/2012_data/2012_SCGL_Pollination_Study.csv"))
+
+head(pol)
+
+polsum <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/2012_Black Hills/2012_data/Pollination summary.csv"))
+
+head(polsum)
+```
+
+Keep adding location for study points
+```{r}
+do.call(data.frame,lapply(split(pol, pol$Site), function(x){ 
+  mean(rowSums(pol[,12:21], na.rm = TRUE))
+}))
+
+totpol <- cbind(apply(polsum[,-1],2,FUN=function(x) sum(x, na.rm = TRUE)))
+
+
+#lm( ,data=pol)
+```
+
+
+
+2013 study data of ScGl size by distance group to a disturbance
+```{r}
+ind13 <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/2013_IndivData.csv"))
+
+head(ind13)
+```
+
+I'm pretty sure that T.S means if the plant is touching another or is seperate
+```{r}
+site13 <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/2013_SiteData.csv"))
+
+head(ind13)
+```
+
+```{r}
+polcheck <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/2012_Black Hills/2012_data/2013-02-27_Pollinator_types_check.csv"))
+
+head(polcheck)
+```
+
+
+
+```{r}
+dist14 <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/2014_ScGl_disturbancedata.csv"))
+
+head(dist14)
+```
+
+
+```{r}
+germ14 <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/2014_ScGl_germinationHeightWidth.csv"))
+
+head(germ14)
+```
+
+### 2014 germination of seeds in Becky's office    
+Need to split the top rows that have date and temperatures from the bottom that give the number of seeds germinated per pot of near or far at each site
+
+```{r}
+germ14_all <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/Germination_ScGl_study2_2014.csv"))
+
+head(germ14_all)
+```
+
+
+Access database "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/Black Hills Disturbance.mdb"
+
+
+```{r}
+pol12 <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/Pollinators.csv"))
+
+head(pol12)
+```
+
+From Access??
+```{r}
+samsize <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/qry_Sample Size_AllYears.csv"))
+
+head(samsize)
+```
+
+
+### Soil samples from two north and two south sites 2015
+```{r}
+soil <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/2015_Black Hills/SoilSamplesResults.csv"))
+
+head(soil)
+```
+
+
+##Seed germination near to far
+```{r}
+seed <- germ14_all[-c(1:3),]
+names.seed <- germ14_all[3,]
+names(seed) <- names.seed
+
+
+```
+
+Compare soil samples with seed germination rate, germination    
+for ANOVA: fixed would be near far, random would be site since I want to generalize to other sites?   
+Use Anova in <car> with type="III" which works best for unbalanced design
+```{r}
+maxgerm <- as.numeric(apply(seed[,10:103],1,function(x) max(x, na.rm=TRUE)))
+seedmax <- data.frame(seed,maxgerm)
+seed.soil <- merge(seedmax, soil, by.x = "X", by.y = "Site")
+
+names(seed.soil)[2] <- "NF"
+names(seed.soil)[1] <- "Site"
+
+summary(lm(maxgerm~Site*NF, data=seed.soil))
+```
+
+##HSD Tukey test
+```{r}
+library(agricolae)
+model <- lm(maxgerm~Site*NF, data=seed.soil)
+HSD.test(model,list("NF","Site"), group=TRUE, console=TRUE)
+
+```
+
+
+Rate of germination?
+```{r}
+seed.soil[,5:103] <- lapply(seed.soil[,5:103], as.numeric)
+
+
+lapply(split(seed.soil, list(seed.soil$Site,seed.soil$NF)), function(y){
+  apply(y[,10:103],2,function(x)x/y$X.3)
+})
+
+
+germ.rate <- apply(seed.soil[,10:103],2,function(x)x/seed.soil$X.3)
+head(germ.rate)
+head(seed.soil)
+
+ggplot()
+
+seed2 <-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BlackHillsDocuments/R code Black Hills/BlackHills_R_tables/Germination_20142015.csv"),na.strings="")
+
+str(seed2)
+days <- as.Date(substr(names(seed2[,-c(1:9)]),2,9), "%m.%d.%y")
+
+
+names(seed2[,-c(1:9)]) <- days
+names(seed2)
+
+
+seed2[,5:103] <- lapply(seed2[,5:103], as.numeric)
+str(seed2)
+
+germ.rate <- apply(seed2[,10:103],2,function(x)x/seed2$NumSeeds)
+head(germ.rate)
+```
+
+
+
+
+#Bio-Logic data     
+bl_scgl has both glaucus and brevispinus but no wetlandicus
+```{r}
+bl_scgl <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BIO-Logic/scgl_2012.csv"), skip = 3, na.strings = "9999")
+
+head(bl_scgl)
+```
+
+## Results 
+Bio-logic    
+Nbr: count of number of cactus within 10cm of marked plant    
+Group: E(ast) or W(est) for scbr and N(orth) S(outh) for scgl     
+
+#Calculate volume same way!
+```{r}
+bl_scgl$Vol <- pi*(bl_scgl$Max.Dia.^2)*bl_scgl$Max.Ht.
+
+#ScGl and ScBr
+ggplot(bl_scgl, aes(log(Vol+1), colour = Species, fill = Species, alpha = 0.5)) +
+  geom_histogram()
+
+summary(lm(log(Vol+1) ~ Meas.*Species, data = bl_scgl))
+summary(lm(log(Vol+1) ~ Categ.*Species, data = bl_scgl))
+
+
+biol <- bl_scgl[,c(1:21,46)]
+table(biol$Species)
+
+
+ggplot(biol, aes(Meas., log(Vol+1), colour = Species)) +
+  geom_point() +
+  stat_smooth(method = "lm") +
+  theme_bw() +
+  theme(legend.justification=c(1,1),legend.position=c(1,1)) +
+  xlab("Distance from disturbance (m)") +
+  ylab("log transformed volume")
+
+
+```
+
+Combind biologic and dbg   
+```{r}
+dbg_demo$Vol <- pi*(dbg_demo$Max.width^2)*dbg_demo$Max.Height
+biol.2c <- biol[,c(1,5,22)]
+dbg.2c <- data.frame(Species="SCGL", Meas.=dbg_demo[,12], Vol=dbg_demo$Vol)
+comb_vol <- rbind(biol.2c, dbg.2c)
+
+```
+
+```{r}
+ggplot(comb_vol, aes(Meas., log(Vol+1), colour = Species)) +
+  geom_point() +
+  stat_smooth(method = "lm") +
+  theme_bw() +
+  theme(legend.justification=c(1,1),legend.position=c(1,1)) +
+  xlab("Distance from disturbance (m)") +
+  ylab("log transformed volume")
+
+
+summary(lm(log(Vol+1) ~ Meas.*Species, data = comb_vol))
+```
+
+
+```{r}
+
+head(dbg_demo)
+
+ggplot(dbg_demo, aes(dist_disturb_1, log(Vol+1))) +
+  geom_point(colour = "cyan3")+
+  stat_smooth(method = "lm") +
+  theme_bw() +
+  theme(legend.justification=c(1,1),legend.position=c(1,1)) +
+  xlab("Distance from disturbance (m)") +
+  ylab("log transformed volume")
+```
+
+##Check same with ind13
+```{r}
+ind13$Vol <- pi*(ind13$Width^2)*ind13$Adj.Height.mm.
+ind13_1 <- ind13[ind13$Vol != 0,]
+density <- aggregate(ind13_1$Vol, 
+                     list(Dist = ind13_1$DistanceGroup,
+                          Site = ind13_1$Name,
+                          Transect = ind13_1$Transect), length)
+
+ggplot(density, aes(Dist,x))+
+  geom_point()+
+  stat_smooth(method="lm")+
+  ylab(substitute(paste("Density of ", italic("Sclerocactus glaucus"))))+
+  theme_bw()+
+  facet_wrap(~Site)
+
+
+ggplot(ind13_1, aes(DistanceGroup,log(Vol+1),colour=Name))+
+  geom_point()+
+  stat_smooth(aes(group=Name), method="lm")+
+  facet_wrap(~Name)+
+  theme_bw()
+
+
+ggplot(ind13_1, aes(factor(DistanceGroup),log(Vol+1),colour=Name))+
+  geom_boxplot()+
+  facet_wrap(~Name)+
+  theme_bw()
+
+
+ggplot(ind13_1, aes(DistanceGroup,log(Vol+1)))+
+  geom_point()+
+  stat_smooth(method="lm")
+
+
+ggplot(ind13_1, aes(factor(DistanceGroup),log(Vol+1), colour = Name))+
+  geom_boxplot()
+
+```
+
+proportion of size in populations    
+from DBG 2012-12-03 report: The average size of vegetative individuals at Black Hills sites was 54.6 cm3 (±10.2 SD). Black Hills individuals are significantly more likely to be reproductive once they reach 163.7 cm3 (± 2.8; t = -34.1, df = 1077.2, p < 0.001). Individuals are significantly smaller as the distance from a disturbance increases (r2 = 0.07, F(1,1158) = 82.2, p < 0.001; Figure 5a). 
+```{r}
+prop_sm <- aggregate(ind13_1$Vol,by=list(Site = ind13_1$Name,
+                              Dist = ind13_1$DistanceGroup,
+                              Transect = ind13_1$Transect), 
+          function(x){
+            length(x[x <16370])/length(x)
+            })
+
+ggplot(prop_sm, aes(factor(Dist),x))+
+  geom_boxplot()+
+  ylab("Proportion of young vegetative individuals")+
+  xlab("Meters from a disturbance")
+
+ggplot(prop_sm, aes(factor(Dist),x))+
+  geom_boxplot()+
+  stat_smooth(aes(group=Site), method="lm")+
+  ylab("Proportion of young vegetative individuals")+
+  xlab("Meters from a disturbance")+
+  facet_wrap(~Site)+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+summary(lm(x~Dist*Site, data=prop_sm))
+```
+
+
+## Need to get pollinator abundance and richness values from Biologic for analysis     
+PBO: percent of bowl occupied out of 99
+```{r}
+blbees <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/BIO-Logic/table14_diversityevennessbees.csv"))
+
+head(blbees)
+
+ggplot(blbees, aes(Dist, Simpson))+
+  geom_boxplot()
+
+
+ggplot(blbees, aes(Dist, Evenness))+
+  geom_boxplot()
+
+
+ggplot(blbees, aes(Dist, PBO))+
+  geom_boxplot()
+```
+
+
