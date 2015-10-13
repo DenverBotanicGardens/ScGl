@@ -4,6 +4,12 @@ author: "Michelle DePrenger-Levin"
 date: "Monday, October 05, 2015"
 output: html_document
 ---
+
+```{r, echo=FALSE}
+library(ggplot2)
+library(plyr)
+```
+
 Need 2008 data seperate from the MySQL database due to lack of measuring hight and width. Will need to get length tagged individuals for number alive instead of number of individuals with a heigth/width in later years. <https://research.botanicgardens.org/admin/>      
 
 In 2012 we switched from measuring the height and width indiviudals under 0.5 cm in width to counting them as "minis". 
@@ -28,12 +34,19 @@ sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPE
 
 head(sg)
 names(sg)
+
+
+sg$Vol <- pi*(sg$Width.cm.^2)*sg$Height.cm.
 ```
 
 
 Why did "(old)" get added to all Oil Pad, T-junction/Road, and Pond sites? 
 ```{r}
 table(sg$Site)
+subset(sg,Site=="Oil Pad (old) (old)")
+
+head(subset(sg,Site=="Pond (old) (old)"))
+head(subset(sg,Site=="Road T-West (old) (old)"))
 table(sg$Site,sg$Transect)
 
 sort(unique(sg$Y.coord.m.[grep("Atwell",sg$Site)]))
@@ -51,7 +64,117 @@ head(sg[grep("Atwell",sg$Site),])
 
 ag_old <- subset(sg[grep("Atwell",sg$Site),], Y.coord.m. < 30)
 table(ag_old$Site)
+
+ag_new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
+
+
+
+ggplot(ag_old, aes(Year))+
+  geom_histogram()
+
+ggplot(ag_new, aes(Year))+
+  geom_histogram()
 ```
+
+
+##Summarize old and new data by number of individuals    
+Need to split by Site - Atwell Gulch needs to be together:  
+       Atwell Gulch_108 and Atwell Gulch_165 are Atwell Gulch with Ycoord < 30
+       Road T-West (old) vs. T-Junction
+       Oil Pad and Oil Pad (old)
+       Pond and Pond (old)
+     
+merge datasets   
+2008:      
+```{r}
+table(scgl08_2$SiteName)
+table(sg$Site)
+
+head(scgl08_2[,c("SiteName","Year","Transect")])
+
+sg$Fl <- as.numeric(sg$Fl)
+sg$Br <- as.numeric(sg$Br)
+str(sg)
+sg$Fl[sg$Fl == 1] <- 0
+sg$Fl[sg$Fl == 2] <- 0
+sg$Fl[sg$Fl == 3] <- 1
+
+sg$Br[sg$Br == 1] <- 0
+sg$Br[sg$Br == 2] <- 0
+sg$Br[sg$Br == 3] <- 1
+
+
+# Rename Sites for Atwell old and new
+atwell <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
+unique(atwell$Year)
+atwell$Site <- "Atwell Gulch"
+
+atwell_old <- sg[intersect(grep("Atwell",sg$Site),which(atwell$Y.coord.m.<30)),]
+unique(atwell_old$Year)
+atwell_old$Site <- "Atwell Gulch (old)"
+
+atwell.all <- rbind(atwell_old, atwell)
+
+atwell_summary <- ddply(subset(atwell.all, Height.cm. > 0), 
+                           .(Site,Year), 
+                    summarise,
+                X = length(Tag),
+                Rep = sum(Fl),
+                Brs = sum(Br),
+                avgH = mean(Height.cm., na.rm = TRUE),
+                sdH = sd(Height.cm., na.rm = TRUE),
+                avgW = mean(Width.cm., na.rm = TRUE),
+                avgVol = mean(Vol, na.rm = TRUE),
+                sdVol = sd(Vol, na.rm = TRUE))
+
+pondoldold <- subset(sg, Site == "Pond (old) (old)")
+table(pondoldold$Transect, pondoldold$Year)
+
+pondold <- subset(sg, Site == "Pond (old)")
+table(pondold$Transect, pondold$Year)
+
+oold <- subset(sg, Site == "Oil Pad (old)")
+ooldold <- subset(sg, Site == "Oil Pad (old) (old)") 
+intersect(oold,ooldold)
+head(oold)
+head(ooldold)
+table(oold$Tag,oold$Year)
+table(ooldold$Tag,ooldold$Year)
+
+#Exclude Atwell
+sgNotatwell <- sg[grep("Atwell", sg$Site, invert=TRUE),]
+table(sgNotatwell$Site,sgNotatwell$Year)
+
+
+# All sites that didn't change in 2012
+sg_summary <- ddply(sg[grep("Atwell", sg$Site, invert=TRUE),],  
+                    .(Site,Year), summarise,
+                    X = length(Tag[Height.cm. > 0]),
+                    Rep = sum(Fl),
+                    Brs = sum(Br),
+                    avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+                    sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+                    avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                    avgVol = mean(Vol),
+                    sdVol = sd(Vol))
+
+head(sg_summary)
+  
+
+sg.all <- rbind(sg_summary, atwell_summary)
+
+ggplot(sg.all, aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~Site)
+
+ggplot(sg_summary[grep("old",sg_summary$Site,invert=TRUE),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~Site)
+
+```
+
 
 
 
