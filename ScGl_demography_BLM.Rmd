@@ -5,9 +5,17 @@ date: "Monday, October 05, 2015"
 output: html_document
 ---
 
+The repository is named "ScGl"   
+Will need: git push ScGl master   
+
+2015: uploaded "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Raw Data/2015 Datasheets/DataEntry2015_10.13.15.csv"
+
+
 ```{r, echo=FALSE}
 library(ggplot2)
 library(plyr)
+library(psych)
+library(devtools)
 ```
 
 Need 2008 data seperate from the MySQL database due to lack of measuring hight and width. Will need to get length tagged individuals for number alive instead of number of individuals with a heigth/width in later years. <https://research.botanicgardens.org/admin/>      
@@ -16,6 +24,8 @@ In 2012 we switched from measuring the height and width indiviudals under 0.5 cm
 
 ```{r}
 scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
+
+head(scgl08)
 
 scgl08_2 <- data.frame(scgl08[,c(1:3)], AverageHeight = as.numeric(NA), AverageWidth = as.numeric(NA),
   		scgl08[,c(4:8)],
@@ -27,59 +37,33 @@ head(scgl08_2)
 names(scgl08_2)
 ```
 
-2015 data
+2008-2015 data
 ### Need to update after upload process fixed
 ```{r}
-sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Excel/2015_ScGl/RawData_scgl2015.csv"))
+rm(sg)
+#sg <- read.csv(path.expand("P:/hackathon/ScGl/2015_ScGl_rawdata_witherrors.csv"))
+#sg <- read.csv(path.expand("P:/hackathon/ScGl/2015_ScGl_rawdata_102915.csv"))
+#sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Excel/2015_ScGl/RawData_scgl_2015_102915.csv"))
+sg <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
 
 head(sg)
 names(sg)
 
+#Remove rows where Site is blank, if any
+if(nrow(sg[-which(sg$Site == ""),])>0){
+  sg <- sg[-which(sg$Site == ""),]
+  }
+
 
 sg$Vol <- pi*(sg$Width.cm.^2)*sg$Height.cm.
-```
 
-
-Why did "(old)" get added to all Oil Pad, T-junction/Road, and Pond sites? 
-```{r}
-table(sg$Site)
-subset(sg,Site=="Oil Pad (old) (old)")
-
-head(subset(sg,Site=="Pond (old) (old)"))
-head(subset(sg,Site=="Road T-West (old) (old)"))
-table(sg$Site,sg$Transect)
-
-sort(unique(sg$Y.coord.m.[grep("Atwell",sg$Site)]))
-
-```
-
-
-
-#Old and New data     
-Atwell Gulch old is everything with a Y less than 30    
-Atwell Gulch new is everything Atwell Gulch    
-```{r}
-
-head(sg[grep("Atwell",sg$Site),])
-
-ag_old <- subset(sg[grep("Atwell",sg$Site),], Y.coord.m. < 30)
-table(ag_old$Site)
-
-ag_new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
-
-
-
-ggplot(ag_old, aes(Year))+
-  geom_histogram()
-
-ggplot(ag_new, aes(Year))+
-  geom_histogram()
+nrow(sg[sg$Year == 2008,])
 ```
 
 
 ##Summarize old and new data by number of individuals    
 Need to split by Site - Atwell Gulch needs to be together:  
-       Atwell Gulch_108 and Atwell Gulch_165 are Atwell Gulch with Ycoord < 30
+       `Atwell Gulch_108` and `Atwell Gulch_165` are Atwell Gulch with Ycoord < 30
        Road T-West (old) vs. T-Junction
        Oil Pad and Oil Pad (old)
        Pond and Pond (old)
@@ -87,10 +71,11 @@ Need to split by Site - Atwell Gulch needs to be together:
 merge datasets   
 2008:      
 ```{r}
-table(scgl08_2$SiteName)
+table(scgl08_2$SiteName)  #summarized number of plants per plot per site
 table(sg$Site)
 
 head(scgl08_2[,c("SiteName","Year","Transect")])
+head(scgl08_2)
 
 sg$Fl <- as.numeric(sg$Fl)
 sg$Br <- as.numeric(sg$Br)
@@ -103,8 +88,37 @@ sg$Br[sg$Br == 1] <- 0
 sg$Br[sg$Br == 2] <- 0
 sg$Br[sg$Br == 3] <- 1
 
+str(sg)
+```
 
+
+#Old and New data     
+Atwell Gulch old is everything with a Y less than 30    
+Atwell Gulch new is everything Atwell Gulch    
+```{r}
+head(sg[grep("Atwell",sg$Site),])
+
+ag_old <- subset(sg[grep("Atwell",sg$Site),], Y.coord.m. < 30)
+table(ag_old$Site)
+
+ag_new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
+
+head(ag_new)
+
+ggplot(ag_old, aes(Year))+
+  geom_histogram()
+
+ggplot(ag_new, aes(Year))+
+  geom_histogram()
+```
+
+```{r}
+# This is repetative from at_old and at_new
 # Rename Sites for Atwell old and new
+
+# Add a level to the Site factor field
+levels(sg$Site) <- c(levels(sg$Site), "Atwell Gulch", "Atwell Gulch (old)")
+
 atwell <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
 unique(atwell$Year)
 atwell$Site <- "Atwell Gulch"
@@ -115,6 +129,7 @@ atwell_old$Site <- "Atwell Gulch (old)"
 
 atwell.all <- rbind(atwell_old, atwell)
 
+# don't want to do this, want to do after combine again with sg so we have old and new Atwell
 atwell_summary <- ddply(subset(atwell.all, Height.cm. > 0), 
                            .(Site,Year), 
                     summarise,
@@ -127,27 +142,32 @@ atwell_summary <- ddply(subset(atwell.all, Height.cm. > 0),
                 avgVol = mean(Vol, na.rm = TRUE),
                 sdVol = sd(Vol, na.rm = TRUE))
 
-pondoldold <- subset(sg, Site == "Pond (old) (old)")
-table(pondoldold$Transect, pondoldold$Year)
+ggplot(atwell_summary, aes(Year,X,colour=Site))+
+  geom_line()
+```
 
-pondold <- subset(sg, Site == "Pond (old)")
-table(pondold$Transect, pondold$Year)
 
-oold <- subset(sg, Site == "Oil Pad (old)")
-ooldold <- subset(sg, Site == "Oil Pad (old) (old)") 
-intersect(oold,ooldold)
-head(oold)
-head(ooldold)
-table(oold$Tag,oold$Year)
-table(ooldold$Tag,ooldold$Year)
+
+2008 is a summary already, need to summarize rest before combining with 2008. 
+```{r}
 
 #Exclude Atwell
 sgNotatwell <- sg[grep("Atwell", sg$Site, invert=TRUE),]
 table(sgNotatwell$Site,sgNotatwell$Year)
+noEast <- sgNotatwell[grep("Road T-East", sgNotatwell$Site, invert=TRUE),]
+table(noEast$Site,noEast$Year)
 
+#bind new and old Atwell to sg
+sg_all <- rbind(noEast,atwell,atwell_old)
+table(sg_all$Site,sg_all$Year)
 
-# All sites that didn't change in 2012
-sg_summary <- ddply(sg[grep("Atwell", sg$Site, invert=TRUE),],  
+str(sg_all)
+sg_all$Vol
+#Reset to factor remaining Sites
+sg_all$Site <- factor(sg_all$Site)
+
+# All sites 
+sg_summary <- ddply(sg_all,  
                     .(Site,Year), summarise,
                     X = length(Tag[Height.cm. > 0]),
                     Rep = sum(Fl),
@@ -155,25 +175,345 @@ sg_summary <- ddply(sg[grep("Atwell", sg$Site, invert=TRUE),],
                     avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
                     sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
                     avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
-                    avgVol = mean(Vol),
-                    sdVol = sd(Vol))
+                    sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                    avgVol = mean(Vol, na.rm = TRUE),
+                    sdVol = sd(Vol, na.rm = TRUE))
 
 head(sg_summary)
-  
-
-sg.all <- rbind(sg_summary, atwell_summary)
-
-ggplot(sg.all, aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  facet_wrap(~Site)
-
-ggplot(sg_summary[grep("old",sg_summary$Site,invert=TRUE),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  facet_wrap(~Site)
+table(sg_summary$Site,sg_summary$Year)
+#Missing half of Pond data, need to remove for 2015
+sg_sum <- sg_summary[-which(grepl("Pond", sg_summary$Site)&sg_summary$Year == 2015) ,]
 
 ```
+
+```{r}
+ggplot(sg_sum, aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()
+
+ggplot(sg_sum, aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~Site)+
+  ylab("Total individuals")
+
+# All the new ones
+ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~Site)+
+  ylab("Total individuals")
+
+ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals")
+
+# All the old ones
+ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  facet_grid(~Site)+
+  ylab("Total individuals")
+
+ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals")
+
+```
+
+#### Need to update once data export is fixed!!    
+Report Tables_2015
+Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008 – 2015).
+```{r}
+#save into excel sheet
+sg_sum[sg_sum$Year == 2015,]
+
+
+
+```
+
+
+Climate data from PRISM <http://prism.oregonstate.edu/explorer/>
+
+```{r}
+at.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Atwell_PRISM_2015.csv"),skip=6)
+br.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Bridgeport_PRISM_2015.csv"),skip=6)
+es.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Escalante_PRISM_2015.csv"),skip=6)
+op.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/OilPad_PRISM_2015.csv"),skip=6)
+pic.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Picnic_PRISM_2015.csv"),skip=6)
+power.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Powerline_PRISM_2015.csv"),skip=6)
+pr.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/PyramidRock_PRISM_2015.csv"),skip=6)
+tj.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/TJunction_PRISM_2015.csv"),skip=6)
+
+at.cli<-data.frame(Site="Atwell Gulch",at.cli)
+br.cli<-data.frame(Site="Bridgeport",br.cli)
+es.cli<-data.frame(Site="Escalante Canyon",es.cli)
+op.cli<-data.frame(Site="Oil Pad",op.cli)
+pic.cli<-data.frame(Site="Picnic Site",pic.cli)
+power.cli<-data.frame(Site="Powerline",power.cli)
+pr.cli<-data.frame(Site="Pyramid Rock",pr.cli)
+tj.cli<-data.frame(Site="T-Junction",tj.cli)
+
+scgl.climate <- rbind(at.cli,br.cli,es.cli,op.cli,pic.cli,power.cli,pr.cli,tj.cli)
+scgl.climate$Year <- substr(scgl.climate$Date,1,4)
+scgl.climate$Month <- substr(scgl.climate$Date,6,7)
+
+scgl.c <- scgl.climate[,c(1,3,5,7:9)]
+names(scgl.c) <- c("Site","Precip","tmin","tmax","Year","Month")
+```
+
+####Summarize climate data
+Climate of the previous 12 month to the May data collection
+```{r}
+scgl.c$Month <- as.numeric(scgl.c$Month)
+scgl.c$Year <- as.numeric(scgl.c$Year)
+
+#Months after data collection to be assigned to next year
+#Add a column to assign the year from May to the previous 12 months: Jun:May
+scgl.c$Prev12 <-scgl.c$Year
+#Months June through December go to the next year
+scgl.c[scgl.c$Month > 5,"Prev12"] <- scgl.c[scgl.c$Month > 5,"Year"]+1
+ 
+scgl.c[scgl.c$Prev12 >2014,]
+```
+
+###PCA for climate factors
+
+calculate seasonal climate averages    
+summer: June-August (6-8)
+fall: September-November (9-11)
+winter: December-February (12, 1-2)
+spring: March-May (3-5)
+```{r}
+scgl.c$season <- "winter"
+scgl.c[scgl.c$Month>5 & scgl.c$Month<9, "season"] <- "summer"
+scgl.c[scgl.c$Month>8 & scgl.c$Month<12, "season"] <- "fall"
+scgl.c[scgl.c$Month>2 & scgl.c$Month<6, "season"] <- "spring"
+
+scgl.c.summary <- aggregate(scgl.c[,2:4], scgl.c[,c("Site","Prev12","season")],
+                            FUN = function(x) mean(x, na.rm = TRUE))
+
+season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<2016,],
+                  idvar = c("Site","Prev12"),
+                  timevar = "season",
+                  direction = "wide")
+
+
+
+```
+
+
+summarySE function borrowed from http://www.cookbook-r.com/Manipulating_data/Summarizing_data/
+```{r}
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+    library(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        c(N    = length2(xx[[col]], na.rm=na.rm),
+          mean = mean   (xx[[col]], na.rm=na.rm),
+          sd   = sd     (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+
+    return(datac)
+}
+```
+
+summary statistics
+```{r}
+scgl_sumSE <- lapply(names(scgl.c[,c("Precip","tmin", "tmax")]), 
+                     function(x){
+                       summarySE(scgl.c, measurevar=x, groupvars=c("Site","Prev12"))
+                       }) 
+
+head(scgl_sumSE[[1]])
+str(scgl_sumSE[[1]])
+names(scgl_sumSE[[1]])
+scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000,]
+```
+
+Precipitation per site
+```{r}
+ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
+                         scgl_sumSE[[1]]$Prev12<2016,],
+       aes(Prev12, Precip, colour=Site))+
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
+  geom_errorbar(aes(ymin=Precip-se, ymax=Precip+se),width=1, position = position_dodge(0.1)) +
+  theme_bw() +
+  ylab("Average precipitation per site") 
+
+```
+
+Minimum temperature per site (Celcius)
+```{r}
+ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
+                         scgl_sumSE[[2]]$Prev12<2016,],
+       aes(Prev12, tmin, colour=Site))+
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
+  geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
+  theme_bw() +
+  ylab("Average minimum temperature per site") 
+
+```
+
+Maximum temperature per site (C)
+```{r}
+ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
+                         scgl_sumSE[[3]]$Prev12<2016,],
+       aes(Prev12, tmax, colour=Site))+
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
+  geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
+  theme_bw() +
+  ylab("Average maximum temperature per site") 
+
+```
+
+```{r}
+head(season)
+tail(season)
+names(season)
+
+nrow(season)
+cc.season <- season[complete.cases(season),]
+str(cc.season)
+nrow(cc.season)
+unique(sort(cc.season$Prev12)) #1986:2015
+
+cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
+                        grep("Month", names(cc.season)))]), numbers = TRUE)
+```
+
+Ditch anything 50% or more correlated 
+  keep  Precip.fall   Remove: tmax.fall(-0.65)
+        tmax.fall             tmin.summer(0.56)
+        Precip.spring         tmax.spring(-0.53)
+        tmin.spring
+        Precip.summer         tmax.summer(-0.56)
+        Precip.winter         
+        tmin.winter
+        tmax.winter
+        
+```{r}
+tomatch <- c("tmax.fall","Year","Month","Site","Prev12",
+             "tmin.summer","tmax.spring","tmax.summer")
+
+names(cc.season[,c(grep(paste(tomatch,collapse="|"),
+                        names(cc.season), value=TRUE, invert = TRUE))])
+
+forpca <- cc.season[,c(grep(paste(tomatch,collapse="|"),
+                            names(cc.season), value=TRUE, invert = TRUE))]
+
+scgl.pca <- princomp(forpca,cor=TRUE)
+summary(scgl.pca)
+scgl.load <- loadings(scgl.pca)
+scgl.pc <- predict(scgl.pca)
+
+source_url("https://raw.github.com/JoFrhwld/FAAV/master/r/stat-ellipse.R")
+
+sg.pc <- data.frame(scgl.pc,cc.season)
+
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() +
+  theme(legend.justification=c(0,1), legend.position=c(0,1))
+
+```
+
+Try for only the study period
+
+```{r}
+recent <- season[season$Prev12 > 2007 & season$Prev12 < 2016,]
+cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
+                        grep("Month", names(recent)))]), numbers = TRUE)
+
+```
+
+#### 2008-2015
+Ditch anything 50% or more correlated 
+Keep Precip.fall and  Remove: tmax.fall(-0.60) 
+                              Precip.summer(0.51)
+     tmin.fall
+     Precip.spring            tmax.spring(-0.56)
+     tmin.spring              Precip.winter(-0.70)
+     tmin.summer              
+     tmax.summer
+     tmax.winter              Precip.winter(-0.66)
+
+```{r}
+
+tomatch <- c("tmax.fall","Year","Month","Site","Prev12",
+             "Precip.summer","tmax.spring","Precip.winter")
+
+forpca <- recent[,c(grep(paste(tomatch,collapse="|"),
+                            names(recent), value=TRUE, invert = TRUE))]
+
+scgl.pca <- princomp(forpca,cor=TRUE)
+summary(scgl.pca)
+scgl.load <- loadings(scgl.pca)
+scgl.pc <- predict(scgl.pca)
+
+sg.pc <- data.frame(scgl.pc,recent)
+
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() +
+  theme(legend.justification=c(1,1), legend.position=c(1,1))
+
+```
+
+
+
+Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
+
+```{r}
+
+as.data.frame(as.table(cor(recent[,-c(1:2,grep("Year", names(recent)),
+                        grep("Month", names(recent)))])))
+
+
+```
+
+Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
+
+```{r}
+
+```
+
+
+
+
+
+
 
 
 
