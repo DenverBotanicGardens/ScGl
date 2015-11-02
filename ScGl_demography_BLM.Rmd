@@ -49,6 +49,8 @@ sg <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
 head(sg)
 names(sg)
 
+table(sg$Site,sg$Year) #Are all the data lacking site information from Road T-East?
+
 #Remove rows where Site is blank, if any
 if(nrow(sg[-which(sg$Site == ""),])>0){
   sg <- sg[-which(sg$Site == ""),]
@@ -221,6 +223,51 @@ ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
   geom_line()+
   ylab("Total individuals")
 
+# old and new
+oldnew <- c("Oil","Pond","T-","Atwell")
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals")  
+
+#Pond
+oldnew <- c("Pond")
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals") 
+
+# Is T-Junction missing some - should be finding more individuals
+#T-Junction
+oldnew <- c("T-")
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals")
+
+#Oil Pad
+oldnew <- c("Oil")
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals")
+
+#Atwell
+oldnew <- c("Atwell")
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals")
 ```
 
 #### Need to update once data export is fixed!!    
@@ -241,6 +288,7 @@ Climate data from PRISM <http://prism.oregonstate.edu/explorer/>
 at.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Atwell_PRISM_2015.csv"),skip=6)
 br.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Bridgeport_PRISM_2015.csv"),skip=6)
 es.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Escalante_PRISM_2015.csv"),skip=6)
+fr.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Fram_PRISM_2015.csv"),skip=6)
 op.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/OilPad_PRISM_2015.csv"),skip=6)
 pic.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Picnic_PRISM_2015.csv"),skip=6)
 power.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Powerline_PRISM_2015.csv"),skip=6)
@@ -250,13 +298,14 @@ tj.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus S
 at.cli<-data.frame(Site="Atwell Gulch",at.cli)
 br.cli<-data.frame(Site="Bridgeport",br.cli)
 es.cli<-data.frame(Site="Escalante Canyon",es.cli)
+fr.cli<-data.frame(Site="Fram",fr.cli)
 op.cli<-data.frame(Site="Oil Pad",op.cli)
 pic.cli<-data.frame(Site="Picnic Site",pic.cli)
 power.cli<-data.frame(Site="Powerline",power.cli)
 pr.cli<-data.frame(Site="Pyramid Rock",pr.cli)
 tj.cli<-data.frame(Site="T-Junction",tj.cli)
 
-scgl.climate <- rbind(at.cli,br.cli,es.cli,op.cli,pic.cli,power.cli,pr.cli,tj.cli)
+scgl.climate <- rbind(at.cli,br.cli,es.cli,fr.cli,op.cli,pic.cli,power.cli,pr.cli,tj.cli)
 scgl.climate$Year <- substr(scgl.climate$Date,1,4)
 scgl.climate$Month <- substr(scgl.climate$Date,6,7)
 
@@ -396,6 +445,8 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
 
 ```
 
+Take out missing data, Years 1986 through 2015 as previous 12 years to the May survey
+
 ```{r}
 head(season)
 tail(season)
@@ -412,18 +463,17 @@ cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
 ```
 
 Ditch anything 50% or more correlated 
-  keep  Precip.fall   Remove: tmax.fall(-0.65)
-        tmax.fall             tmin.summer(0.56)
+  keep  Precip.fall   Remove: tmax.fall(-0.64)
+        tmin.fall             tmin.spring(0.56)
+                              tmin.summer(0.56)
         Precip.spring         tmax.spring(-0.53)
-        tmin.spring
-        Precip.summer         tmax.summer(-0.56)
+        Precip.summer         tmax.summer(-0.58)
         Precip.winter         
-        tmin.winter
-        tmax.winter
+        tmin.winter           tmax.winter(0.8)
         
 ```{r}
-tomatch <- c("tmax.fall","Year","Month","Site","Prev12",
-             "tmin.summer","tmax.spring","tmax.summer")
+tomatch <- c("tmax","Year","Month","Site","Prev12",
+             "tmin.summer","tmin.spring")
 
 names(cc.season[,c(grep(paste(tomatch,collapse="|"),
                         names(cc.season), value=TRUE, invert = TRUE))])
@@ -439,6 +489,13 @@ scgl.pc <- predict(scgl.pca)
 source_url("https://raw.github.com/JoFrhwld/FAAV/master/r/stat-ellipse.R")
 
 sg.pc <- data.frame(scgl.pc,cc.season)
+# Assign genetic regions
+sg.pc$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     sg.pc$Site,
+                                     value=TRUE))] <- "South"
+
 
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
@@ -447,6 +504,19 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   theme(legend.justification=c(0,1), legend.position=c(0,1))
 
 ```
+
+Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings of summer and spring temperatures and Summer Palmer Z Index grouped by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+```{r}
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() +
+  theme(legend.justification=c(0,1), legend.position=c(0,1))
+
+
+```
+
+
 
 Try for only the study period
 
@@ -501,11 +571,49 @@ as.data.frame(as.table(cor(recent[,-c(1:2,grep("Year", names(recent)),
                         grep("Month", names(recent)))])))
 
 
+cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
+                        grep("Month", names(recent)))])
+data <- as.data.frame(as.table(cor.table))
+combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
+cor.data <- data[data$Var1 != data$Var2,]
+data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
 ```
 
 Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
 
 ```{r}
+# total area from table 2
+
+unique(sg_sum$Site)
+sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
+sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
+sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
+sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
+sg_sum$area[sg_sum$Site == "Fram"] <- 1300
+sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
+sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120
+sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
+sg_sum$area[sg_sum$Site == "Pond"] <- 36
+sg_sum$area[sg_sum$Site == "Pond (old)"] <- 235.6
+sg_sum$area[sg_sum$Site == "Powerline"] <- 40
+sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
+sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
+sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
+
+sg_sum$SiteSame <- sg_sum$Site
+sg_sum$SiteSame[sg_sum$Site%in%unique ]
+require(scales)
+
+ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~NS + SiteSame, ncol = 5) +
+  ylab("Individuals per square meter") +
+  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
+        panel.background = element_blank()) +
+  scale_x_continuous(breaks=pretty_breaks(n=7))
+
+
 
 ```
 
