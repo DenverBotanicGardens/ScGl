@@ -16,6 +16,7 @@ library(ggplot2)
 library(plyr)
 library(psych)
 library(devtools)
+library(multcompView)
 ```
 
 Need 2008 data seperate from the MySQL database due to lack of measuring hight and width. Will need to get length tagged individuals for number alive instead of number of individuals with a heigth/width in later years. <https://research.botanicgardens.org/admin/>      
@@ -292,6 +293,7 @@ fr.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus S
 op.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/OilPad_PRISM_2015.csv"),skip=6)
 pic.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Picnic_PRISM_2015.csv"),skip=6)
 power.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Powerline_PRISM_2015.csv"),skip=6)
+pond.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Pond_PRISM_2015.csv"),skip=6)
 pr.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/PyramidRock_PRISM_2015.csv"),skip=6)
 tj.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/TJunction_PRISM_2015.csv"),skip=6)
 
@@ -302,10 +304,11 @@ fr.cli<-data.frame(Site="Fram",fr.cli)
 op.cli<-data.frame(Site="Oil Pad",op.cli)
 pic.cli<-data.frame(Site="Picnic Site",pic.cli)
 power.cli<-data.frame(Site="Powerline",power.cli)
+pond.cli<-data.frame(Site="Pond",pond.cli)
 pr.cli<-data.frame(Site="Pyramid Rock",pr.cli)
 tj.cli<-data.frame(Site="T-Junction",tj.cli)
 
-scgl.climate <- rbind(at.cli,br.cli,es.cli,fr.cli,op.cli,pic.cli,power.cli,pr.cli,tj.cli)
+scgl.climate <- rbind(at.cli,br.cli,es.cli,fr.cli,op.cli,pic.cli,power.cli,pond.cli,pr.cli,tj.cli)
 scgl.climate$Year <- substr(scgl.climate$Date,1,4)
 scgl.climate$Month <- substr(scgl.climate$Date,6,7)
 
@@ -505,7 +508,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
 
 ```
 
-Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings of summer and spring temperatures and Summer Palmer Z Index grouped by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+#### Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings of summer and spring temperatures and Summer Palmer Z Index grouped by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
@@ -529,19 +532,26 @@ cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
 
 #### 2008-2015
 Ditch anything 50% or more correlated 
-Keep Precip.fall and  Remove: tmax.fall(-0.60) 
-                              Precip.summer(0.51)
-     tmin.fall
-     Precip.spring            tmax.spring(-0.56)
+Keep Precip.fall and  Remove: tmax.fall(-0.62) 
+                              Precip.summer(0.53)
+     tmin.fall                tmin.spring(0.56)
+                              tmin.summer(0.87)
+     Precip.spring            tmax.spring(-0.55)
      tmin.spring              Precip.winter(-0.70)
      tmin.summer              
      tmax.summer
      tmax.winter              Precip.winter(-0.66)
 
 ```{r}
+cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
+                        grep("Month", names(recent)))])
+data <- as.data.frame(as.table(cor.table))
+combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
+cor.data <- data[data$Var1 != data$Var2,]
+data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
+exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
 
-tomatch <- c("tmax.fall","Year","Month","Site","Prev12",
-             "Precip.summer","tmax.spring","Precip.winter")
+tomatch <- c("Year","Month","Site","Prev12",exclude)
 
 forpca <- recent[,c(grep(paste(tomatch,collapse="|"),
                             names(recent), value=TRUE, invert = TRUE))]
@@ -556,14 +566,33 @@ sg.pc <- data.frame(scgl.pc,recent)
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
   stat_ellipse() +
-  theme_bw() +
-  theme(legend.justification=c(1,1), legend.position=c(1,1))
+  theme_bw() 
 
+
+```
+
+Figure 3 c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+
+```{r}
+#doesn't like "-" in the name
+levels(sg.pc$Site)[levels(sg.pc$Site) == 'T-Junction'] <- 'TJunction'
+sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc))
+lasign <- multcompLetters(extract_p(sg.thsd$Site))
+
+SiteLetters <- data.frame(Letter = lasign$Letters,
+                          Site = rownames(data.frame(lasign$Letters)))
+
+ggplot(sg.pc, aes(Site, Comp.1))+
+  geom_boxplot()+
+  annotate("text",x=1:10, y = 8,
+           label = SiteLetters$Letter[order(SiteLetters$Site)])
 ```
 
 
 
-Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
+
+
+#### Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
 
 ```{r}
 
@@ -579,9 +608,14 @@ cor.data <- data[data$Var1 != data$Var2,]
 data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
 ```
 
-Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
+#### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
 
 ```{r}
+sg_sum[sg_sum$Site == "",]
+sg_sum <- sg_sum[sg_sum$Site != "",]
+#reset levels to not include blank
+sg_sum$Site <- factor(sg_sum$Site)
+
 # total area from table 2
 
 unique(sg_sum$Site)
@@ -601,7 +635,31 @@ sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
 sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
 
 sg_sum$SiteSame <- sg_sum$Site
-sg_sum$SiteSame[sg_sum$Site%in%unique ]
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Atwell",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Atwell Gulch"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Pond",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Pond"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Oil",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Oil Pad"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("T-",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "T-Junction"
+
+table(sg_sum$Site,sg_sum$SiteSame)
+
+# Assign genetic regions
+sg_sum$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     sg_sum$Site,
+                                     value=TRUE))] <- "South"
+
 require(scales)
 
 ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
@@ -616,6 +674,22 @@ ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
 
 
 ```
+
+
+### Figure 2b
+```{r}
+ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
+  geom_line()+
+  geom_point()+
+  facet_wrap(~NS + SiteSame, ncol =5)+
+  ylab("Average volume")+
+  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
+        panel.background = element_blank()) +
+  scale_x_continuous(breaks=pretty_breaks(n=7))
+
+
+```
+
 
 
 
