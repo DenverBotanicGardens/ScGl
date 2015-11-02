@@ -475,8 +475,15 @@ Ditch anything 50% or more correlated
         tmin.winter           tmax.winter(0.8)
         
 ```{r}
-tomatch <- c("tmax","Year","Month","Site","Prev12",
-             "tmin.summer","tmin.spring")
+cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
+                        grep("Month", names(cc.season)))])
+data <- as.data.frame(as.table(cor.table))
+combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
+cor.data <- data[data$Var1 != data$Var2,]
+data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
+exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
+
+tomatch <- c("Year","Month","Site","Prev12",exclude)
 
 names(cc.season[,c(grep(paste(tomatch,collapse="|"),
                         names(cc.season), value=TRUE, invert = TRUE))])
@@ -503,10 +510,37 @@ sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
   stat_ellipse() +
-  theme_bw() +
-  theme(legend.justification=c(0,1), legend.position=c(0,1))
+  theme_bw() 
+
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() 
+```
+
+# Use all years of data for all plots comparison?
+The letters won't line up with the sites unless specified
+```{r}
+#doesn't like "-" in the name
+levels(sg.pc$Site)[levels(sg.pc$Site) == 'T-Junction'] <- 'TJunction'
+sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc))
+lasign <- multcompLetters(extract_p(sg.thsd$Site))
+
+SiteLetters <- data.frame(Letter = lasign$Letters,
+                          Site = rownames(data.frame(lasign$Letters)))
+
+
+ggplot(sg.pc, aes(Site, Comp.1))+
+  geom_boxplot()+
+  annotate("text",x=1:10, y = 4,
+           label = SiteLetters$Letter[c(10,1:9)])
+
+t.test(Comp.1~NS, data=sg.pc)
 
 ```
+
+
+
 
 #### Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings of summer and spring temperatures and Summer Palmer Z Index grouped by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 ```{r}
@@ -519,7 +553,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
 
 ```
 
-
+# PCA 2008-2015
 
 Try for only the study period
 
@@ -562,6 +596,12 @@ scgl.load <- loadings(scgl.pca)
 scgl.pc <- predict(scgl.pca)
 
 sg.pc <- data.frame(scgl.pc,recent)
+# Assign genetic regions
+sg.pc$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     sg.pc$Site,
+                                     value=TRUE))] <- "South"
 
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
@@ -569,23 +609,31 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   theme_bw() 
 
 
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() 
+
+
 ```
 
-Figure 3 c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+Figure 3 f) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 
 ```{r}
 #doesn't like "-" in the name
 levels(sg.pc$Site)[levels(sg.pc$Site) == 'T-Junction'] <- 'TJunction'
-sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc))
+sg.thsd <- TukeyHSD(aov(Comp.2~Site, data=sg.pc))
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
 
-SiteLetters <- data.frame(Letter = lasign$Letters,
-                          Site = rownames(data.frame(lasign$Letters)))
 
-ggplot(sg.pc, aes(Site, Comp.1))+
+SiteLetters <- data.frame(Letter = lasign$Letters[],
+                          Site = rownames(data.frame(lasign$Letters)))
+Siteletters <- SiteLetters[order(SiteLetters$Site),]
+
+ggplot(sg.pc, aes(Site, Comp.2))+
   geom_boxplot()+
-  annotate("text",x=1:10, y = 8,
-           label = SiteLetters$Letter[order(SiteLetters$Site)])
+  annotate("text",x=1:10, y = 3,
+           label = SiteLetters$Letter[c(10,1:9)])
 ```
 
 
@@ -690,10 +738,124 @@ ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
 
 ```
 
+average volume, height, and width explains reproductive status
+```{r}
+sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
+summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
+
+
+summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
+
+
+summary(lm(Prepro~avgVol, data=sg_sum))
+summary(lm(Prepro~avgW, data=sg_sum))
+summary(lm(Prepro~avgH, data=sg_sum))
+
+```
+
+
+## Figure 4: Growth relationships between years for width (top) and height (bottom) for Sclerocactus glaucus individuals within demographic monitoring sites.    
+6 rows of Road T-West that don't have a tag number, one row for Road T-East
+
+```{r}
+head(sg)
+sg <- sg[!is.na(sg$Tag),]
+
+sg.xy <- subset(merge(sg[,c(2:5,10:11)], sg[,c(2:5,10:11)], by=c("Site","Transect","Tag"),
+                      sort=FALSE), Year.x == Year.y+1)
+head(sg.xy)
+sg.xy[is.na(sg.xy$Tag),]
+
+ggplot(sg.xy, aes(colour = Site))+
+  stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
+  ylab(expression("Height year"[y]))+
+  xlab(expression("Height year"[y-1]))+
+  theme_bw()
+
+
+ggplot(sg.xy, aes(colour = Site))+
+  stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
+  ylab(expression("Width year"[y]))+
+  xlab(expression("Width year"[y-1]))+
+  theme_bw()
+
+
+summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
+summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy))
+
+```
+
+
+####Figure 6:   
+
+```{r}
+# old and new
+oldnew <- c("Oil","Pond","T-","Atwell")
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals") +
+  facet_wrap(~SiteSame)+
+  theme_bw()
+
+```
+
+
+### statistics
+count pva
+
+test lapply below
+```{r}
+x<-sg_sum$Year[sg_sum$Site == "Atwell Gulch"]
+y<-sg_sum$X[sg_sum$Site == "Atwell Gulch"]
+
+rm(x)
+rm(y)
+```
+
+
+```{r}
+CountPVA <- function(x,y){
+  
+  LM.table <- c()
+  
+  for(yrs in 3:length(unique(x))){		# gives 2 transitions before the first Count PVA calculation
+		rsq <- c(); PVA.lm <- list()
+  
+    y.count <- y[1:yrs] #Annual count for site
+    x.years <- x[1:yrs] #Years of counts (can have missing years)
+    ySpecies <- log10(y.count[-1]/y.count[-length(y.count)])
+    yr <- sqrt(x.years[-1]-x.years[-length(x.years)])
+    
+		PVA.lm <- lm(ySpecies ~ -1 + yr)
+		mu_sp <- predict(PVA.lm, level= 0.95,
+		                 interval = "confidence",
+		                 se.fit = T)$fit[1,]
+    rsq <- c(rsq, R2 = summary(PVA.lm)$adj.r.squared)	# pull R squared values from each year interval 
+    LM.table <- rbind(LM.table,data.frame(rsq,RangeStart=min(x),RangeEnd=x[yrs],t(mu_sp)))    
+	}
+	Year1 <- x.years[-length(x.years)]
+	Year2 <- x.years[-1]
+	PVA.table <-data.frame(yr,ySpecies,Year1,Year2)
+  
+  list(PVA = PVA.table,LM = LM.table)
+}
+
+```
+
+#Why is rsq Nan??
+rename the list items with sites
+
+```{r}
+all.count <- lapply(unique(sg_sum$Site), function(x){
+  CountPVA(sg_sum$Year[sg_sum$Site == x],sg_sum$X[sg_sum$Site == x])
+  })
 
 
 
-
+```
 
 
 
