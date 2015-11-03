@@ -166,7 +166,6 @@ sg_all <- rbind(noEast,atwell,atwell_old)
 table(sg_all$Site,sg_all$Year)
 
 str(sg_all)
-sg_all$Vol
 #Reset to factor remaining Sites
 sg_all$Site <- factor(sg_all$Site)
 
@@ -756,38 +755,6 @@ summary(lm(Prepro~avgH, data=sg_sum))
 ```
 
 
-## Figure 4: Growth relationships between years for width (top) and height (bottom) for Sclerocactus glaucus individuals within demographic monitoring sites.    
-6 rows of Road T-West that don't have a tag number, one row for Road T-East
-
-```{r}
-head(sg)
-sg <- sg[!is.na(sg$Tag),]
-
-sg.xy <- subset(merge(sg[,c(2:5,10:11)], sg[,c(2:5,10:11)], by=c("Site","Transect","Tag"),
-                      sort=FALSE), Year.x == Year.y+1)
-head(sg.xy)
-sg.xy[is.na(sg.xy$Tag),]
-
-ggplot(sg.xy, aes(colour = Site))+
-  stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
-  ylab(expression("Height year"[y]))+
-  xlab(expression("Height year"[y-1]))+
-  theme_bw()
-
-
-ggplot(sg.xy, aes(colour = Site))+
-  stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
-  ylab(expression("Width year"[y]))+
-  xlab(expression("Width year"[y-1]))+
-  theme_bw()
-
-
-summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
-summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy))
-
-```
-
-
 ####Figure 6:   
 
 ```{r}
@@ -887,9 +854,68 @@ plot.2015 <- melt(fit.2015,
 ### Reproduction
 ```{r}
 
+sum15 <- sg_sum[sg_sum$Year == 2015,]
+sum(sum15$Rep)/sum(sum15$X)
+
+mean(sg_sum$Prepro)
+sd(sg_sum$Prepro)`
+data.frame(as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN =mean)),
+           as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN = sd)))
 
 ```
 
+
+Plant size
+
+## Figure 4: Growth relationships between years for width (top) and height (bottom) for Sclerocactus glaucus individuals within demographic monitoring sites.    
+6 rows of Road T-West that don't have a tag number, one row for Road T-East
+
+```{r}
+head(sg)
+sg <- sg[!is.na(sg$Tag),]
+
+sg.xy <- subset(merge(sg[,c(2:5,10:11)], sg[,c(2:5,10:11)], by=c("Site","Transect","Tag"),
+                      sort=FALSE), Year.x == Year.y+1)
+head(sg.xy)
+sg.xy[is.na(sg.xy$Tag),]
+
+ggplot(sg.xy, aes(colour = Site))+
+  stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
+  ylab(expression("Height year"[y]))+
+  xlab(expression("Height year"[y-1]))+
+  theme_bw()
+
+
+ggplot(sg.xy, aes(colour = Site))+
+  stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
+  ylab(expression("Width year"[y]))+
+  xlab(expression("Width year"[y-1]))+
+  theme_bw()
+
+
+summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
+summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy))
+
+# Too many errors, use linear model to get change in size
+sg.xy$ChangeH <- sg.xy$Height.cm..x-sg.xy$Height.cm..y
+sg.xy$ChangeW <- sg.xy$Width.cm..x-sg.xy$Width.cm..y
+
+mean(sg.xy$ChangeH[abs(sg.xy$ChangeH) < 3], na.rm=TRUE) #No way something lost 11cm or 21cm! that's an error
+sd(sg.xy$Height.cm..x-sg.xy$Height.cm..y, na.rm=TRUE)
+
+mean(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
+sd(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
+
+```
+
+
+
+```{r}
+
+
+
+
+```
 
 
 
