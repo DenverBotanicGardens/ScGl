@@ -17,6 +17,7 @@ library(plyr)
 library(psych)
 library(devtools)
 library(multcompView)
+library(reshape2)
 ```
 
 Need 2008 data seperate from the MySQL database due to lack of measuring hight and width. Will need to get length tagged individuals for number alive instead of number of individuals with a heigth/width in later years. <https://research.botanicgardens.org/admin/>      
@@ -614,6 +615,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   stat_ellipse() +
   theme_bw() 
 
+t.test(Comp.1~NS, data=sg.pc)
 
 ```
 
@@ -845,14 +847,45 @@ CountPVA <- function(x,y){
 
 ```
 
-#Why is rsq Nan??
-rename the list items with sites
+#PVA count based
 
 ```{r}
 all.count <- lapply(unique(sg_sum$Site), function(x){
   CountPVA(sg_sum$Year[sg_sum$Site == x],sg_sum$X[sg_sum$Site == x])
   })
 
+names(all.count) <- unique(sg_sum$Site)
+
+all.count
+```
+
+#### Demography   
+
+```{r}
+# average fit for current year over all sites
+last.fit <- sapply(all.count, function(x){
+  x$LM[nrow(x$LM),]
+})
+
+tlast.fit <- data.frame(t(last.fit))
+apply(tlast.fit[tlast.fit$RangeEnd == 2015,4:6], 2, 
+      FUN = function(x) mean(exp(as.numeric(x)), na.rm=TRUE)) #arithmetic mean
+
+fit.2015 <- tlast.fit[tlast.fit$RangeEnd == 2015,]
+
+fit.2015 <- transform(fit.2015, fit = exp(as.numeric(fit)), 
+                      lwr = exp(as.numeric(lwr)), 
+                      upr = exp(as.numeric(upr)))
+fit.2015 <- data.frame(Site = rownames(fit.2015), fit.2015)
+plot.2015 <- melt(fit.2015,
+                  id.vars = "Site",
+                  measure.vars = c("fit","upr","lwr"))
+
+```
+
+
+### Reproduction
+```{r}
 
 
 ```
