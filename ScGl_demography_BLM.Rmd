@@ -39,27 +39,32 @@ head(scgl08_2)
 names(scgl08_2)
 ```
 
-2008-2015 data
+2008-2016 data
 ### Need to update after upload process fixed
 ```{r}
 rm(sg)
 #sg <- read.csv(path.expand("P:/hackathon/ScGl/2015_ScGl_rawdata_witherrors.csv"))
 #sg <- read.csv(path.expand("P:/hackathon/ScGl/2015_ScGl_rawdata_102915.csv"))
 #sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Excel/2015_ScGl/RawData_scgl_2015_102915.csv"))
-sg <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
+# 2015
+sg15 <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
+names(sg15)
 
-head(sg)
+#2016
+# Need to strip white space and conform to 2015 data
+sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_2016.csv"))
 names(sg)
 
-table(sg$Site,sg$Year) #Are all the data lacking site information from Road T-East?
+table(sg$Site,sg$Year) 
 
 #Remove rows where Site is blank, if any
+sg[which(sg$Site == ""),]
 if(nrow(sg[-which(sg$Site == ""),])>0){
   sg <- sg[-which(sg$Site == ""),]
   }
 
-
-sg$Vol <- pi*(sg$Width.cm.^2)*sg$Height.cm.
+# Vol calculated at pi*r^2*h
+sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
 
 nrow(sg[sg$Year == 2008,])
 ```
@@ -76,21 +81,25 @@ merge datasets
 2008:      
 ```{r}
 table(scgl08_2$SiteName)  #summarized number of plants per plot per site
+sg$Site <- droplevels(sg$Site)
 table(sg$Site)
+
 
 head(scgl08_2[,c("SiteName","Year","Transect")])
 head(scgl08_2)
 
+
+sg$Fl <- as.character(sg$Fl)
+sg$Br <- as.character(sg$Br)
+
+sg$Fl[sg$Fl == "n"] <- "0"
+sg$Fl[sg$Fl == "y"] <- "1"
+
+sg$Br[sg$Br == "n"] <- "0"
+sg$Br[sg$Br == "y"] <- "1"
+
 sg$Fl <- as.numeric(sg$Fl)
 sg$Br <- as.numeric(sg$Br)
-str(sg)
-sg$Fl[sg$Fl == 1] <- 0
-sg$Fl[sg$Fl == 2] <- 0
-sg$Fl[sg$Fl == 3] <- 1
-
-sg$Br[sg$Br == 1] <- 0
-sg$Br[sg$Br == 2] <- 0
-sg$Br[sg$Br == 3] <- 1
 
 str(sg)
 ```
@@ -99,29 +108,10 @@ str(sg)
 #Old and New data     
 Atwell Gulch old is everything with a Y less than 30    
 Atwell Gulch new is everything Atwell Gulch    
+Rename Sites for Atwell old and new
 ```{r}
-head(sg[grep("Atwell",sg$Site),])
-
-ag_old <- subset(sg[grep("Atwell",sg$Site),], Y.coord.m. < 30)
-table(ag_old$Site)
-
-ag_new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
-
-head(ag_new)
-
-ggplot(ag_old, aes(Year))+
-  geom_histogram()
-
-ggplot(ag_new, aes(Year))+
-  geom_histogram()
-```
-
-```{r}
-# This is repetative from at_old and at_new
-# Rename Sites for Atwell old and new
-
 # Add a level to the Site factor field
-levels(sg$Site) <- c(levels(sg$Site), "Atwell Gulch", "Atwell Gulch (old)")
+levels(sg$Site) <- c("Atwell Gulch", "Atwell Gulch (old)",levels(sg$Site))
 
 atwell <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
 unique(atwell$Year)
@@ -132,42 +122,46 @@ unique(atwell_old$Year)
 atwell_old$Site <- "Atwell Gulch (old)"
 
 atwell.all <- rbind(atwell_old, atwell)
+```
 
-# don't want to do this, want to do after combine again with sg so we have old and new Atwell
-atwell_summary <- ddply(subset(atwell.all, Height.cm. > 0), 
-                           .(Site,Year), 
-                    summarise,
-                X = length(Tag),
-                Rep = sum(Fl),
-                Brs = sum(Br),
-                avgH = mean(Height.cm., na.rm = TRUE),
-                sdH = sd(Height.cm., na.rm = TRUE),
-                avgW = mean(Width.cm., na.rm = TRUE),
-                avgVol = mean(Vol, na.rm = TRUE),
-                sdVol = sd(Vol, na.rm = TRUE))
+#2016 on    
+No more "Old" versions. Need to remove these data - tags that were in both versions are still reported. 
+Stop Pond old in 2015
+Keep Atwell old and new
+Fram no data in 2015
+```{r}
 
-ggplot(atwell_summary, aes(Year,X,colour=Site))+
-  geom_line()
+#Exclude Atwell and Road T-East
+sgNotatwell <- sg[grep("Atwell", sg$Site, invert=TRUE),]
+table(sgNotatwell$Site,sgNotatwell$Year)
+noEast <- sgNotatwell[grep("Road T-East", sgNotatwell$Site, invert=TRUE),]
+table(noEast$Site,noEast$Year)
+
+noEast <- noEast[-intersect(grep("old", noEast$Site), which(noEast$Year>2015)),]
+noEast <- noEast[-intersect(grep("Pond", noEast$Site), which(noEast$Year == 2015)),]
+
+```
+
+#Data checks
+```{r}
+ggplot(noEast[noEast$Site == "Picnic Site",], aes(Transect,Height.cm.))+
+  geom_point()
+#WHAAAaaaaa Picnic Site got Pond's transects?
+str(noEast)
+
 ```
 
 
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
-
-#Exclude Atwell
-sgNotatwell <- sg[grep("Atwell", sg$Site, invert=TRUE),]
-table(sgNotatwell$Site,sgNotatwell$Year)
-noEast <- sgNotatwell[grep("Road T-East", sgNotatwell$Site, invert=TRUE),]
-table(noEast$Site,noEast$Year)
-
 #bind new and old Atwell to sg
 sg_all <- rbind(noEast,atwell,atwell_old)
-table(sg_all$Site,sg_all$Year)
+#get rid of Atwell Gulch_108 and Atwell Gulch_165 now unused factor levels
+sg_all$Site <- droplevels(sg_all$Site)
 
+table(sg_all$Site,sg_all$Year)
 str(sg_all)
-#Reset to factor remaining Sites
-sg_all$Site <- factor(sg_all$Site)
 
 # All sites 
 sg_summary <- ddply(sg_all,  
@@ -184,9 +178,6 @@ sg_summary <- ddply(sg_all,
 
 head(sg_summary)
 table(sg_summary$Site,sg_summary$Year)
-#Missing half of Pond data, need to remove for 2015
-sg_sum <- sg_summary[-which(grepl("Pond", sg_summary$Site)&sg_summary$Year == 2015) ,]
-
 ```
 
 ```{r}
@@ -278,14 +269,63 @@ Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western 
 #save into excel sheet
 sg_sum[sg_sum$Year == 2015,]
 
+sg_sum[sg_sum$Year == 2016,]
+
 
 
 ```
 
 
+Climate directly from PRISM
+```{r}
+#devtools::install_github("ropensci/prism")
+library(prism)
+
+# Set wd for prism
+options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+
+# Precip Total precipitation (rain and snow)
+get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+
+# Maximum temperature (average)
+get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+
+# Minimum temperature (average)
+get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+```
+
+Lat longs for 10 sites   
+39.1969°N, 108.1298°W Atwell    
+38.8491°N, 108.3717°W Bridgeport   
+38.6593°N, 108.3466°W Escalante     
+39.0612°N, 108.3799°W Fram        
+39.3446°N, 108.3102°W Oil Pad    
+38.6701°N, 108.3286°W Picinic    
+39.3606°N, 108.3136°W Pond    
+38.7291°N, 108.1770°W Powerline   
+39.3069°N, 108.2755°W Pyramid Rock   
+39.3544°N, 108.3286°W T-Junciton   
+```{r}
+latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell"),    
+c(38.8491, -108.3717, "Bridgeport"),   
+c(38.6593, -108.3466, "Escalante"),     
+c(39.0612, -108.3799, "Fram"),    
+c(39.3446, -108.3102, "Oil Pad"),    
+c(38.6701, -108.3286, "Picinic"),    
+c(39.3606, -108.3136, "Pond"),    
+c(38.7291, -108.1770, "Powerline"),   
+c(39.3069, -108.2755, "Pyramid Rock"),   
+c(39.3544, -108.3286, "T-Junciton")))   
+
+```
+
+
+
+
+
 Climate data from PRISM <http://prism.oregonstate.edu/explorer/>
 
-```{r}
+```{r, eval=FALSE}
 at.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Atwell_PRISM_2015.csv"),skip=6)
 br.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Bridgeport_PRISM_2015.csv"),skip=6)
 es.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Escalante_PRISM_2015.csv"),skip=6)
@@ -711,14 +751,43 @@ sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
 
 require(scales)
 
-ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
+unique(sg_sum$Site)
+
+sg_sum1 <- sg_sum
+sg_sum1$X[which("Pond" == sg_sum1$Site)] <- sg_sum1$X[which("Pond" == sg_sum1$Site)]/2
+
+```
+
+
+```{r Figure 2 pond only}
+ggplot(sg_sum[which("Pond" == sg_sum$Site),],aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
-  facet_wrap(~NS + SiteSame, ncol = 5) +
   ylab("Individuals per square meter") +
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
         panel.background = element_blank()) +
-  scale_x_continuous(breaks=pretty_breaks(n=7))
+  scale_x_continuous(breaks=pretty_breaks(n=3)) +
+  scale_y_continuous(limits = c(6.5,8.5))
+
+
+
+```
+
+
+```{r Figure 2 remove pond}
+ggplot(sg_sum[grep(paste(c("Pond"), collapse="|"), sg_sum$Site, invert=TRUE),],
+       aes(Year, X/area, colour = Site)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~NS + SiteSame, ncol = 3) +
+  ylab("Individuals per square meter") +
+  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
+        panel.background = element_blank()) +
+  scale_x_continuous(breaks=pretty_breaks(n=7))+
+  scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#7D9EC0","#7171C6",
+                                "#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#7D9EC0","#8B0000"))
 
 
 
@@ -734,10 +803,25 @@ ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
   ylab("Average volume")+
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
         panel.background = element_blank()) +
-  scale_x_continuous(breaks=pretty_breaks(n=7))
+  scale_x_continuous(breaks=pretty_breaks(n=7))+
+  scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#388E8E","#7D9EC0","#7171C6",
+                                "#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#388E8E","#7D9EC0","#8B0000"))
 
 
 ```
+
+```{r}
+par(cex=0.8)  
+interaction.plot(sg_sum$Year, factor(sg_sum$Site), 
+	as.numeric(sg_sum$X),
+	ylab= expression(paste(italic("Sclerocactus glaucus")," individuals per sampling unit")), xlab="Year", 
+	trace.label="Site",
+	col=c(1:6,11,8:(nlevels(sg_sum$Site))))
+
+```
+
 
 average volume, height, and width explains reproductive status
 ```{r}
