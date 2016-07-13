@@ -18,37 +18,21 @@ library(psych)
 library(devtools)
 library(multcompView)
 library(reshape2)
+library(raster)
+library(prism)
 ```
 
-Need 2008 data seperate from the MySQL database due to lack of measuring hight and width. Will need to get length tagged individuals for number alive instead of number of individuals with a heigth/width in later years. <https://research.botanicgardens.org/admin/>      
+Need to calculate individuals from 2008 data seperate from following due to lack of measuring hight and width. Will need to get the total tagged individuals for number alive instead of number of individuals with a heigth > 0 from 2009 on. <https://research.botanicgardens.org/admin/>      
 
 In 2012 we switched from measuring the height and width indiviudals under 0.5 cm in width to counting them as "minis". 
 
-```{r}
-scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
-
-head(scgl08)
-
-scgl08_2 <- data.frame(scgl08[,c(1:3)], AverageHeight = as.numeric(NA), AverageWidth = as.numeric(NA),
-  		scgl08[,c(4:8)],
-			Minis = as.numeric(scgl08[,9]), scgl08[,c(10:12)],
-			AprRain = scgl08[,c(13)], scgl08[,c(14:21)],
-			PrYrRain = scgl08[,c(22)], scgl08[,c(23:34)])
-str(scgl08_2)
-head(scgl08_2)
-names(scgl08_2)
-```
-
-2008-2016 data
-### Need to update after upload process fixed
+2008-2016 data  
 ```{r}
 rm(sg)
-#sg <- read.csv(path.expand("P:/hackathon/ScGl/2015_ScGl_rawdata_witherrors.csv"))
-#sg <- read.csv(path.expand("P:/hackathon/ScGl/2015_ScGl_rawdata_102915.csv"))
-#sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Excel/2015_ScGl/RawData_scgl_2015_102915.csv"))
+
 # 2015
-sg15 <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
-names(sg15)
+#sg15 <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
+#names(sg15)
 
 #2016
 # Need to strip white space and conform to 2015 data
@@ -67,6 +51,9 @@ if(nrow(sg[-which(sg$Site == ""),])>0){
 sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
 
 nrow(sg[sg$Year == 2008,])
+
+write.table(sg, file="P:/hackathon/ScGl/datasets/sg.csv", sep=",")
+
 ```
 
 
@@ -77,17 +64,31 @@ Need to split by Site - Atwell Gulch needs to be together:
        Oil Pad and Oil Pad (old)
        Pond and Pond (old)
      
-merge datasets   
-2008:      
+summarize 2008  
 ```{r}
-table(scgl08_2$SiteName)  #summarized number of plants per plot per site
-sg$Site <- droplevels(sg$Site)
+rm(scgl08)
+scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
+
+head(scgl08)
+
+sg_summary08 <- ddply(scgl08,  
+                    .(SiteName,Year), summarise,
+                    X = sum(CountofHeight),
+                    Rep = sum(SumFlowered),
+                    Brs = sum(SumBrowsed),
+                    avgH = NA,
+                    sdH = NA,
+                    avgW = NA,
+                    sdW = NA,
+                    avgVol = NA,
+                    sdVol = NA)
+
+head(sg_summary08)
+```
+
+
+```{r}
 table(sg$Site)
-
-
-head(scgl08_2[,c("SiteName","Year","Transect")])
-head(scgl08_2)
-
 
 sg$Fl <- as.character(sg$Fl)
 sg$Br <- as.character(sg$Br)
@@ -111,17 +112,18 @@ Atwell Gulch new is everything Atwell Gulch
 Rename Sites for Atwell old and new
 ```{r}
 # Add a level to the Site factor field
-levels(sg$Site) <- c("Atwell Gulch", "Atwell Gulch (old)",levels(sg$Site))
+sg$Site <- factor(sg$Site, 
+                  levels = c("Atwell Gulch", "Atwell Gulch (old)",levels(sg$Site)))
 
-atwell <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
-unique(atwell$Year)
-atwell$Site <- "Atwell Gulch"
+# Rename all Atwell Gulch
+sg[grep("Atwell", sg$Site),"Site"] <- "Atwell Gulch"
 
-atwell_old <- sg[intersect(grep("Atwell",sg$Site),which(atwell$Y.coord.m.<30)),]
-unique(atwell_old$Year)
-atwell_old$Site <- "Atwell Gulch (old)"
+# One copy of all Atwell Gulch 2012 on for new
+atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
 
-atwell.all <- rbind(atwell_old, atwell)
+atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(atwell$Y.coord.m.<30)),] 
+atwell.old$Site <- "Atwell Gulch (old)"
+
 ```
 
 #2016 on    
@@ -130,41 +132,37 @@ Stop Pond old in 2015
 Keep Atwell old and new
 Fram no data in 2015
 ```{r}
+#Road T-East
+sg <- sg[grep("Road T-East", sg$Site, invert=TRUE),]
 
-#Exclude Atwell and Road T-East
-sgNotatwell <- sg[grep("Atwell", sg$Site, invert=TRUE),]
-table(sgNotatwell$Site,sgNotatwell$Year)
-noEast <- sgNotatwell[grep("Road T-East", sgNotatwell$Site, invert=TRUE),]
-table(noEast$Site,noEast$Year)
 
-noEast <- noEast[-intersect(grep("old", noEast$Site), which(noEast$Year>2015)),]
-noEast <- noEast[-intersect(grep("Pond", noEast$Site), which(noEast$Year == 2015)),]
+#No "old" 2016 on
+sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 
+#No Pond in 2015
+sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
+
+#Add back Atwell duplicated for old and new
+sg <- rbind(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old)
+sg$Site <- droplevels(sg$Site)
+
+table(sg$Site,sg$Year)
 ```
 
 #Data checks
 ```{r}
-ggplot(noEast[noEast$Site == "Picnic Site",], aes(Transect,Height.cm.))+
+ggplot(sg[sg$Site == "Picnic Site",], aes(Transect,Height.cm.))+
   geom_point()
-#WHAAAaaaaa Picnic Site got Pond's transects?
-str(noEast)
 
+ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
+  geom_point()
 ```
 
 
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
-#bind new and old Atwell to sg
-sg_all <- rbind(noEast,atwell,atwell_old)
-#get rid of Atwell Gulch_108 and Atwell Gulch_165 now unused factor levels
-sg_all$Site <- droplevels(sg_all$Site)
-
-table(sg_all$Site,sg_all$Year)
-str(sg_all)
-
-# All sites 
-sg_summary <- ddply(sg_all,  
+sg_summary <- ddply(sg[sg$Year>2008,],  
                     .(Site,Year), summarise,
                     X = length(Tag[Height.cm. > 0]),
                     Rep = sum(Fl),
@@ -180,42 +178,66 @@ head(sg_summary)
 table(sg_summary$Site,sg_summary$Year)
 ```
 
+#Data summary
+Combine 2008 (with no height or width data) and remaining years 
+```{r}
+names(sg_summary08) <- names(sg_summary)
+sg_sum <- rbind(sg_summary08,sg_summary)
+```
+
+All sites 
+```{r}
+ggplot(sg_sum, aes(Year,X,colour=Site))+
+  geom_point(size=3)+
+  geom_line()
+```
+
+All sites separate plots
 ```{r}
 ggplot(sg_sum, aes(Year,X,colour=Site))+
   geom_point()+
-  geom_line()
-
-ggplot(sg_sum, aes(Year,X,colour=Site))+
-  geom_point()+
   geom_line()+
   facet_wrap(~Site)+
   ylab("Total individuals")
+```
 
-# All the new ones
+All the new ones
+```{r}
 ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   facet_wrap(~Site)+
   ylab("Total individuals")
+```
 
+
+```{r}
 ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   ylab("Total individuals")
+```
 
-# All the old ones
+
+All the old ones
+```{r}
 ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   facet_grid(~Site)+
   ylab("Total individuals")
+```
 
+```{r}
 ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   ylab("Total individuals")
+```
 
-# old and new
+
+old and new
+```{r}
 oldnew <- c("Oil","Pond","T-","Atwell")
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
@@ -223,8 +245,11 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   geom_point()+
   geom_line()+
   ylab("Total individuals")  
+```
+
 
 #Pond
+```{r}
 oldnew <- c("Pond")
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
@@ -232,9 +257,11 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   geom_point()+
   geom_line()+
   ylab("Total individuals") 
+```
 
-# Is T-Junction missing some - should be finding more individuals
+Is T-Junction missing some - should be finding more individuals
 #T-Junction
+```{r}
 oldnew <- c("T-")
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
@@ -242,8 +269,10 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   geom_point()+
   geom_line()+
   ylab("Total individuals")
+```
 
 #Oil Pad
+```{r}
 oldnew <- c("Oil")
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
@@ -251,8 +280,10 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   geom_point()+
   geom_line()+
   ylab("Total individuals")
+```
 
 #Atwell
+```{r}
 oldnew <- c("Atwell")
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
@@ -262,22 +293,20 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   ylab("Total individuals")
 ```
 
-#### Need to update once data export is fixed!!    
 Report Tables_2015
 Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008 – 2015).
 ```{r}
 #save into excel sheet
 sg_sum[sg_sum$Year == 2015,]
 
-sg_sum[sg_sum$Year == 2016,]
-
-
-
+write.table(sg_sum[sg_sum$Year == 2016,], "clipboard", 
+            sep="\t", row.names=FALSE)
+#Report Tables_20XX
 ```
 
 
 Climate directly from PRISM
-```{r}
+```{r, eval=FALSE}
 #devtools::install_github("ropensci/prism")
 library(prism)
 
@@ -286,6 +315,11 @@ options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/S
 
 # Precip Total precipitation (rain and snow)
 get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+# error, didn't download
+get_prism_monthlys(type="ppt", mon=10, keepZip = FALSE, years = 2001)
+get_prism_monthlys(type="ppt", mon=11, keepZip = FALSE, years = 2004)
+get_prism_monthlys(type="ppt", mon=7, keepZip = FALSE, years = 2007)
+get_prism_monthlys(type="ppt", mon=12, keepZip = FALSE, years = 2009)
 
 # Maximum temperature (average)
 get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 2000:2015)
@@ -306,20 +340,40 @@ Lat longs for 10 sites
 39.3069°N, 108.2755°W Pyramid Rock   
 39.3544°N, 108.3286°W T-Junciton   
 ```{r}
-latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell"),    
-c(38.8491, -108.3717, "Bridgeport"),   
-c(38.6593, -108.3466, "Escalante"),     
-c(39.0612, -108.3799, "Fram"),    
-c(39.3446, -108.3102, "Oil Pad"),    
-c(38.6701, -108.3286, "Picinic"),    
-c(39.3606, -108.3136, "Pond"),    
-c(38.7291, -108.1770, "Powerline"),   
-c(39.3069, -108.2755, "Pyramid Rock"),   
-c(39.3544, -108.3286, "T-Junciton")))   
-
+latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
+                            c(39.1969, -108.1298, "Atwell Gulch (old)"),
+                            c(38.8491, -108.3717, "Bridgeport"),   
+                            c(38.6593, -108.3466, "Escalante Canyon"),
+                            c(39.0612, -108.3799, "Fram"),
+                            c(39.3446, -108.3102, "Oil Pad"),
+                            c(39.3446, -108.3102, "Oil Pad (old)"),
+                            c(38.6701, -108.3286, "Picnic Site"),
+                            c(39.3606, -108.3136, "Pond"),
+                            c(39.3606, -108.3136, "Pond (old)"),
+                            c(38.7291, -108.1770, "Powerline"),
+                            c(39.3069, -108.2755, "Pyramid Rock"),
+                            c(39.3544, -108.3286, "T-Junciton"),
+                            c(39.3544, -108.3286, "Road T-West (old)")))   
+names(latlong) <- c("Lat","Long","Site")
+latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 ```
 
+Precip   
+16 years 2000:2015
+```{r}
+#Set wd for prism data if not already
+options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+library(prism)
+library(raster)
 
+ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
+
+m.ppt <- lapply(ppt, function(x){
+  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+  data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
+             date = ls_prism_data()[x,], Site = latlong$Site)
+})
+```
 
 
 
