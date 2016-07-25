@@ -305,7 +305,8 @@ write.table(sg_sum[sg_sum$Year == 2016,], "clipboard",
 ```
 
 
-Climate directly from PRISM
+Climate directly from PRISM   
+update only the previous year each year  
 ```{r, eval=FALSE}
 #devtools::install_github("ropensci/prism")
 library(prism)
@@ -376,6 +377,77 @@ m.ppt <- lapply(ppt, function(x){
 ```
 
 
+Max temp   
+16 years 2000:2015
+```{r}
+tmax <- grep("tmax", ls_prism_data(absPath = TRUE)[,2])
+
+m.tmax <- lapply(tmax, function(x){
+  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+  data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
+             date = ls_prism_data()[x,], Site = latlong$Site)
+})
+```
+
+
+Min temp   
+16 years 2000:2015
+```{r}
+tmin <- grep("tmin", ls_prism_data(absPath = TRUE)[,2])
+
+m.tmin <- lapply(tmin, function(x){
+  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+  data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
+             date = ls_prism_data()[x,], Site = latlong$Site)
+})
+```
+
+PRISM_ppt_stable_4kmM3_201512_bil
+
+# Combine climate data from library(prism)   
+```{r}
+scgl.temps <- rbind(do.call(rbind, m.tmin), 
+                    do.call(rbind, m.tmax))
+scgl.temps$Year <- substr(scgl.temps$date, 25,28)
+scgl.temps$Month <- substr(scgl.temps$date, 29,30)
+
+scgl.ppt <- do.call(rbind, m.ppt)
+scgl.ppt$Year <- substr(scgl.ppt$date, 24,27)
+scgl.ppt$Month <- substr(scgl.ppt$date, 28,29)
+
+scgl.climate <- rbind(scgl.temps,scgl.ppt)
+
+#Character to numeric
+scgl.climate[,4:5] <- sapply(scgl.climate[,4:5], as.numeric)
+
+scgl.climate$Prev12 <- scgl.climate$Year 
+scgl.climate$Prev12[scgl.climate$Month > 5] <- scgl.climate$Year[scgl.climate$Month>5]+1
+
+#extract the climate variable name from the prism long name
+scgl.climate$date <- as.character(scgl.climate$date)
+data.name <- sapply(scgl.climate$date, function(x) {
+  unlist(strsplit(x, split="_", fixed=TRUE))[[2]]
+  })
+head(data.name)
+scgl.climate$Variable <- data.name
+
+str(scgl.climate)
+
+#long to wide
+library(reshape)
+melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Year","Month","Variable"))
+head(melt.scgl)
+```
+
+          Site Precip  tmin tmax Year Month Prev12 season
+1 Atwell Gulch  54.37 -10.1  2.0 1895     1   1895 winter
+2 Atwell Gulch  26.50 -10.0  4.0 1895     2   1895 winter
+3 Atwell Gulch  23.35  -4.1 11.1 1895     3   1895 spring
+4 Atwell Gulch  12.97   0.5 19.3 1895     4   1895 spring
+5 Atwell Gulch  31.98   4.9 23.5 1895     5   1895 spring
+6 Atwell Gulch  19.17   7.4 26.8 1895     6   1896 summer
+> names(scgl.c)
+[1] "Site"   "Precip" "tmin"   "tmax"   "Year"   "Month"  "Prev12" "season"
 
 Climate data from PRISM <http://prism.oregonstate.edu/explorer/>
 
