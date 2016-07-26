@@ -21,13 +21,19 @@ library(reshape)
 library(reshape2)
 library(raster)
 library(prism)
+library(RCurl)
+library(devtools)
+
+#Some universal variables
+currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
+
 ```
 
 Need to calculate individuals from 2008 data seperate from following due to lack of measuring hight and width. Will need to get the total tagged individuals for number alive instead of number of individuals with a heigth > 0 from 2009 on. <https://research.botanicgardens.org/admin/>      
 
 In 2012 we switched from measuring the height and width indiviudals under 0.5 cm in width to counting them as "minis". 
 
-2008-2016 data  
+2008-currentYr data  
 ```{r}
 rm(sg)
 
@@ -294,14 +300,18 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   ylab("Total individuals")
 ```
 
-Report Tables_2015
+Report Tables_current year
 Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008 – 2015).
 ```{r}
-#save into excel sheet
-sg_sum[sg_sum$Year == 2015,]
+#save to clipboard to excel sheet in correct format ("$" says the end of the string)
+new <- c("Atwell Gulch$","Oil Pad","Pond","T-Junction")
+poststand <- sg_sum[sg_sum$Year == currentYr & sg_sum$Site %in% grep(paste(new,collapse="|"),
+                                                        sg_sum$Site,value=TRUE),]
+prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
+                                                        sg_sum$Site,value=TRUE),]
 
-write.table(sg_sum[sg_sum$Year == 2016,], "clipboard", 
-            sep="\t", row.names=FALSE)
+write.table(poststand, "clipboard", sep="\t", row.names=FALSE)
+write.table(prestand,  "clipboard", sep="\t", row.names=FALSE)
 #Report Tables_20XX
 ```
 
@@ -316,7 +326,7 @@ library(prism)
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 
 # Precip Total precipitation (rain and snow)
-get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:2016)
+get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
 # error, didn't download
 get_prism_monthlys(type="ppt", mon=3, keepZip = FALSE, years = 1995)
 get_prism_monthlys(type="ppt", mon=5, keepZip = FALSE, years = 1988)
@@ -326,10 +336,10 @@ get_prism_monthlys(type="ppt", mon=7, keepZip = FALSE, years = 2007)
 get_prism_monthlys(type="ppt", mon=12, keepZip = FALSE, years = 2009)
 
 # Maximum temperature (average)
-get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 1986:2016)
+get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
 
 # Minimum temperature (average)
-get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 1986:2016)
+get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
 ```
 
 Lat longs for 10 sites   
@@ -345,25 +355,26 @@ Lat longs for 10 sites
 39.3544°N, 108.3286°W T-Junciton   
 ```{r}
 latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
-                            c(39.1969, -108.1298, "Atwell Gulch (old)"),
+#                            c(39.1969, -108.1298, "Atwell Gulch (old)"),
                             c(38.8491, -108.3717, "Bridgeport"),   
                             c(38.6593, -108.3466, "Escalante Canyon"),
                             c(39.0612, -108.3799, "Fram"),
                             c(39.3446, -108.3102, "Oil Pad"),
-                            c(39.3446, -108.3102, "Oil Pad (old)"),
+#                            c(39.3446, -108.3102, "Oil Pad (old)"),
                             c(38.6701, -108.3286, "Picnic Site"),
                             c(39.3606, -108.3136, "Pond"),
-                            c(39.3606, -108.3136, "Pond (old)"),
+#                            c(39.3606, -108.3136, "Pond (old)"),
                             c(38.7291, -108.1770, "Powerline"),
                             c(39.3069, -108.2755, "Pyramid Rock"),
-                            c(39.3544, -108.3286, "T-Junciton"),
-                            c(39.3544, -108.3286, "Road T-West (old)")))   
+                            c(39.3544, -108.3286, "T-Junciton")))
+#,
+#                            c(39.3544, -108.3286, "Road T-West (old)")))   
 names(latlong) <- c("Lat","Long","Site")
 latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 ```
 
 Precip   
-16 years 2000:2015
+16 years 2000:currentYr
 ```{r}
 #Set wd for prism data if not already
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
@@ -383,7 +394,7 @@ m.ppt <- lapply(ppt, function(x){
 
 
 Max temp   
-16 years 2000:2015
+16 years 2000:currentYr
 ```{r}
 tmax <- grep("tmax", ls_prism_data(absPath = TRUE)[,2])
 
@@ -396,7 +407,7 @@ m.tmax <- lapply(tmax, function(x){
 
 
 Min temp   
-16 years 2000:2015
+16 years 2000:currentYr
 ```{r}
 tmin <- grep("tmin", ls_prism_data(absPath = TRUE)[,2])
 
@@ -409,20 +420,27 @@ m.tmin <- lapply(tmin, function(x){
 
 PRISM_ppt_stable_4kmM3_201512_bil
 
-### START HERE
-### Issues with 2016 being provisional so pulling year and month from number is funny, should pull from last two and first four after split by underscore.... remove "provisional_" first and then it'll work?
 # Combine climate data from library(prism)   
+
+Strip off the last bit after the last underscore    
+
+     scgl.temps$date <- sapply(scgl.temps$date, function(x){
+       unlist(strsplit(x, "_\\s*(?=[^_]+$)", perl=TRUE))[[1]]
+       })  
+       
 ```{r}
-scgl.temps <- rbind(do.call(rbind, m.tmin), 
-                    do.call(rbind, m.tmax))
-scgl.temps$Year <- substr(scgl.temps$date, 25,28)
-scgl.temps$Month <- substr(scgl.temps$date, 29,30)
+scgl.climate <- rbind(do.call(rbind, m.tmin), 
+                    do.call(rbind, m.tmax),
+                    do.call(rbind, m.ppt))
+#turn factors into characters
+scgl.climate$date <- sapply(scgl.climate$date, as.character)
 
-scgl.ppt <- do.call(rbind, m.ppt)
-scgl.ppt$Year <- substr(scgl.ppt$date, 24,27)
-scgl.ppt$Month <- substr(scgl.ppt$date, 28,29)
-
-scgl.climate <- rbind(scgl.temps,scgl.ppt)
+scgl.climate$Year <- sapply(scgl.climate$date, function(x){
+  substr(x, (nchar(x)+1)-10,nchar(x)-6)
+})
+scgl.climate$Month <- sapply(scgl.climate$date, function(x){
+  substr(x, (nchar(x)+1)-6,nchar(x)-4)
+})
 
 #Character to numeric
 scgl.climate[,4:5] <- sapply(scgl.climate[,4:5], as.numeric)
@@ -432,11 +450,9 @@ scgl.climate$Prev12[scgl.climate$Month > 5] <- scgl.climate$Year[scgl.climate$Mo
 
 #extract the climate variable name from the prism long name
 scgl.climate$date <- as.character(scgl.climate$date)
-data.name <- sapply(scgl.climate$date, function(x) {
+scgl.climate$Variable <- sapply(scgl.climate$date, function(x) {
   unlist(strsplit(x, split="_", fixed=TRUE))[[2]]
   })
-head(data.name)
-scgl.climate$Variable <- data.name
 
 str(scgl.climate)
 
@@ -487,16 +503,14 @@ fall: September-November (9-11)
 winter: December-February (12, 1-2)
 spring: March-May (3-5)
 ```{r}
-scgl.c.summary <- aggregate(scgl.c[,2:4], scgl.c[,c("Site","Prev12","season")],
+scgl.c.summary <- aggregate(scgl.c[,c("ppt","tmax","tmin")],
+                            scgl.c[,c("Site","Prev12","season")],
                             FUN = function(x) mean(x, na.rm = TRUE))
 
-season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<2017,],
+season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<currentYr+1,],
                   idvar = c("Site","Prev12"),
                   timevar = "season",
                   direction = "wide")
-
-
-
 ```
 
 
@@ -555,7 +569,7 @@ scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000,]
 Precipitation per site
 ```{r}
 ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
-                         scgl_sumSE[[1]]$Prev12<2017,],
+                         scgl_sumSE[[1]]$Prev12<currentYr,],
        aes(Prev12, ppt, colour=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
@@ -568,7 +582,7 @@ ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
 Minimum temperature per site (Celcius)
 ```{r}
 ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
-                         scgl_sumSE[[2]]$Prev12<2016,],
+                         scgl_sumSE[[2]]$Prev12<currentYr+1,],
        aes(Prev12, tmin, colour=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
@@ -581,7 +595,7 @@ ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
 Maximum temperature per site (C)
 ```{r}
 ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
-                         scgl_sumSE[[3]]$Prev12<2016,],
+                         scgl_sumSE[[3]]$Prev12<currentYr+1,],
        aes(Prev12, tmax, colour=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
@@ -598,11 +612,11 @@ head(season)
 tail(season)
 names(season)
 
-nrow(season)
+nrow(season) #310
 cc.season <- season[complete.cases(season),]
 str(cc.season)
-nrow(cc.season)
-unique(sort(cc.season$Prev12)) #1986:2015
+nrow(cc.season) #300
+unique(sort(cc.season$Prev12)) #1986:current year
 
 cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))]), numbers = TRUE)
@@ -618,7 +632,7 @@ Ditch anything 50% or more correlated
         tmin.winter           tmax.winter(0.8)
         
 ```{r}
-cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
+6cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))])
 data <- as.data.frame(as.table(cor.table))
 combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
@@ -628,6 +642,7 @@ exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
 
 tomatch <- c("Year","Month","Site","Prev12",exclude)
 
+# Seasonal varaibles kept for the PCA
 names(cc.season[,c(grep(paste(tomatch,collapse="|"),
                         names(cc.season), value=TRUE, invert = TRUE))])
 
@@ -637,9 +652,8 @@ forpca <- cc.season[,c(grep(paste(tomatch,collapse="|"),
 scgl.pca <- princomp(forpca,cor=TRUE)
 summary(scgl.pca)
 scgl.load <- loadings(scgl.pca)
+write.table(scgl.load, "clipboard", sep="\t", row.names=TRUE)
 scgl.pc <- predict(scgl.pca)
-
-source_url("https://raw.github.com/JoFrhwld/FAAV/master/r/stat-ellipse.R")
 
 sg.pc <- data.frame(scgl.pc,cc.season)
 # Assign genetic regions
@@ -648,13 +662,20 @@ southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
 sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
                                      sg.pc$Site,
                                      value=TRUE))] <- "South"
+```
 
-
+Site differences
+#Figure 3  
+1986-2016
+```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
   stat_ellipse() +
   theme_bw() 
+```
 
+North/South differences
+```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
   stat_ellipse() +
@@ -665,7 +686,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
 The letters won't line up with the sites unless specified
 ```{r}
 #doesn't like "-" in the name
-levels(sg.pc$Site)[levels(sg.pc$Site) == 'T-Junction'] <- 'TJunction'
+levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-10], "TJunction")
 sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc))
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
 
@@ -685,7 +706,7 @@ t.test(Comp.1~NS, data=sg.pc)
 
 
 
-#### Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings of summer and spring temperatures and Summer Palmer Z Index grouped by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+#### Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
@@ -697,11 +718,11 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
 ```
 
 # PCA 2008-2015
-
+#####START HERE#### 
 Try for only the study period
 
 ```{r}
-recent <- season[season$Prev12 > 2007 & season$Prev12 < 2016,]
+recent <- season[season$Prev12 > 2007 & season$Prev12 < currentYr,]
 cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
                         grep("Month", names(recent)))]), numbers = TRUE)
 
@@ -765,7 +786,8 @@ Figure 3 f) Site distribution along PC1 is shown with Tukey Honest Significant D
 
 ```{r}
 #doesn't like "-" in the name
-levels(sg.pc$Site)[levels(sg.pc$Site) == 'T-Junction'] <- 'TJunction'
+levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-(13:14)],"RoadTWest","TJunction")
+
 sg.thsd <- TukeyHSD(aov(Comp.2~Site, data=sg.pc))
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
 
@@ -1022,16 +1044,16 @@ last.fit <- sapply(all.count, function(x){
 })
 
 tlast.fit <- data.frame(t(last.fit))
-apply(tlast.fit[tlast.fit$RangeEnd == 2015,4:6], 2, 
+apply(tlast.fit[tlast.fit$RangeEnd == currentYr,4:6], 2, 
       FUN = function(x) mean(exp(as.numeric(x)), na.rm=TRUE)) #arithmetic mean
 
-fit.2015 <- tlast.fit[tlast.fit$RangeEnd == 2015,]
+fit.currentYr <- tlast.fit[tlast.fit$RangeEnd == currentYr,]
 
-fit.2015 <- transform(fit.2015, fit = exp(as.numeric(fit)), 
+fit.currentYr <- transform(fit.currentYr, fit = exp(as.numeric(fit)), 
                       lwr = exp(as.numeric(lwr)), 
                       upr = exp(as.numeric(upr)))
-fit.2015 <- data.frame(Site = rownames(fit.2015), fit.2015)
-plot.2015 <- melt(fit.2015,
+fit.currentYr <- data.frame(Site = rownames(fit.currentYr), fit.currentYr)
+plot.currentYr <- melt(fit.currentYr,
                   id.vars = "Site",
                   measure.vars = c("fit","upr","lwr"))
 
@@ -1041,7 +1063,7 @@ plot.2015 <- melt(fit.2015,
 ### Reproduction
 ```{r}
 
-sum15 <- sg_sum[sg_sum$Year == 2015,]
+sum15 <- sg_sum[sg_sum$Year == currentYr,]
 sum(sum15$Rep)/sum(sum15$X)
 
 mean(sg_sum$Prepro)
