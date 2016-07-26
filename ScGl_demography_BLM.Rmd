@@ -17,6 +17,7 @@ library(plyr)
 library(psych)
 library(devtools)
 library(multcompView)
+library(reshape)
 library(reshape2)
 library(raster)
 library(prism)
@@ -306,7 +307,7 @@ write.table(sg_sum[sg_sum$Year == 2016,], "clipboard",
 
 
 Climate directly from PRISM   
-update only the previous year each year  
+### update only the previous year each year  
 ```{r, eval=FALSE}
 #devtools::install_github("ropensci/prism")
 library(prism)
@@ -315,18 +316,20 @@ library(prism)
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 
 # Precip Total precipitation (rain and snow)
-get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:2016)
 # error, didn't download
+get_prism_monthlys(type="ppt", mon=3, keepZip = FALSE, years = 1995)
+get_prism_monthlys(type="ppt", mon=5, keepZip = FALSE, years = 1988)
 get_prism_monthlys(type="ppt", mon=10, keepZip = FALSE, years = 2001)
 get_prism_monthlys(type="ppt", mon=11, keepZip = FALSE, years = 2004)
 get_prism_monthlys(type="ppt", mon=7, keepZip = FALSE, years = 2007)
 get_prism_monthlys(type="ppt", mon=12, keepZip = FALSE, years = 2009)
 
 # Maximum temperature (average)
-get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 1986:2016)
 
 # Minimum temperature (average)
-get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 2000:2015)
+get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 1986:2016)
 ```
 
 Lat longs for 10 sites   
@@ -366,7 +369,9 @@ Precip
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 library(prism)
 library(raster)
+```
 
+```{r}
 ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
 
 m.ppt <- lapply(ppt, function(x){
@@ -404,6 +409,8 @@ m.tmin <- lapply(tmin, function(x){
 
 PRISM_ppt_stable_4kmM3_201512_bil
 
+### START HERE
+### Issues with 2016 being provisional so pulling year and month from number is funny, should pull from last two and first four after split by underscore.... remove "provisional_" first and then it'll work?
 # Combine climate data from library(prism)   
 ```{r}
 scgl.temps <- rbind(do.call(rbind, m.tmin), 
@@ -434,9 +441,26 @@ scgl.climate$Variable <- data.name
 str(scgl.climate)
 
 #long to wide
-library(reshape)
-melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Year","Month","Variable"))
+melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Prev12","Month","Year","Variable"))
 head(melt.scgl)
+
+sp.melt.scgl <- split(melt.scgl, melt.scgl$Variable)
+
+head(sp.melt.scgl[[2]])
+
+scgl.c.1 <- merge(sp.melt.scgl[[1]],sp.melt.scgl[[2]], by = c("Site","Prev12","Month","Year"))
+scgl.c.1 <- scgl.c.1[,c("Site","Prev12","Month","Year","value.x","value.y")]
+names(scgl.c.1) <- c("Site","Prev12","Month","Year","ppt","tmax")
+
+scgl.c.2 <- merge(scgl.c.1,sp.melt.scgl[[3]], by = c("Site","Prev12","Month","Year"))
+head(scgl.c.2)
+scgl.c <- scgl.c.2[,c("Site","Prev12","Month","Year","ppt","tmax","value")]
+names(scgl.c) <- c("Site","Prev12","Month","Year","ppt","tmax","tmin")
+
+scgl.c$season <- "winter"
+scgl.c[scgl.c$Month>5 & scgl.c$Month<9, "season"] <- "summer"
+scgl.c[scgl.c$Month>8 & scgl.c$Month<12, "season"] <- "fall"
+scgl.c[scgl.c$Month>2 & scgl.c$Month<6, "season"] <- "spring"
 ```
 
           Site Precip  tmin tmax Year Month Prev12 season
@@ -449,71 +473,24 @@ head(melt.scgl)
 > names(scgl.c)
 [1] "Site"   "Precip" "tmin"   "tmax"   "Year"   "Month"  "Prev12" "season"
 
-Climate data from PRISM <http://prism.oregonstate.edu/explorer/>
-
-```{r, eval=FALSE}
-at.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Atwell_PRISM_2015.csv"),skip=6)
-br.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Bridgeport_PRISM_2015.csv"),skip=6)
-es.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Escalante_PRISM_2015.csv"),skip=6)
-fr.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Fram_PRISM_2015.csv"),skip=6)
-op.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/OilPad_PRISM_2015.csv"),skip=6)
-pic.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Picnic_PRISM_2015.csv"),skip=6)
-power.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Powerline_PRISM_2015.csv"),skip=6)
-pond.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/Pond_PRISM_2015.csv"),skip=6)
-pr.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/PyramidRock_PRISM_2015.csv"),skip=6)
-tj.cli<-read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/TJunction_PRISM_2015.csv"),skip=6)
-
-at.cli<-data.frame(Site="Atwell Gulch",at.cli)
-br.cli<-data.frame(Site="Bridgeport",br.cli)
-es.cli<-data.frame(Site="Escalante Canyon",es.cli)
-fr.cli<-data.frame(Site="Fram",fr.cli)
-op.cli<-data.frame(Site="Oil Pad",op.cli)
-pic.cli<-data.frame(Site="Picnic Site",pic.cli)
-power.cli<-data.frame(Site="Powerline",power.cli)
-pond.cli<-data.frame(Site="Pond",pond.cli)
-pr.cli<-data.frame(Site="Pyramid Rock",pr.cli)
-tj.cli<-data.frame(Site="T-Junction",tj.cli)
-
-scgl.climate <- rbind(at.cli,br.cli,es.cli,fr.cli,op.cli,pic.cli,power.cli,pond.cli,pr.cli,tj.cli)
-scgl.climate$Year <- substr(scgl.climate$Date,1,4)
-scgl.climate$Month <- substr(scgl.climate$Date,6,7)
 
 scgl.c <- scgl.climate[,c(1,3,5,7:9)]
 names(scgl.c) <- c("Site","Precip","tmin","tmax","Year","Month")
-```
 
 ####Summarize climate data
 Climate of the previous 12 month to the May data collection
-```{r}
-scgl.c$Month <- as.numeric(scgl.c$Month)
-scgl.c$Year <- as.numeric(scgl.c$Year)
-
-#Months after data collection to be assigned to next year
-#Add a column to assign the year from May to the previous 12 months: Jun:May
-scgl.c$Prev12 <-scgl.c$Year
-#Months June through December go to the next year
-scgl.c[scgl.c$Month > 5,"Prev12"] <- scgl.c[scgl.c$Month > 5,"Year"]+1
- 
-scgl.c[scgl.c$Prev12 >2014,]
-```
 
 ###PCA for climate factors
-
 calculate seasonal climate averages    
 summer: June-August (6-8)
 fall: September-November (9-11)
 winter: December-February (12, 1-2)
 spring: March-May (3-5)
 ```{r}
-scgl.c$season <- "winter"
-scgl.c[scgl.c$Month>5 & scgl.c$Month<9, "season"] <- "summer"
-scgl.c[scgl.c$Month>8 & scgl.c$Month<12, "season"] <- "fall"
-scgl.c[scgl.c$Month>2 & scgl.c$Month<6, "season"] <- "spring"
-
 scgl.c.summary <- aggregate(scgl.c[,2:4], scgl.c[,c("Site","Prev12","season")],
                             FUN = function(x) mean(x, na.rm = TRUE))
 
-season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<2016,],
+season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<2017,],
                   idvar = c("Site","Prev12"),
                   timevar = "season",
                   direction = "wide")
@@ -564,7 +541,7 @@ summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
 
 summary statistics
 ```{r}
-scgl_sumSE <- lapply(names(scgl.c[,c("Precip","tmin", "tmax")]), 
+scgl_sumSE <- lapply(names(scgl.c[,c("ppt","tmin", "tmax")]), 
                      function(x){
                        summarySE(scgl.c, measurevar=x, groupvars=c("Site","Prev12"))
                        }) 
@@ -578,11 +555,11 @@ scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000,]
 Precipitation per site
 ```{r}
 ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
-                         scgl_sumSE[[1]]$Prev12<2016,],
-       aes(Prev12, Precip, colour=Site))+
+                         scgl_sumSE[[1]]$Prev12<2017,],
+       aes(Prev12, ppt, colour=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=Precip-se, ymax=Precip+se),width=1, position = position_dodge(0.1)) +
+  geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.1)) +
   theme_bw() +
   ylab("Average precipitation per site") 
 
