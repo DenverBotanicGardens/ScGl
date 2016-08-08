@@ -24,7 +24,7 @@ library(prism)
 library(RCurl)
 library(devtools)
 
-#Some universal variables
+#Some global variables
 currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
 
 ```
@@ -605,12 +605,13 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
 
 ```
 
-Take out missing data, Years 1986 through 2015 as previous 12 years to the May survey
+Take out missing data, Years 1986 through current year as previous 12 years to the May survey
 
 ```{r}
 head(season)
 tail(season)
 names(season)
+sort(unique(season$Prev12))
 
 nrow(season) #310
 cc.season <- season[complete.cases(season),]
@@ -623,16 +624,9 @@ cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
 ```
 
 Ditch anything 50% or more correlated 
-  keep  Precip.fall   Remove: tmax.fall(-0.64)
-        tmin.fall             tmin.spring(0.56)
-                              tmin.summer(0.56)
-        Precip.spring         tmax.spring(-0.53)
-        Precip.summer         tmax.summer(-0.58)
-        Precip.winter         
-        tmin.winter           tmax.winter(0.8)
-        
+
 ```{r}
-6cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
+cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))])
 data <- as.data.frame(as.table(cor.table))
 combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
@@ -655,6 +649,7 @@ scgl.load <- loadings(scgl.pca)
 write.table(scgl.load, "clipboard", sep="\t", row.names=TRUE)
 scgl.pc <- predict(scgl.pca)
 
+rm(sg.pc)
 sg.pc <- data.frame(scgl.pc,cc.season)
 # Assign genetic regions
 sg.pc$NS <- "North"
@@ -664,8 +659,13 @@ sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
                                      value=TRUE))] <- "South"
 ```
 
+#Table 3a)    
+```{r}
+data[abs(data$Freq)>0.5,]
+```
+
 Site differences
-#Figure 3  
+#Figure 3b  
 1986-2016
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
@@ -675,6 +675,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
 ```
 
 North/South differences
+#Figure 3a
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
@@ -682,7 +683,8 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   theme_bw() 
 ```
 
-# Use all years of data for all plots comparison?
+#Figure 3c
+Use all years of data for all plots comparison?
 The letters won't line up with the sites unless specified
 ```{r}
 #doesn't like "-" in the name
@@ -703,9 +705,6 @@ t.test(Comp.1~NS, data=sg.pc)
 
 ```
 
-
-
-
 #### Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
@@ -718,11 +717,11 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
 ```
 
 # PCA 2008-2015
-#####START HERE#### 
-Try for only the study period
+Try for only the study period 
+Prev12 is the May of the previous year through the April of the current year
 
 ```{r}
-recent <- season[season$Prev12 > 2007 & season$Prev12 < currentYr,]
+recent <- season[season$Prev12 > 2007 & season$Prev12 < currentYr+1,]
 cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
                         grep("Month", names(recent)))]), numbers = TRUE)
 
@@ -730,15 +729,6 @@ cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
 
 #### 2008-2015
 Ditch anything 50% or more correlated 
-Keep Precip.fall and  Remove: tmax.fall(-0.62) 
-                              Precip.summer(0.53)
-     tmin.fall                tmin.spring(0.56)
-                              tmin.summer(0.87)
-     Precip.spring            tmax.spring(-0.55)
-     tmin.spring              Precip.winter(-0.70)
-     tmin.summer              
-     tmax.summer
-     tmax.winter              Precip.winter(-0.66)
 
 ```{r}
 cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
@@ -746,6 +736,7 @@ cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
 data <- as.data.frame(as.table(cor.table))
 combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
 cor.data <- data[data$Var1 != data$Var2,]
+rm(data)
 data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
 exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
 
@@ -766,7 +757,15 @@ southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
 sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
                                      sg.pc$Site,
                                      value=TRUE))] <- "South"
+```
 
+# Table 3b) 2008 - current year
+```{r}
+data[abs(data$Freq) > 0.5,]
+
+```
+
+```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
   stat_ellipse() +
@@ -786,7 +785,7 @@ Figure 3 f) Site distribution along PC1 is shown with Tukey Honest Significant D
 
 ```{r}
 #doesn't like "-" in the name
-levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-(13:14)],"RoadTWest","TJunction")
+levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-(10)],"TJunction")
 
 sg.thsd <- TukeyHSD(aov(Comp.2~Site, data=sg.pc))
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
@@ -964,7 +963,7 @@ summary(lm(Prepro~avgH, data=sg_sum))
 ```
 
 
-####Figure 6:   
+####Figure 5:   
 
 ```{r}
 # old and new
@@ -980,7 +979,8 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
 
 ```
 
-
+### START HERE ########
+and finish plot 4
 ### statistics
 count pva
 
@@ -1067,7 +1067,7 @@ sum15 <- sg_sum[sg_sum$Year == currentYr,]
 sum(sum15$Rep)/sum(sum15$X)
 
 mean(sg_sum$Prepro)
-sd(sg_sum$Prepro)`
+sd(sg_sum$Prepro)
 data.frame(as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN =mean)),
            as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN = sd)))
 
