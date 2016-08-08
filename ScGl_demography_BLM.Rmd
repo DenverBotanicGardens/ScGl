@@ -1059,6 +1059,11 @@ plot.currentYr <- melt(fit.currentYr,
 
 ```
 
+```{r}
+ggplot(plot.currentYr, aes(Site,value, color= variable))+
+  geom_point()
+
+```
 
 ### Reproduction
 ```{r}
