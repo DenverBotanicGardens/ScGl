@@ -1059,6 +1059,8 @@ plot.currentYr <- melt(fit.currentYr,
 
 ```
 
+
+#### Start here to make plot nice
 ```{r}
 ggplot(plot.currentYr, aes(Site,value, color= variable))+
   geom_point()
