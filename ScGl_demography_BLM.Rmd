@@ -1060,10 +1060,23 @@ plot.currentYr <- melt(fit.currentYr,
 ```
 
 
-#### Start here to make plot nice
+#Lambdas by site
 ```{r}
-ggplot(plot.currentYr, aes(Site,value, color= variable))+
-  geom_point()
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+plot.currentYr$NS <- "North"
+plot.currentYr$NS[plot.currentYr$Site %in% grep(paste(southsites,collapse="|"),
+                                                plot.currentYr$Site, value=TRUE)] <- "South"
+                    
+                    
+ggplot(plot.currentYr, aes(Site,value, color= variable, group = variable, shape=variable))+
+  geom_point(aes(size = 1)) +
+  theme_bw()+
+  scale_shape_manual(values=c(1,6,2))+
+  scale_colour_manual(values=c("black","red", "red"))+
+  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0, size = 12))+
+  guides(colour= FALSE, shape= FALSE, size = FALSE)+
+  labs(y="Lambda")+
+  facet_grid(~NS, scales="free")
 
 ```
 
