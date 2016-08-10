@@ -665,7 +665,7 @@ data[abs(data$Freq)>0.5,]
 ```
 
 Site differences
-#Figure 3b  
+#Figure 4b  
 1986-2016
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
@@ -675,7 +675,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
 ```
 
 North/South differences
-#Figure 3a
+#Figure 4a
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
@@ -683,7 +683,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   theme_bw() 
 ```
 
-#Figure 3c
+#Figure 4c
 Use all years of data for all plots comparison?
 The letters won't line up with the sites unless specified
 ```{r}
@@ -705,7 +705,7 @@ t.test(Comp.1~NS, data=sg.pc)
 
 ```
 
-#### Figure 3: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+#### Figure 4: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 ```{r}
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
@@ -963,7 +963,7 @@ summary(lm(Prepro~avgH, data=sg_sum))
 ```
 
 
-####Figure 5:   
+####Figure 6: The plot design for four ScGl sites were changed in 2012...   
 
 ```{r}
 # old and new
@@ -979,8 +979,7 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
 
 ```
 
-### START HERE ########
-and finish plot 4
+
 ### statistics
 count pva
 
@@ -1096,7 +1095,7 @@ data.frame(as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN =mean)),
 
 Plant size
 
-## Figure 4: Growth relationships between years for width (top) and height (bottom) for Sclerocactus glaucus individuals within demographic monitoring sites.    
+## Figure 5: Growth relationships between years for width (top) and height (bottom) for Sclerocactus glaucus individuals within demographic monitoring sites.    
 6 rows of Road T-West that don't have a tag number, one row for Road T-East
 
 ```{r}
@@ -1108,19 +1107,28 @@ sg.xy <- subset(merge(sg[,c(2:5,10:11)], sg[,c(2:5,10:11)], by=c("Site","Transec
 head(sg.xy)
 sg.xy[is.na(sg.xy$Tag),]
 
-ggplot(sg.xy, aes(colour = Site))+
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg.xy$NS <- "North"
+sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
+                                                sg.xy$Site, value=TRUE)] <- "South"
+```
+```{r}
+ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
   ylab(expression("Height year"[y]))+
   xlab(expression("Height year"[y-1]))+
-  theme_bw()
-
-
-ggplot(sg.xy, aes(colour = Site))+
+  theme_bw() +
+  facet_grid(~NS)
+```
+```{r}
+ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
   ylab(expression("Width year"[y]))+
   xlab(expression("Width year"[y-1]))+
-  theme_bw()
-
+  theme_bw() +
+  facet_grid(~NS)
+```
+```{r}
 
 summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
 summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy))
