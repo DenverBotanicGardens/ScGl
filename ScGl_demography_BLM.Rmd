@@ -628,6 +628,8 @@ Ditch anything 50% or more correlated
 ```{r}
 cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))])
+
+rm(data,combins,cor.data,exclude,tomatch)
 data <- as.data.frame(as.table(cor.table))
 combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
 cor.data <- data[data$Var1 != data$Var2,]
@@ -639,6 +641,9 @@ tomatch <- c("Year","Month","Site","Prev12",exclude)
 # Seasonal varaibles kept for the PCA
 names(cc.season[,c(grep(paste(tomatch,collapse="|"),
                         names(cc.season), value=TRUE, invert = TRUE))])
+
+# Climatic variables used in PCA 1986-current year
+sort(grep(paste(tomatch,collapse="|"),names(cc.season), value=TRUE, invert = TRUE))
 
 forpca <- cc.season[,c(grep(paste(tomatch,collapse="|"),
                             names(cc.season), value=TRUE, invert = TRUE))]
@@ -744,6 +749,9 @@ tomatch <- c("Year","Month","Site","Prev12",exclude)
 
 forpca <- recent[,c(grep(paste(tomatch,collapse="|"),
                             names(recent), value=TRUE, invert = TRUE))]
+
+#Variables kept for 2007 May - current year
+sort(grep(paste(tomatch,collapse="|"),names(recent), value=TRUE, invert = TRUE))
 
 scgl.pca <- princomp(forpca,cor=TRUE)
 summary(scgl.pca)
@@ -982,16 +990,6 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
 
 ### statistics
 count pva
-
-test lapply below
-```{r}
-x<-sg_sum$Year[sg_sum$Site == "Atwell Gulch"]
-y<-sg_sum$X[sg_sum$Site == "Atwell Gulch"]
-
-rm(x)
-rm(y)
-```
-
 
 ```{r}
 CountPVA <- function(x,y){
