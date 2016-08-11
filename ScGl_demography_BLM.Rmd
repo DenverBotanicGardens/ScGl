@@ -564,6 +564,25 @@ head(scgl_sumSE[[1]])
 str(scgl_sumSE[[1]])
 names(scgl_sumSE[[1]])
 scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000,]
+
+scgl_sumSE[[1]]$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+scgl_sumSE[[1]]$NS[scgl_sumSE[[1]]$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     scgl_sumSE[[1]]$Site,
+                                     value=TRUE))] <- "South"
+
+scgl_sumSE[[2]]$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+scgl_sumSE[[2]]$NS[scgl_sumSE[[2]]$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     scgl_sumSE[[2]]$Site,
+                                     value=TRUE))] <- "South"
+
+scgl_sumSE[[3]]$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+scgl_sumSE[[3]]$NS[scgl_sumSE[[3]]$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     scgl_sumSE[[3]]$Site,
+                                     value=TRUE))] <- "South"
+
 ```
 
 Precipitation per site
@@ -578,12 +597,36 @@ ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
   ylab("Average precipitation per site") 
 
 ```
+Precipitation North vs. South
+```{r}
+ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
+                         scgl_sumSE[[1]]$Prev12<currentYr,],
+       aes(Prev12, ppt, colour=NS))+
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
+  geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.1)) +
+  theme_bw() +
+  ylab("Average precipitation per site") 
+
+t.test(ppt~NS, data = scgl_sumSE[[1]])
+```
 
 Minimum temperature per site (Celcius)
 ```{r}
 ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
                          scgl_sumSE[[2]]$Prev12<currentYr+1,],
        aes(Prev12, tmin, colour=Site))+
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
+  geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
+  theme_bw() +
+  ylab("Average minimum temperature per site") 
+
+```
+```{r}
+ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
+                         scgl_sumSE[[2]]$Prev12<currentYr+1,],
+       aes(Prev12, tmin, colour=NS))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
@@ -603,6 +646,18 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
   theme_bw() +
   ylab("Average maximum temperature per site") 
 
+```
+```{r}
+ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
+                         scgl_sumSE[[3]]$Prev12<currentYr+1,],
+       aes(Prev12, tmax, colour=NS))+
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
+  geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
+  theme_bw() +
+  ylab("Average maximum temperature per site") 
+
+t.test(tmax~NS, data= scgl_sumSE[[3]])
 ```
 
 Take out missing data, Years 1986 through current year as previous 12 years to the May survey
@@ -736,56 +791,54 @@ cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
 Ditch anything 50% or more correlated 
 
 ```{r}
-cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
+cor.table.r<-cor(recent[,-c(1:2,grep("Year", names(recent)),
                         grep("Month", names(recent)))])
-data <- as.data.frame(as.table(cor.table))
-combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
-cor.data <- data[data$Var1 != data$Var2,]
-rm(data)
-data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
-exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
+data.r <- as.data.frame(as.table(cor.table.r))
+combins.r <- combn(colnames(cor.table.r),2,FUN = function(x) {paste(x,collapse="_")})
+cor.data.r <- data.r[data.r$Var1 != data.r$Var2,]
+data.r <- cor.data[paste(cor.data.r$Var1, cor.data.r$Var2, sep="_") %in% combins.r,]
+exclude.r <- paste(data.r$Var2[abs(data.r$Freq)>0.49],sep=",")
 
-tomatch <- c("Year","Month","Site","Prev12",exclude)
+tomatch.r <- c("Year","Month","Site","Prev12",exclude.r)
 
-forpca <- recent[,c(grep(paste(tomatch,collapse="|"),
+forpca.r <- recent[,c(grep(paste(tomatch.r,collapse="|"),
                             names(recent), value=TRUE, invert = TRUE))]
 
 #Variables kept for 2007 May - current year
-sort(grep(paste(tomatch,collapse="|"),names(recent), value=TRUE, invert = TRUE))
+sort(grep(paste(tomatch.r,collapse="|"),names(recent), value=TRUE, invert = TRUE))
 
-scgl.pca <- princomp(forpca,cor=TRUE)
-summary(scgl.pca)
-scgl.load <- loadings(scgl.pca)
-scgl.pc <- predict(scgl.pca)
+scgl.pca.r <- princomp(forpca.r,cor=TRUE)
+summary(scgl.pca.r)
+scgl.load.r <- loadings(scgl.pca.r)
+scgl.pc.r <- predict(scgl.pca.r)
 
-sg.pc <- data.frame(scgl.pc,recent)
+sg.pc.r <- data.frame(scgl.pc.r,recent)
 # Assign genetic regions
-sg.pc$NS <- "North"
+sg.pc.r$NS <- "North"
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg.pc$NS[sg.pc$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     sg.pc$Site,
+sg.pc.r$NS[sg.pc.r$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     sg.pc.r$Site,
                                      value=TRUE))] <- "South"
 ```
 
 # Table 3b) 2008 - current year
 ```{r}
-data[abs(data$Freq) > 0.5,]
-
+data.r[abs(data.r$Freq) > 0.5,]
 ```
 
 ```{r}
-ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
+ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
   stat_ellipse() +
   theme_bw() 
 
 
-ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
+ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
   stat_ellipse() +
   theme_bw() 
 
-t.test(Comp.1~NS, data=sg.pc)
+t.test(Comp.2~NS, data=sg.pc.r)
 
 ```
 
@@ -793,9 +846,9 @@ Figure 3 f) Site distribution along PC1 is shown with Tukey Honest Significant D
 
 ```{r}
 #doesn't like "-" in the name
-levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-(10)],"TJunction")
+levels(sg.pc.r$Site) <- c(as.character(unique(sg.pc.r$Site))[-(10)],"TJunction")
 
-sg.thsd <- TukeyHSD(aov(Comp.2~Site, data=sg.pc))
+sg.thsd <- TukeyHSD(aov(Comp.2~Site, data=sg.pc.r))
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
 
 
@@ -803,7 +856,7 @@ SiteLetters <- data.frame(Letter = lasign$Letters[],
                           Site = rownames(data.frame(lasign$Letters)))
 Siteletters <- SiteLetters[order(SiteLetters$Site),]
 
-ggplot(sg.pc, aes(Site, Comp.2))+
+ggplot(sg.pc.r, aes(Site, Comp.2))+
   geom_boxplot()+
   annotate("text",x=1:10, y = 3,
            label = SiteLetters$Letter[c(10,1:9)])
