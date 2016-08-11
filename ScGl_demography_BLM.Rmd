@@ -172,8 +172,8 @@ ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
 sg_summary <- ddply(sg[sg$Year>2008,],  
                     .(Site,Year), summarise,
                     X = length(Tag[Height.cm. > 0]),
-                    Rep = sum(Fl),
-                    Brs = sum(Br),
+                    Rep = sum(Fl, na.rm = TRUE),
+                    Brs = sum(Br, na.rm = TRUE),
                     avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
                     sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
                     avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
@@ -862,7 +862,45 @@ ggplot(sg.pc.r, aes(Site, Comp.2))+
            label = SiteLetters$Letter[c(10,1:9)])
 ```
 
+#Reproduction
+```{r}
+#Percent Reproductive in current year (but don't repeat Atwell Gulch ones)
+sum(sg_sum$Rep[sg_sum$Year==currentYr & 
+                 sg_sum$Site !="Atwell Gulch (old)"])/sum(sg_sum$X[sg_sum$Year==currentYr & 
+                 sg_sum$Site !="Atwell Gulch (old)"])
 
+#average volume, height, and width explains reproductive status
+sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
+summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
+```
+
+```{r}
+ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], 
+       aes(Year, Prepro, group = Site, colour = Site)) +
+  geom_point()+
+  geom_line()+
+  ylab("Percent reproductive") +
+  facet_wrap(~NS+Site,ncol = 5) +
+  theme_bw()
+```
+
+```{r}
+sg_sum[sg_sum$Site=="Pond",]
+
+summarySEreproductive <- summarySE(sg_sum, measurevar = "Prepro", groupvars=c("Site"))
+
+
+summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
+
+
+summary(lm(Prepro~avgVol, data=sg_sum))
+summary(lm(Prepro~avgW, data=sg_sum))
+summary(lm(Prepro~avgH, data=sg_sum))
+
+```
+
+
+```
 
 
 
@@ -1004,22 +1042,6 @@ interaction.plot(sg_sum$Year, factor(sg_sum$Site),
 	ylab= expression(paste(italic("Sclerocactus glaucus")," individuals per sampling unit")), xlab="Year", 
 	trace.label="Site",
 	col=c(1:6,11,8:(nlevels(sg_sum$Site))))
-
-```
-
-
-average volume, height, and width explains reproductive status
-```{r}
-sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
-summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
-
-
-summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
-
-
-summary(lm(Prepro~avgVol, data=sg_sum))
-summary(lm(Prepro~avgW, data=sg_sum))
-summary(lm(Prepro~avgH, data=sg_sum))
 
 ```
 
