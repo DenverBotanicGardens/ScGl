@@ -322,22 +322,32 @@ library(prism)
 # Set wd for prism
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 
-# Precip Total precipitation (rain and snow)
-get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
-# error, didn't download
-get_prism_monthlys(type="ppt", mon=3, keepZip = FALSE, years = 1995)
-get_prism_monthlys(type="ppt", mon=5, keepZip = FALSE, years = 1988)
-get_prism_monthlys(type="ppt", mon=10, keepZip = FALSE, years = 2001)
-get_prism_monthlys(type="ppt", mon=11, keepZip = FALSE, years = 2004)
-get_prism_monthlys(type="ppt", mon=7, keepZip = FALSE, years = 2007)
-get_prism_monthlys(type="ppt", mon=12, keepZip = FALSE, years = 2009)
+```
 
+
+# Precip Total precipitation (rain and snow)
+```{r}
+get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
+```
+
+```{r}
 # Maximum temperature (average)
 get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
 
 # Minimum temperature (average)
 get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
 ```
+
+Pick up any that didn't download
+```{r}
+get_prism_monthlys(type="ppt", mon=3, keepZip = FALSE, years = 1995)
+get_prism_monthlys(type="ppt", mon=5, keepZip = FALSE, years = 1988)
+get_prism_monthlys(type="ppt", mon=10, keepZip = FALSE, years = 2001)
+get_prism_monthlys(type="ppt", mon=11, keepZip = FALSE, years = 2004)
+get_prism_monthlys(type="ppt", mon=7, keepZip = FALSE, years = 2007)
+get_prism_monthlys(type="ppt", mon=12, keepZip = FALSE, years = 2009)
+```
+
 
 Lat longs for 10 sites   
 39.1969°N, 108.1298°W Atwell    
@@ -771,7 +781,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
   theme_bw() +
   theme(legend.justification=c(0,1), legend.position=c(0,1))
 
-
+t.test(Comp.1~NS, data=sg.pc)
 ```
 
 # PCA 2008-2015
@@ -794,7 +804,7 @@ cor.table.r<-cor(recent[,-c(1:2,grep("Year", names(recent)),
 data.r <- as.data.frame(as.table(cor.table.r))
 combins.r <- combn(colnames(cor.table.r),2,FUN = function(x) {paste(x,collapse="_")})
 cor.data.r <- data.r[data.r$Var1 != data.r$Var2,]
-data.r <- cor.data[paste(cor.data.r$Var1, cor.data.r$Var2, sep="_") %in% combins.r,]
+data.r <- cor.data.r[paste(cor.data.r$Var1, cor.data.r$Var2, sep="_") %in% combins.r,]
 exclude.r <- paste(data.r$Var2[abs(data.r$Freq)>0.49],sep=",")
 
 tomatch.r <- c("Year","Month","Site","Prev12",exclude.r)
@@ -824,6 +834,9 @@ sg.pc.r$NS[sg.pc.r$Site %in% unique(grep(paste(southsites,collapse="|"),
 data.r[abs(data.r$Freq) > 0.5,]
 ```
 
+In case of "Error in .Call.graphics(C_palette2, .Call..."  
+use dev.off()
+
 ```{r}
 ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=Site))+
   geom_point() +
@@ -836,11 +849,13 @@ ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=NS))+
   stat_ellipse() +
   theme_bw() 
 
+t.test(Comp.1~NS, data=sg.pc.r)
 t.test(Comp.2~NS, data=sg.pc.r)
+
 
 ```
 
-Figure 3 f) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+Figure 4 f) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 
 ```{r}
 #doesn't like "-" in the name
@@ -858,60 +873,6 @@ ggplot(sg.pc.r, aes(Site, Comp.2))+
   geom_boxplot()+
   annotate("text",x=1:10, y = 3,
            label = SiteLetters$Letter[c(10,1:9)])
-```
-
-#Reproduction
-```{r}
-#Percent Reproductive in current year (but don't repeat Atwell Gulch ones)
-sum(sg_sum$Rep[sg_sum$Year==currentYr & 
-                 sg_sum$Site !="Atwell Gulch (old)"])/sum(sg_sum$X[sg_sum$Year==currentYr & 
-                 sg_sum$Site !="Atwell Gulch (old)"])
-
-#average volume, height, and width explains reproductive status
-sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
-summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
-```
-
-```{r}
-ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], 
-       aes(Year, Prepro, group = Site, colour = Site)) +
-  geom_point()+
-  geom_line()+
-  ylab("Percent reproductive") +
-  facet_wrap(~NS+Site,ncol = 5) +
-  theme_bw()
-```
-
-```{r}
-sg_sum[sg_sum$Site=="Pond",]
-
-summarySEreproductive <- summarySE(sg_sum, measurevar = "Prepro", groupvars=c("Site"))
-
-
-summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
-
-
-summary(lm(Prepro~avgVol, data=sg_sum))
-summary(lm(Prepro~avgW, data=sg_sum))
-summary(lm(Prepro~avgH, data=sg_sum))
-
-```
-
-
-#### Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
-
-```{r}
-
-as.data.frame(as.table(cor(recent[,-c(1:2,grep("Year", names(recent)),
-                        grep("Month", names(recent)))])))
-
-
-cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
-                        grep("Month", names(recent)))])
-data <- as.data.frame(as.table(cor.table))
-combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
-cor.data <- data[data$Var1 != data$Var2,]
-data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
 ```
 
 #### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
@@ -974,6 +935,62 @@ sg_sum1 <- sg_sum
 sg_sum1$X[which("Pond" == sg_sum1$Site)] <- sg_sum1$X[which("Pond" == sg_sum1$Site)]/2
 
 ```
+
+
+#Reproduction
+```{r}
+#Percent Reproductive in current year (but don't repeat Atwell Gulch ones)
+sum(sg_sum$Rep[sg_sum$Year==currentYr & 
+                 sg_sum$Site !="Atwell Gulch (old)"])/sum(sg_sum$X[sg_sum$Year==currentYr & 
+                 sg_sum$Site !="Atwell Gulch (old)"])
+
+#average volume, height, and width explains reproductive status
+sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
+summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
+```
+
+```{r}
+ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], 
+       aes(Year, Prepro, group = Site, colour = Site)) +
+  geom_point()+
+  geom_line()+
+  ylab("Percent reproductive") +
+  facet_wrap(~NS+Site,ncol = 5) +
+  theme_bw()
+```
+
+```{r}
+sg_sum[sg_sum$Site=="Pond",]
+
+summarySEreproductive <- summarySE(sg_sum, measurevar = "Prepro", groupvars=c("Site"))
+
+
+summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
+
+
+summary(lm(Prepro~avgVol, data=sg_sum))
+summary(lm(Prepro~avgW, data=sg_sum))
+summary(lm(Prepro~avgH, data=sg_sum))
+
+```
+
+
+#### Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
+
+```{r}
+
+as.data.frame(as.table(cor(recent[,-c(1:2,grep("Year", names(recent)),
+                        grep("Month", names(recent)))])))
+
+
+cor.table<-cor(recent[,-c(1:2,grep("Year", names(recent)),
+                        grep("Month", names(recent)))])
+data <- as.data.frame(as.table(cor.table))
+combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
+cor.data <- data[data$Var1 != data$Var2,]
+data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
+```
+
 
 
 ```{r Figure 2 pond only}
@@ -1183,6 +1200,7 @@ sg.xy$NS <- "North"
 sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
                                                 sg.xy$Site, value=TRUE)] <- "South"
 ```
+
 ```{r}
 ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
@@ -1191,6 +1209,7 @@ ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   theme_bw() +
   facet_grid(~NS)
 ```
+
 ```{r}
 ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
@@ -1199,6 +1218,7 @@ ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   theme_bw() +
   facet_grid(~NS)
 ```
+
 ```{r}
 
 summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
