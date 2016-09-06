@@ -14,19 +14,15 @@ Will need: git push ScGl master
 ```{r, echo=FALSE}
 library(ggplot2)
 library(plyr)
-library(psych)
 library(devtools)
-library(multcompView)
-library(reshape)
+#library(multcompView)
 library(reshape2)
 library(raster)
 library(prism)
 library(RCurl)
-library(devtools)
 
 #Some global variables
 currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
-
 ```
 
 Need to calculate individuals from 2008 data seperate from following due to lack of measuring hight and width. Will need to get the total tagged individuals for number alive instead of number of individuals with a heigth > 0 from 2009 on. <https://research.botanicgardens.org/admin/>      
@@ -36,7 +32,7 @@ In 2012 we switched from measuring the height and width indiviudals under 0.5 cm
 2008-currentYr data  
 ```{r}
 rm(sg)
-
+ 
 # 2015
 #sg15 <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
 #names(sg15)
@@ -75,6 +71,7 @@ summarize 2008
 ```{r}
 rm(scgl08)
 scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
+
 
 head(scgl08)
 
@@ -623,6 +620,7 @@ ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
   ylab("Average minimum temperature per site") 
 
 ```
+
 ```{r}
 ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
                          scgl_sumSE[[2]]$Prev12<currentYr+1,],
@@ -900,10 +898,6 @@ summary(lm(Prepro~avgH, data=sg_sum))
 ```
 
 
-```
-
-
-
 #### Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
 
 ```{r}
@@ -991,7 +985,6 @@ ggplot(sg_sum[which("Pond" == sg_sum$Site),],aes(Year, X/area, colour = Site)) +
         panel.background = element_blank()) +
   scale_x_continuous(breaks=pretty_breaks(n=3)) +
   scale_y_continuous(limits = c(6.5,8.5))
-
 
 
 ```
@@ -1140,6 +1133,7 @@ plot.currentYr$NS[plot.currentYr$Site %in% grep(paste(southsites,collapse="|"),
                                                 plot.currentYr$Site, value=TRUE)] <- "South"
                     
                     
+
 ggplot(plot.currentYr, aes(Site,value, color= variable, group = variable, shape=variable))+
   geom_point(aes(size = 1)) +
   theme_bw()+
@@ -1158,10 +1152,14 @@ ggplot(plot.currentYr, aes(Site,value, color= variable, group = variable, shape=
 sum15 <- sg_sum[sg_sum$Year == currentYr,]
 sum(sum15$Rep)/sum(sum15$X)
 
+aggregate(sg_sum$Rep, list(Year = sg_sum$Year, Site = sg_sum$SiteSame), sum)
+aggregate(sg_sum$X, list(Year = sg_sum$Year, Site = sg_sum$SiteSame), sum)
+
 mean(sg_sum$Prepro)
 sd(sg_sum$Prepro)
 data.frame(as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN =mean)),
            as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN = sd)))
+
 
 ```
 
@@ -1217,17 +1215,4 @@ mean(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
 sd(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
 
 ```
-
-
-
-```{r}
-
-
-
-
-```
-
-
-
-
 
