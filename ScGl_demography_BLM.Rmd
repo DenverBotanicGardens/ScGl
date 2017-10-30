@@ -9,7 +9,10 @@ The repository is named "ScGl"
 Will need: git push ScGl master   
 
 2015: uploaded "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Raw Data/2015 Datasheets/DataEntry2015_10.13.15.csv"
-
+```{r}
+#if I need it!
+rm(list=ls())
+```
 
 ```{r, echo=FALSE}
 library(ggplot2)
@@ -20,6 +23,10 @@ library(reshape2)
 library(raster)
 library(prism)
 library(RCurl)
+library(psych)
+#Set wd for prism data if not already
+options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+
 
 #Some global variables
 currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
@@ -31,15 +38,14 @@ In 2012 we switched from measuring the height and width indiviudals under 0.5 cm
 
 2008-currentYr data  
 ```{r}
-rm(sg)
- 
 # 2015
 #sg15 <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
 #names(sg15)
 
 #2016
 # Need to strip white space and conform to 2015 data
-sg <- read.csv(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_2016.csv"))
+sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_", currentYr,".csv",
+                     sep=""))
 names(sg)
 
 table(sg$Site,sg$Year) 
@@ -72,9 +78,6 @@ summarize 2008
 rm(scgl08)
 scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
 
-
-head(scgl08)
-
 sg_summary08 <- ddply(scgl08,  
                     .(SiteName,Year), summarise,
                     X = sum(CountofHeight),
@@ -87,13 +90,10 @@ sg_summary08 <- ddply(scgl08,
                     avgVol = NA,
                     sdVol = NA)
 
-head(sg_summary08)
 ```
 
 
 ```{r}
-table(sg$Site)
-
 sg$Fl <- as.character(sg$Fl)
 sg$Br <- as.character(sg$Br)
 
@@ -106,7 +106,6 @@ sg$Br[sg$Br == "y"] <- "1"
 sg$Fl <- as.numeric(sg$Fl)
 sg$Br <- as.numeric(sg$Br)
 
-str(sg)
 ```
 
 
@@ -125,7 +124,7 @@ sg[grep("Atwell", sg$Site),"Site"] <- "Atwell Gulch"
 # One copy of all Atwell Gulch 2012 on for new
 atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
 
-atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(atwell$Y.coord.m.<30)),] 
+atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
 atwell.old$Site <- "Atwell Gulch (old)"
 
 ```
@@ -162,6 +161,50 @@ ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
   geom_point()
 ```
 
+Minis
+```{r}
+sg$Site <- factor(sg$Site)
+
+
+sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
+sg$Minis[sg$Minis > 1000] <- NA
+
+minis <- aggregate(sg$Minis, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
+names(minis) <- c("Site","Year","Minis")
+
+repro <- aggregate(sg$Fl, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
+names(repro) <- c("Site","Year","Reproductive")
+minis.p.repro <- merge(minis,repro, by = c("Site","Year"))
+minis.p.repro$PerM <- minis.p.repro$Minis/minis.p.repro$Reproductive
+
+#Minis per reproductive plant
+ggplot(minis.p.repro, aes(Year, PerM))+
+  geom_line()+
+  facet_wrap(~Site)
+
+
+
+sgminis <- merge(sg, minis, by = c("Site","Year"))
+
+#want average minis per adult plant per site per year
+
+ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site, group = Year))+
+  geom_boxplot()+
+  facet_wrap(~Site)
+
+ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site))+
+  geom_point()+
+  facet_wrap(~Site)
+
+#Some die, some grow into big ones. 
+ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = as.factor(Tag)))+
+  geom_line()+
+  facet_wrap(~Site)+
+  theme(legend.position = "none")
+
+
+
+```
 
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
@@ -216,10 +259,13 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
 
 
 ```{r}
-ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
+ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site, shape=Site))+
+  scale_shape_manual(values=1:nlevels(sg_sum$Site[grep("old",sg_sum$Site,invert=TRUE)]))+
   geom_point()+
   geom_line()+
-  ylab("Total individuals")
+  ylab("Total individuals")+
+  theme_bw()+
+  scale_x_continuous(breaks = seq(2008, currentYr, 2))
 ```
 
 
@@ -229,7 +275,8 @@ ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   facet_grid(~Site)+
-  ylab("Total individuals")
+  ylab("Total individuals")+
+  theme_bw()
 ```
 
 ```{r}
@@ -248,7 +295,8 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
                    sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
-  ylab("Total individuals")  
+  ylab("Total individuals")+
+  theme_bw()
 ```
 
 
@@ -298,12 +346,15 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
 ```
 
 Report Tables_current year
-Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008 – 2015).
+Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008-2015).
 ```{r}
 #save to clipboard to excel sheet in correct format ("$" says the end of the string)
 new <- c("Atwell Gulch$","Oil Pad","Pond","T-Junction")
 poststand <- sg_sum[sg_sum$Year == currentYr & sg_sum$Site %in% grep(paste(new,collapse="|"),
                                                         sg_sum$Site,value=TRUE),]
+
+sg_sum[sg_sum$Year == currentYr,]
+
 prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
                                                         sg_sum$Site,value=TRUE),]
 
@@ -327,15 +378,22 @@ options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/S
 
 # Precip Total precipitation (rain and snow)
 ```{r}
-get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
+#get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
 ```
+
+#Update last year and get this year 
+```{r}
+get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = (currentYr-1):currentYr)
+
+```
+
 
 ```{r}
 # Maximum temperature (average)
-get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
+get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = (currentYr-1):currentYr)
 
 # Minimum temperature (average)
-get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 1986:currentYr)
+get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = (currentYr-1):currentYr)
 ```
 
 Pick up any that didn't download
@@ -380,17 +438,11 @@ names(latlong) <- c("Lat","Long","Site")
 latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 ```
 
-Precip   
-16 years 2000:currentYr
-```{r}
-#Set wd for prism data if not already
-options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
-library(prism)
-library(raster)
-```
+# Go into folder "Q:\Research\All_Projects_by_Species\Sclerocactus SPECIES\Sclerocactus_glaucus\ScGl_climate\PRISM_ppt_provisional_4kmM3_201601_bil" and delete the provisional ones from last year   
 
 ```{r}
 ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
+#ppt2 <- grep(paste("ppt_stable",paste("ppt_provisional_4kmM3_",currentYr,sep=""),collapse="|"),ls_prism_data(absPath = TRUE)[,2])
 
 m.ppt <- lapply(ppt, function(x){
   rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
@@ -567,11 +619,6 @@ scgl_sumSE <- lapply(names(scgl.c[,c("ppt","tmin", "tmax")]),
                        summarySE(scgl.c, measurevar=x, groupvars=c("Site","Prev12"))
                        }) 
 
-head(scgl_sumSE[[1]])
-str(scgl_sumSE[[1]])
-names(scgl_sumSE[[1]])
-scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000,]
-
 scgl_sumSE[[1]]$NS <- "North"
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
 scgl_sumSE[[1]]$NS[scgl_sumSE[[1]]$Site %in% unique(grep(paste(southsites,collapse="|"),
@@ -608,7 +655,7 @@ Precipitation North vs. South
 ```{r}
 ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
                          scgl_sumSE[[1]]$Prev12<currentYr,],
-       aes(Prev12, ppt, colour=NS))+
+       aes(Prev12, ppt, colour=NS, group=NS))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.1)) +
@@ -686,9 +733,15 @@ cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))]), numbers = TRUE)
 ```
 
-Ditch anything 50% or more correlated 
+Ditch anything 50% or more correlated of the pair that explains less variation, get r^2 values
 
 ```{r}
+
+rsqs <- lapply(3:length(cc.season), function(x){
+  lm <- summary(lm(cc.season$Site~cc.season[,x]))
+  lm$adj.r.squared
+})
+
 cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))])
 
