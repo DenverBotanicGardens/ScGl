@@ -737,10 +737,12 @@ Ditch anything 50% or more correlated of the pair that explains less variation, 
 
 ```{r}
 
-rsqs <- lapply(3:length(cc.season), function(x){
-  lm <- summary(lm(cc.season$Site~cc.season[,x]))
-  lm$adj.r.squared
-})
+#mlogit(Site~1|ppt.fall+tmax.fall+tmin.fall, cc.season)
+
+#rsqs <- lapply(3:length(cc.season), function(x){
+ # lm <- summary(glm(as.factor(cc.season$Site)~cc.season[,x]))
+  #lm$adj.r.squared
+#})
 
 cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
                         grep("Month", names(cc.season)))])
@@ -770,7 +772,6 @@ scgl.load <- loadings(scgl.pca)
 write.table(scgl.load, "clipboard", sep="\t", row.names=TRUE)
 scgl.pc <- predict(scgl.pca)
 
-rm(sg.pc)
 sg.pc <- data.frame(scgl.pc,cc.season)
 # Assign genetic regions
 sg.pc$NS <- "North"
@@ -789,7 +790,8 @@ Site differences
 #Figure 4b  
 1986-2016
 ```{r}
-ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site, shape=Site))+
+  scale_shape_manual(values=1:nlevels(sg.pc$Site))+
   geom_point() +
   stat_ellipse() +
   theme_bw() 
@@ -798,7 +800,7 @@ ggplot(sg.pc, aes(Comp.1,Comp.2, colour=Site))+
 North/South differences
 #Figure 4a
 ```{r}
-ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
+ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
   geom_point() +
   stat_ellipse() +
   theme_bw() 
@@ -811,6 +813,9 @@ The letters won't line up with the sites unless specified
 #doesn't like "-" in the name
 levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-10], "TJunction")
 sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc))
+
+##START HERE! FIND THE PACKAGE I NEED
+
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
 
 SiteLetters <- data.frame(Letter = lasign$Letters,
