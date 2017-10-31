@@ -26,6 +26,7 @@ library(RCurl)
 library(psych)
 #Set wd for prism data if not already
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+library(multcompView)
 
 
 #Some global variables
@@ -803,7 +804,9 @@ North/South differences
 ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
   geom_point() +
   stat_ellipse() +
-  theme_bw() 
+  theme_bw()+
+  guides(colour=guide_legend(title="Genetic region"))+
+  guides(shape=guide_legend(title="Genetic region"))
 ```
 
 #Figure 4c
@@ -814,18 +817,19 @@ The letters won't line up with the sites unless specified
 levels(sg.pc$Site) <- c(as.character(unique(sg.pc$Site))[-10], "TJunction")
 sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc))
 
-##START HERE! FIND THE PACKAGE I NEED
-
 lasign <- multcompLetters(extract_p(sg.thsd$Site))
 
 SiteLetters <- data.frame(Letter = lasign$Letters,
                           Site = rownames(data.frame(lasign$Letters)))
 
 
-ggplot(sg.pc, aes(Site, Comp.1))+
+ggplot(sg.pc, aes(Site, Comp.1, colour=NS))+
+  stat_boxplot(geom='errorbar')+
   geom_boxplot()+
-  annotate("text",x=1:10, y = 4,
-           label = SiteLetters$Letter[c(10,1:9)])
+  annotate("text",x=1:10, y = 5,
+           label = SiteLetters$Letter[c(10,1:9)])+
+  theme_bw()+
+  guides(colour=guide_legend(title="Genetic region"))
 
 t.test(Comp.1~NS, data=sg.pc)
 
