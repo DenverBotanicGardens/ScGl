@@ -1238,19 +1238,25 @@ all.count
 ```
 
 
-
+###START HERE!!
 #how do climatic variables explain growth rates?   
 ```{r}
-all.count[[1]][1]
-
-lambdaxsite <- mapply(data.frame, 
-                      all.count,
-                      unique(sg_sum$Site))
-
 lambdas <- do.call(rbind, lapply(all.count, '[[', 1))
+lambdas$Site <- sub("\\.[0-9]","",row.names(lambdas)) #get rid of numbers following .
 
-allgrowthrates <- do.call(rbind, all.count)
-head(allgrowthrates)
+head(lambdas)
+head(sg.pc)
+
+# merge the growth rate of the climatic factors of year 2 (so the climate shaping the change from Year 1 to year 2, not before year 1)
+sg.pc.lambda <- merge(sg.pc, lambdas, by.x = c("Site","Prev12"), by.y = c("Site","Year2"))
+
+step1 <- as.formula(paste("ySpecies ~(",
+                          paste(names(sg.pc.lambda)[10:21],
+                                collapse="+"),")^2"))
+
+lm4step <- do.call("lm", list(step1, quote(sg.pc.lambda)))
+summary(step(lm4step))
+                   
 ```
 
 
