@@ -61,6 +61,9 @@ if(nrow(sg[-which(sg$Site == ""),])>0){
 sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
 
 nrow(sg[sg$Year == 2008,])
+sg$Site <- factor(sg$Site)
+sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
+sg$Minis[sg$Minis > 1000] <- NA
 
 write.table(sg, file="P:/hackathon/ScGl/datasets/sg.csv", sep=",")
 
@@ -162,50 +165,6 @@ ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
   geom_point()
 ```
 
-Minis
-```{r}
-sg$Site <- factor(sg$Site)
-
-
-sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
-sg$Minis[sg$Minis > 1000] <- NA
-
-minis <- aggregate(sg$Minis, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
-names(minis) <- c("Site","Year","Minis")
-
-repro <- aggregate(sg$Fl, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
-names(repro) <- c("Site","Year","Reproductive")
-minis.p.repro <- merge(minis,repro, by = c("Site","Year"))
-minis.p.repro$PerM <- minis.p.repro$Minis/minis.p.repro$Reproductive
-
-#Minis per reproductive plant
-ggplot(minis.p.repro, aes(Year, PerM))+
-  geom_line()+
-  facet_wrap(~Site)
-
-
-
-sgminis <- merge(sg, minis, by = c("Site","Year"))
-
-#want average minis per adult plant per site per year
-
-ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site, group = Year))+
-  geom_boxplot()+
-  facet_wrap(~Site)
-
-ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site))+
-  geom_point()+
-  facet_wrap(~Site)
-
-#Some die, some grow into big ones. 
-ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = as.factor(Tag)))+
-  geom_line()+
-  facet_wrap(~Site)+
-  theme(legend.position = "none")
-
-
-
-```
 
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
@@ -900,16 +859,19 @@ In case of "Error in .Call.graphics(C_palette2, .Call..."
 use dev.off()
 
 ```{r}
-ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=Site))+
+ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=Site, shape=Site))+
+  scale_shape_manual(values=1:nlevels(sg_sum$Site[grep("old",sg_sum$Site,invert=TRUE)]))+
   geom_point() +
   stat_ellipse() +
-  theme_bw() 
+  theme_bw()
 
 
-ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=NS))+
+ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
   geom_point() +
   stat_ellipse() +
-  theme_bw() 
+  theme_bw()+
+  guides(colour=guide_legend(title="Genetic region"))+
+  guides(shape=guide_legend(title="Genetic region")) 
 
 t.test(Comp.1~NS, data=sg.pc.r)
 t.test(Comp.2~NS, data=sg.pc.r)
@@ -923,18 +885,36 @@ Figure 4 f) Site distribution along PC1 is shown with Tukey Honest Significant D
 #doesn't like "-" in the name
 levels(sg.pc.r$Site) <- c(as.character(unique(sg.pc.r$Site))[-(10)],"TJunction")
 
-sg.thsd <- TukeyHSD(aov(Comp.2~Site, data=sg.pc.r))
-lasign <- multcompLetters(extract_p(sg.thsd$Site))
+sg.thsd2 <- TukeyHSD(aov(Comp.2~Site, data=sg.pc.r))
+lasign2 <- multcompLetters(extract_p(sg.thsd2$Site))
+
+SiteLetters2 <- data.frame(Letter = lasign2$Letters[],
+                          Site = rownames(data.frame(lasign2$Letters)))
+Siteletters2 <- SiteLetters[order(SiteLetters2$Site),]
+
+sg.thsd1 <- TukeyHSD(aov(Comp.1~Site, data=sg.pc.r))
+lasign1 <- multcompLetters(extract_p(sg.thsd1$Site))
+
+SiteLetters1 <- data.frame(Letter = lasign1$Letters[],
+                          Site = rownames(data.frame(lasign1$Letters)))
+Siteletters1 <- SiteLetters[order(SiteLetters1$Site),]
 
 
-SiteLetters <- data.frame(Letter = lasign$Letters[],
-                          Site = rownames(data.frame(lasign$Letters)))
-Siteletters <- SiteLetters[order(SiteLetters$Site),]
-
-ggplot(sg.pc.r, aes(Site, Comp.2))+
+ggplot(sg.pc.r, aes(Site, Comp.2, colour=NS))+
+  stat_boxplot(geom='errorbar')+
   geom_boxplot()+
-  annotate("text",x=1:10, y = 3,
-           label = SiteLetters$Letter[c(10,1:9)])
+  annotate("text",x=1:10, y = 4,
+           label = SiteLetters2$Letter[c(10,1:9)])+
+  theme_bw()+
+  guides(colour=guide_legend(title="Genetic region"))
+
+ggplot(sg.pc.r, aes(Site, Comp.1, colour=NS))+
+  stat_boxplot(geom='errorbar')+
+  geom_boxplot()+
+  annotate("text",x=1:10, y = 4,
+           label = SiteLetters1$Letter[c(10,1:9)])+
+  theme_bw()+
+  guides(colour=guide_legend(title="Genetic region"))
 ```
 
 #### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
@@ -1011,7 +991,10 @@ sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
 summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
 ```
 
+
 ```{r}
+
+
 ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], 
        aes(Year, Prepro, group = Site, colour = Site)) +
   geom_point()+
@@ -1054,58 +1037,104 @@ data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
 ```
 
 
+Figure 3a Number of sclerocactus glaucus
+```{r Figure  remove pond}
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig3a.jpg", sep=""), width=250, height=125, units="mm", res=300)
 
-```{r Figure 2 pond only}
-ggplot(sg_sum[which("Pond" == sg_sum$Site),],aes(Year, X/area, colour = Site)) +
+
+ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
+  facet_wrap(~NS + SiteSame, ncol = 5) +
   ylab("Individuals per square meter") +
-  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
-        panel.background = element_blank()) +
-  scale_x_continuous(breaks=pretty_breaks(n=3)) +
-  scale_y_continuous(limits = c(6.5,8.5))
-
-
-```
-
-
-```{r Figure 2 remove pond}
-ggplot(sg_sum[grep(paste(c("Pond"), collapse="|"), sg_sum$Site, invert=TRUE),],
-       aes(Year, X/area, colour = Site)) +
-  geom_line() +
-  geom_point() +
-  facet_wrap(~NS + SiteSame, ncol = 3) +
-  ylab("Individuals per square meter") +
-  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
-        panel.background = element_blank()) +
-  scale_x_continuous(breaks=pretty_breaks(n=7))+
-  scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
-                                "#71C671","#7D9EC0","#7171C6",
-                                "#C67171","#C5C1AA","#8E8E38",
-                                "#71C671","#7D9EC0","#8B0000"))
-
-
-
-```
-
-
-### Figure 2b
-```{r}
-ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
-  geom_line()+
-  geom_point()+
-  facet_wrap(~NS + SiteSame, ncol =5)+
-  ylab("Average volume")+
-  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1),
-        panel.background = element_blank()) +
-  scale_x_continuous(breaks=pretty_breaks(n=7))+
+  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
+  theme_bw()+
+  scale_x_continuous(breaks = seq(2008, currentYr, 2))+
   scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#7171C6",
                                 "#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#8B0000"))
 
+dev.off()
 
 ```
+
+
+### Figure 3b
+```{r}
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig3b.jpg", sep=""), width=250, height=125, units="mm", res=300)
+
+
+ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
+  geom_line()+
+  geom_point()+
+  facet_wrap(~NS + SiteSame, ncol =5)+
+  ylab("Average volume")+
+  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
+  scale_x_continuous(breaks = seq(2008, currentYr, 2))+
+  scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#388E8E","#7D9EC0","#7171C6",
+                                "#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#388E8E","#7D9EC0","#8B0000"))+
+  theme_bw()
+
+dev.off()
+```
+
+
+Figure 3c
+```{r}
+#Minis
+
+minis <- aggregate(sg$Minis, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
+names(minis) <- c("Site","Year","Minis")
+
+repro <- aggregate(sg$Fl, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
+names(repro) <- c("Site","Year","Reproductive")
+minis.p.repro <- merge(minis,repro, by = c("Site","Year"))
+minis.p.repro$PerM <- minis.p.repro$Minis/minis.p.repro$Reproductive
+
+sg[sg$Minis>20 & !is.na(sg$Minis),]
+
+#Minis per reproductive plant
+ggplot(minis.p.repro, aes(Year, PerM))+
+  geom_line()+
+  facet_wrap(~Site)
+
+sgminis <- merge(sg_sum, minis, by = c("Site","Year"))
+
+#want average minis per adult plant per site per year
+
+ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site, group = Year))+
+  geom_boxplot()+
+  facet_wrap(~Site)
+
+ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site))+
+  geom_point()+
+  facet_wrap(~Site)
+
+#Some die, some grow into big ones. 
+ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = as.factor(Tag)))+
+  geom_line()+
+  facet_wrap(~Site)+
+  theme(legend.position = "none")
+```
+
+```{r}
+
+##FIGURE 3c
+ggplot(sgminis[grep("old",sgminis$Site,invert=TRUE),], 
+       aes(Year, Minis,colour= Site, shape = Site))+
+  scale_shape_manual(values=1:10)+
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  scale_x_continuous(breaks = seq(2011, currentYr, 2))+ 
+  xlim(c(2011, currentYr))
+  
+
+```
+
 
 ```{r}
 par(cex=0.8)  
@@ -1119,7 +1148,7 @@ interaction.plot(sg_sum$Year, factor(sg_sum$Site),
 
 
 ####Figure 6: The plot design for four ScGl sites were changed in 2012...   
-
+START HERE!! fix the x axis lables, not .5
 ```{r}
 # old and new
 oldnew <- c("Oil","Pond","T-","Atwell")
@@ -1130,15 +1159,16 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   geom_line()+
   ylab("Total individuals") +
   facet_wrap(~SiteSame)+
-  theme_bw()
+  theme_bw()+
+  scale_x_continuous(breaks = seq(2009, currentYr, 1))
 
 ```
 
 
 ### statistics
 count pva
-
 ```{r}
+# x = Year, y = count
 CountPVA <- function(x,y){
   
   LM.table <- c()
@@ -1203,16 +1233,24 @@ plot.currentYr <- melt(fit.currentYr,
 
 ```
 
-
+#Demography
 #Lambdas by site
 ```{r}
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
 plot.currentYr$NS <- "North"
 plot.currentYr$NS[plot.currentYr$Site %in% grep(paste(southsites,collapse="|"),
                                                 plot.currentYr$Site, value=TRUE)] <- "South"
-                    
-                    
 
+#Average growth rate and CI for south and north
+aggregate(value ~ variable + NS, data = plot.currentYr, FUN= mean)
+#Average growth rate and CI for all sites
+aggregate(value ~ variable, data = plot.currentYr, FUN= mean)
+#Pyramid Rock growing?
+plot.currentYr[plot.currentYr$Site == "Pyramid Rock",]
+```
+
+#Figure 2: Lambda and 95% CI for each
+```{r}
 ggplot(plot.currentYr, aes(Site,value, color= variable, group = variable, shape=variable))+
   geom_point(aes(size = 1)) +
   theme_bw()+
