@@ -816,7 +816,7 @@ cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
 
 ```
 
-#### 2008-2015
+#### 2008-currentYr
 Ditch anything 50% or more correlated 
 
 ```{r}
@@ -848,6 +848,9 @@ southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
 sg.pc.r$NS[sg.pc.r$Site %in% unique(grep(paste(southsites,collapse="|"),
                                      sg.pc.r$Site,
                                      value=TRUE))] <- "South"
+
+# how do climate variables explain annual growth rates?
+head()
 ```
 
 # Table 3b) 2008 - current year
@@ -1045,11 +1048,12 @@ jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactu
 ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
+  ggtitle("a)")+
   facet_wrap(~NS + SiteSame, ncol = 5) +
   ylab("Individuals per square meter") +
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
   theme_bw()+
-  scale_x_continuous(breaks = seq(2008, currentYr, 2))+
+  scale_x_continuous(breaks = seq(2008, currentYr, 4))+
   scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#7171C6",
                                 "#C67171","#C5C1AA","#8E8E38",
@@ -1068,10 +1072,11 @@ jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactu
 ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
   geom_line()+
   geom_point()+
+  ggtitle("b)")+
   facet_wrap(~NS + SiteSame, ncol =5)+
   ylab("Average volume")+
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
-  scale_x_continuous(breaks = seq(2008, currentYr, 2))+
+  scale_x_continuous(breaks = seq(2008, currentYr, 4))+
   scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#7171C6",
                                 "#C67171","#C5C1AA","#8E8E38",
@@ -1120,20 +1125,44 @@ ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = as.factor(Tag)))+
   theme(legend.position = "none")
 ```
 
+##FIGURE 3c
+```{r}
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig3c.jpg", sep=""), width=250, height=125, units="mm", res=300)
+
+ggplot(sgminis, aes(Year, Minis,colour= Site))+
+  geom_line()+
+  geom_point()+
+  ggtitle("c)")+
+  facet_wrap(~NS + SiteSame, ncol =5)+
+  ylab("Total seedlings (< 0.5cm width)")+
+  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
+  scale_x_continuous(breaks = seq(2008, currentYr, 4))+
+  scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#388E8E","#7D9EC0","#7171C6",
+                                "#C67171","#C5C1AA","#8E8E38",
+                                "#71C671","#388E8E","#7D9EC0","#8B0000"))+
+  theme_bw()
+
+  
+dev.off()
+```
 ```{r}
 
-##FIGURE 3c
-ggplot(sgminis[grep("old",sgminis$Site,invert=TRUE),], 
-       aes(Year, Minis,colour= Site, shape = Site))+
-  scale_shape_manual(values=1:10)+
-  geom_point()+
-  geom_line()+
-  theme_bw()+
-  scale_x_continuous(breaks = seq(2011, currentYr, 2))+ 
-  xlim(c(2011, currentYr))
-  
+summary(lm(X/area ~ avgVol*Minis, data=sgminis))
 
+ggplot(sgminis, aes(Minis, X/area))+
+  geom_point()+
+  stat_smooth(method="lm")
+
+ggplot(sgminis, aes(Minis, Rep))+
+  geom_point()+
+  stat_smooth(method="lm")
+
+ggplot(sgminis, aes(Minis/Rep, X/area))+
+  geom_point()+
+  stat_smooth(method="lm")
 ```
+
 
 
 ```{r}
@@ -1148,7 +1177,6 @@ interaction.plot(sg_sum$Year, factor(sg_sum$Site),
 
 
 ####Figure 6: The plot design for four ScGl sites were changed in 2012...   
-START HERE!! fix the x axis lables, not .5
 ```{r}
 # old and new
 oldnew <- c("Oil","Pond","T-","Atwell")
@@ -1208,6 +1236,23 @@ names(all.count) <- unique(sg_sum$Site)
 
 all.count
 ```
+
+
+
+#how do climatic variables explain growth rates?   
+```{r}
+all.count[[1]][1]
+
+lambdaxsite <- mapply(data.frame, 
+                      all.count,
+                      unique(sg_sum$Site))
+
+lambdas <- do.call(rbind, lapply(all.count, '[[', 1))
+
+allgrowthrates <- do.call(rbind, all.count)
+head(allgrowthrates)
+```
+
 
 #### Demography   
 
