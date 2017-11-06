@@ -824,52 +824,64 @@ t.test(Comp.1~NS, data=sg.pc86current)
 
 #### Figure 4: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 ```{r}
-ggplot(sg.pc, aes(Comp.1,Comp.2, colour=NS))+
+ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
   stat_ellipse() +
   theme_bw() +
   theme(legend.justification=c(0,1), legend.position=c(0,1))
 
-t.test(Comp.1~NS, data=sg.pc)
+t.test(Comp.1~NS, data=sg.pc86current)
 ```
+
+Results of first PCA  
+```{r}
+ggplot(sg.pc86current, aes(tmax.fall, tmax.spring, colour = NS))+
+  geom_point()+
+  stat_ellipse()
+
+ggplot(sg.pc86current, aes(ppt.spring, ppt.fall, colour=NS))+
+  geom_point()+
+  stat_ellipse()
+```
+
+
 
 # PCA 2008-2015
 Try for only the study period 
 Prev12 is the May of the previous year through the April of the current year
-
-```{r}
-recent <- season[season$Prev12 > 2007 & season$Prev12 < currentYr+1,]
-cor.plot(cor(recent[,-c(1:2,grep("Year", names(recent)),
-                        grep("Month", names(recent)))]), numbers = TRUE)
-
-```
-
 #### 2008-currentYr
 Ditch anything 50% or more correlated 
 
 ```{r}
-cor.table.r<-cor(recent[,-c(1:2,grep("Year", names(recent)),
-                        grep("Month", names(recent)))])
+
+recent08current <- cc.season[cc.season$Prev12 > 2007 & cc.season$Prev12 < currentYr+1,]
+
+cor.table.r<-cor(recent08current[,-c(1:2)])
 data.r <- as.data.frame(as.table(cor.table.r))
-combins.r <- combn(colnames(cor.table.r),2,FUN = function(x) {paste(x,collapse="_")})
-cor.data.r <- data.r[data.r$Var1 != data.r$Var2,]
-data.r <- cor.data.r[paste(cor.data.r$Var1, cor.data.r$Var2, sep="_") %in% combins.r,]
-exclude.r <- paste(data.r$Var2[abs(data.r$Freq)>0.49],sep=",")
+colexclude08 <- c(1:2)
 
-tomatch.r <- c("Year","Month","Site","Prev12",exclude.r)
-
-forpca.r <- recent[,c(grep(paste(tomatch.r,collapse="|"),
-                            names(recent), value=TRUE, invert = TRUE))]
+while(max(data.r$Freq[abs(data.r$Freq)>cor.level&
+                      data.r$Freq<1])>0.5){
+  cor08 <- data.r[abs(data.r$Freq)>cor.level & data.r$Freq<1,]
+  #order by most correlated
+  cor08 <- cor08[with(cor08, order(-abs(Freq))),]
+  exclude08 <- rsqs$var[rsqs$r2 == min(rsqs$r2[rsqs$var==as.character(cor08[1,1])],
+                                       rsqs$r2[rsqs$var==as.character(cor08[1,2])])]
+  #need to iteratively get rid of exclude
+  colexclude08 <- c(colexclude08,grep(as.character(exclude08), names(recent08current)))
+  cor.table08<-cor(recent08current[,-colexclude08]) 
+  data.r <- as.data.frame(as.table(cor.table08))
+}
 
 #Variables kept for 2007 May - current year
-sort(grep(paste(tomatch.r,collapse="|"),names(recent), value=TRUE, invert = TRUE))
+names(recent08current[,-colexclude08])
 
-scgl.pca.r <- princomp(forpca.r,cor=TRUE)
+scgl.pca.r <- princomp(recent08current[,-colexclude08],cor=TRUE)
 summary(scgl.pca.r)
 scgl.load.r <- loadings(scgl.pca.r)
 scgl.pc.r <- predict(scgl.pca.r)
 
-sg.pc.r <- data.frame(scgl.pc.r,recent)
+sg.pc.r <- data.frame(scgl.pc.r,recent08current)
 # Assign genetic regions
 sg.pc.r$NS <- "North"
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
@@ -881,7 +893,13 @@ sg.pc.r$NS[sg.pc.r$Site %in% unique(grep(paste(southsites,collapse="|"),
 
 # Table 3b) 2008 - current year
 ```{r}
-data.r[abs(data.r$Freq) > 0.5,]
+Table3bcor <- cor(recent08current[,-c(1:2)])
+Table3b <- as.data.frame(as.table(Table3bcor))
+
+Table3b <- Table3b[abs(Table3b$Freq)>cor.level&Table3b$Freq<1,]
+Table3b <- Table3b[with(Table3b, order(Table3b$Freq)),]
+write.table(Table3b[!duplicated(Table3b$Freq),], "clipboard", sep="\t", row.names=FALSE)
+
 ```
 
 In case of "Error in .Call.graphics(C_palette2, .Call..."  
@@ -907,6 +925,19 @@ t.test(Comp.2~NS, data=sg.pc.r)
 
 
 ```
+
+Reults of the second PCA 
+```{r}
+ggplot(sg.pc.r, aes(tmin.fall,tmax.fall,colour=NS))+
+  geom_point()+
+  stat_ellipse()
+
+ggplot(sg.pc.r, aes(ppt.winter,ppt.spring,colour=NS))+
+  geom_point()+
+  stat_ellipse()
+```
+
+
 
 Figure 4 f) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
 
@@ -1301,24 +1332,20 @@ summary(lm4stepComps)
 #### Demography   
 
 ```{r}
-# average fit for current year over all sites
-last.fit <- sapply(all.count, function(x){
-  x$LM[nrow(x$LM),]
-})
 
-tlast.fit <- data.frame(t(last.fit))
-apply(tlast.fit[tlast.fit$RangeEnd == currentYr,4:6], 2, 
-      FUN = function(x) mean(exp(as.numeric(x)), na.rm=TRUE)) #arithmetic mean
+Fit.list <- lapply(all.count, '[[', 2) 
 
-fit.currentYr <- tlast.fit[tlast.fit$RangeEnd == currentYr,]
+last.fit <- do.call(rbind,lapply(Fit.list, function(x){
+  out <- exp(x[nrow(x),-c(1:3)])
+  years <- x[nrow(x), 1:3]
+  data.frame(years,out)
+}))
 
-fit.currentYr <- transform(fit.currentYr, fit = exp(as.numeric(fit)), 
-                      lwr = exp(as.numeric(lwr)), 
-                      upr = exp(as.numeric(upr)))
-fit.currentYr <- data.frame(Site = rownames(fit.currentYr), fit.currentYr)
+
+fit.currentYr <- data.frame(Site = rownames(last.fit), last.fit)
 plot.currentYr <- melt(fit.currentYr,
                   id.vars = "Site",
-                  measure.vars = c("fit","upr","lwr"))
+                  measure.vars = c("fit","upr","lwr","rsq"))
 
 ```
 
@@ -1340,7 +1367,11 @@ plot.currentYr[plot.currentYr$Site == "Pyramid Rock",]
 
 #Figure 2: Lambda and 95% CI for each
 ```{r}
-ggplot(plot.currentYr, aes(Site,value, color= variable, group = variable, shape=variable))+
+plot.noold <- plot.currentYr[!grepl("old", plot.currentYr$Site),]
+plot.noold <- rbind(plot.noold, plot.currentYr[plot.currentYr$Site == "Atwell Gulch (old)",])
+
+ggplot(plot.noold[plot.noold$variable!="rsq",], 
+       aes(Site,value, color= variable, group = variable, shape=variable))+
   geom_point(aes(size = 1)) +
   theme_bw()+
   scale_shape_manual(values=c(1,6,2))+
@@ -1349,6 +1380,13 @@ ggplot(plot.currentYr, aes(Site,value, color= variable, group = variable, shape=
   guides(colour= FALSE, shape= FALSE, size = FALSE)+
   labs(y="Lambda")+
   facet_grid(~NS, scales="free")
+
+```
+
+Discussion, lambda patterns
+```{r}
+
+fit.currentYr[fit.currentYr$lwr>1,]
 
 ```
 
@@ -1433,6 +1471,9 @@ sd(sg.xy$Height.cm..x-sg.xy$Height.cm..y, na.rm=TRUE)
 
 mean(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
 sd(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
+
+
+summary(lm(Prepro~(avgH+avgW)^2, data=sg_sum))
 
 ```
 
