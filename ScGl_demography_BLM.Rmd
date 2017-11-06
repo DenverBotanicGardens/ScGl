@@ -31,7 +31,74 @@ library(multcompView)
 
 #Some global variables
 currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
+
+#summarySE function borrowed from http://www.cookbook-r.com/Manipulating_data/Summarizing_data/
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+    library(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        c(N    = length2(xx[[col]], na.rm=na.rm),
+          mean = mean   (xx[[col]], na.rm=na.rm),
+          sd   = sd     (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+
+    return(datac)
+}
+
+#count pva
+# x = Year, y = count
+CountPVA <- function(x,y){
+  
+  LM.table <- c()
+  
+  for(yrs in 3:length(unique(x))){		# gives 2 transitions before the first Count PVA calculation
+		rsq <- c(); PVA.lm <- list()
+  
+    y.count <- y[1:yrs] #Annual count for site
+    x.years <- x[1:yrs] #Years of counts (can have missing years)
+    ySpecies <- log10(y.count[-1]/y.count[-length(y.count)])
+    yr <- sqrt(x.years[-1]-x.years[-length(x.years)])
+    
+		PVA.lm <- lm(ySpecies ~ -1 + yr)
+		mu_sp <- predict(PVA.lm, level= 0.95,
+		                 interval = "confidence",
+		                 se.fit = T)$fit[1,]
+    rsq <- c(rsq, R2 = summary(PVA.lm)$adj.r.squared)	# pull R squared values from each year interval 
+    LM.table <- rbind(LM.table,data.frame(rsq,RangeStart=min(x),RangeEnd=x[yrs],t(mu_sp)))    
+	}
+	Year1 <- x.years[-length(x.years)]
+	Year2 <- x.years[-1]
+	PVA.table <-data.frame(yr,ySpecies,Year1,Year2)
+  
+  list(PVA = PVA.table,LM = LM.table)
+}
+
 ```
+
 
 Need to calculate individuals from 2008 data seperate from following due to lack of measuring hight and width. Will need to get the total tagged individuals for number alive instead of number of individuals with a heigth > 0 from 2009 on. <https://research.botanicgardens.org/admin/>      
 
@@ -65,7 +132,7 @@ sg$Site <- factor(sg$Site)
 sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
 sg$Minis[sg$Minis > 1000] <- NA
 
-write.table(sg, file="P:/hackathon/ScGl/datasets/sg.csv", sep=",")
+write.table(sg, file=paste("P:/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
 
 ```
 
@@ -400,6 +467,10 @@ latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 
 # Go into folder "Q:\Research\All_Projects_by_Species\Sclerocactus SPECIES\Sclerocactus_glaucus\ScGl_climate\PRISM_ppt_provisional_4kmM3_201601_bil" and delete the provisional ones from last year   
 
+Max temp   
+16 years 2000:currentYr
+Min temp   
+16 years 2000:currentYr
 ```{r}
 ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
 #ppt2 <- grep(paste("ppt_stable",paste("ppt_provisional_4kmM3_",currentYr,sep=""),collapse="|"),ls_prism_data(absPath = TRUE)[,2])
@@ -409,12 +480,7 @@ m.ppt <- lapply(ppt, function(x){
   data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
              date = ls_prism_data()[x,], Site = latlong$Site)
 })
-```
 
-
-Max temp   
-16 years 2000:currentYr
-```{r}
 tmax <- grep("tmax", ls_prism_data(absPath = TRUE)[,2])
 
 m.tmax <- lapply(tmax, function(x){
@@ -422,12 +488,7 @@ m.tmax <- lapply(tmax, function(x){
   data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
              date = ls_prism_data()[x,], Site = latlong$Site)
 })
-```
 
-
-Min temp   
-16 years 2000:currentYr
-```{r}
 tmin <- grep("tmin", ls_prism_data(absPath = TRUE)[,2])
 
 m.tmin <- lapply(tmin, function(x){
@@ -533,45 +594,6 @@ season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<currentYr+1,],
 ```
 
 
-summarySE function borrowed from http://www.cookbook-r.com/Manipulating_data/Summarizing_data/
-```{r}
-summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
-                      conf.interval=.95, .drop=TRUE) {
-    library(plyr)
-
-    # New version of length which can handle NA's: if na.rm==T, don't count them
-    length2 <- function (x, na.rm=FALSE) {
-        if (na.rm) sum(!is.na(x))
-        else       length(x)
-    }
-
-    # This does the summary. For each group's data frame, return a vector with
-    # N, mean, and sd
-    datac <- ddply(data, groupvars, .drop=.drop,
-      .fun = function(xx, col) {
-        c(N    = length2(xx[[col]], na.rm=na.rm),
-          mean = mean   (xx[[col]], na.rm=na.rm),
-          sd   = sd     (xx[[col]], na.rm=na.rm)
-        )
-      },
-      measurevar
-    )
-
-    # Rename the "mean" column    
-    datac <- rename(datac, c("mean" = measurevar))
-
-    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
-
-    # Confidence interval multiplier for standard error
-    # Calculate t-statistic for confidence interval: 
-    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
-    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
-    datac$ci <- datac$se * ciMult
-
-    return(datac)
-}
-```
-
 summary statistics
 ```{r}
 scgl_sumSE <- lapply(names(scgl.c[,c("ppt","tmin", "tmax")]), 
@@ -629,12 +651,12 @@ Minimum temperature per site (Celcius)
 ```{r}
 ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
                          scgl_sumSE[[2]]$Prev12<currentYr+1,],
-       aes(Prev12, tmin, colour=Site))+
+       aes(Prev12, tmin, colour=NS, group=NS))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
   theme_bw() +
-  ylab("Average minimum temperature per site") 
+  ylab("Average monthly minimum temperature") 
 
 ```
 
@@ -662,6 +684,7 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
   ylab("Average maximum temperature per site") 
 
 ```
+
 ```{r}
 ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
                          scgl_sumSE[[3]]$Prev12<currentYr+1,],
@@ -678,15 +701,9 @@ t.test(tmax~NS, data= scgl_sumSE[[3]])
 Take out missing data, Years 1986 through current year as previous 12 years to the May survey
 
 ```{r}
-head(season)
-tail(season)
-names(season)
-sort(unique(season$Prev12))
-
-nrow(season) #310
+nrow(season) #320
 cc.season <- season[complete.cases(season),]
-str(cc.season)
-nrow(cc.season) #300
+nrow(cc.season) #310
 unique(sort(cc.season$Prev12)) #1986:current year
 
 cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
@@ -699,22 +716,30 @@ Ditch anything 50% or more correlated of the pair that explains less variation, 
 
 #mlogit(Site~1|ppt.fall+tmax.fall+tmin.fall, cc.season)
 
-#rsqs <- lapply(3:length(cc.season), function(x){
- # lm <- summary(glm(as.factor(cc.season$Site)~cc.season[,x]))
-  #lm$adj.r.squared
-#})
+rsqs <- do.call(rbind,lapply(3:length(cc.season), function(x){
+  lm <- summary(lm(cc.season$Prev12~cc.season[,x]))
+  data.frame(var=names(cc.season[x]),r2=lm$adj.r.squared)
+}))
 
-cor.table<-cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
-                        grep("Month", names(cc.season)))])
 
-rm(data,combins,cor.data,exclude,tomatch)
-data <- as.data.frame(as.table(cor.table))
-combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
-cor.data <- data[data$Var1 != data$Var2,]
-data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
-exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
+cor.table86.current<-cor(cc.season[,-c(1:2)])
 
-tomatch <- c("Year","Month","Site","Prev12",exclude)
+data86.current <- as.data.frame(as.table(cor.table86.current))
+#keep the one with bigger r2 from var1 and var2 when Freq is > 50% 
+cor.level <- .5 
+exclude86.current <- apply(data86.current[abs(data86.current$Freq)>cor.level&
+                                            data86.current$Freq<1,], 1, function(x){
+  #Which varaible explains less yearly variation between the two correlated
+  rsqs$var[rsqs$r2 == min(rsqs$r2[rsqs$var==x[1]],rsqs$r2[rsqs$var==x[2]])]
+})
+
+
+#combins <- combn(colnames(cor.table86.current),2,FUN = function(x) {paste(x,collapse="_")})
+#cor.data <- data[data$Var1 != data$Var2,]
+#data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
+#exclude <- paste(data$Var2[abs(data$Freq)>0.49],sep=",")
+
+tomatch <- c("Year","Month","Site","Prev12",levels(exclude86.current))
 
 # Seasonal varaibles kept for the PCA
 names(cc.season[,c(grep(paste(tomatch,collapse="|"),
@@ -723,7 +748,9 @@ names(cc.season[,c(grep(paste(tomatch,collapse="|"),
 # Climatic variables used in PCA 1986-current year
 sort(grep(paste(tomatch,collapse="|"),names(cc.season), value=TRUE, invert = TRUE))
 
-forpca <- cc.season[,c(grep(paste(tomatch,collapse="|"),
+
+# Just use everything? 
+forpca86.current <- cc.season[,c(grep(paste(tomatch,collapse="|"),
                             names(cc.season), value=TRUE, invert = TRUE))]
 
 scgl.pca <- princomp(forpca,cor=TRUE)
@@ -849,8 +876,6 @@ sg.pc.r$NS[sg.pc.r$Site %in% unique(grep(paste(southsites,collapse="|"),
                                      sg.pc.r$Site,
                                      value=TRUE))] <- "South"
 
-# how do climate variables explain annual growth rates?
-head()
 ```
 
 # Table 3b) 2008 - current year
@@ -984,6 +1009,20 @@ sg_sum1$X[which("Pond" == sg_sum1$Site)] <- sg_sum1$X[which("Pond" == sg_sum1$Si
 
 #Reproduction
 ```{r}
+mean(sg_sum$Rep[sg_sum$Year==currentYr &
+                  sg_sum$Site %in% unique(grep("old",sg_sum$Site,
+                                        invert=TRUE, value=TRUE))]/sg_sum$X[sg_sum$Year==currentYr&
+                  sg_sum$Site %in% unique(grep("old",sg_sum$Site,
+                                        invert=TRUE, value=TRUE))])
+
+#AVerage and SD over all years (not 'old')
+mean(sg_sum$Rep[sg_sum$Site %in% unique(grep("old",sg_sum$Site,
+          invert=TRUE, value=TRUE))]/sg_sum$X[sg_sum$Site %in% 
+          unique(grep("old",sg_sum$Site,invert=TRUE, value=TRUE))])
+sd(sg_sum$Rep[sg_sum$Site %in% unique(grep("old",sg_sum$Site,
+          invert=TRUE, value=TRUE))]/sg_sum$X[sg_sum$Site %in% 
+          unique(grep("old",sg_sum$Site,invert=TRUE, value=TRUE))])
+
 #Percent Reproductive in current year (but don't repeat Atwell Gulch ones)
 sum(sg_sum$Rep[sg_sum$Year==currentYr & 
                  sg_sum$Site !="Atwell Gulch (old)"])/sum(sg_sum$X[sg_sum$Year==currentYr & 
@@ -991,7 +1030,13 @@ sum(sg_sum$Rep[sg_sum$Year==currentYr &
 
 #average volume, height, and width explains reproductive status
 sg_sum$Prepro <- sg_sum$Rep/sg_sum$X
-summary(lm(Prepro~(avgH+avgW+avgVol)^2, data=sg_sum))
+summary(lm(Prepro~(avgH+avgW)^2, data=sg_sum))
+
+summary(lm(Prepro~avgW, data=sg_sum))
+
+ggplot(sg_sum, aes(Prepro, avgW))+
+  geom_point()+
+  stat_smooth()
 ```
 
 
@@ -1146,6 +1191,7 @@ ggplot(sgminis, aes(Year, Minis,colour= Site))+
   
 dev.off()
 ```
+
 ```{r}
 
 summary(lm(X/area ~ avgVol*Minis, data=sgminis))
@@ -1194,37 +1240,6 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
 
 
 ### statistics
-count pva
-```{r}
-# x = Year, y = count
-CountPVA <- function(x,y){
-  
-  LM.table <- c()
-  
-  for(yrs in 3:length(unique(x))){		# gives 2 transitions before the first Count PVA calculation
-		rsq <- c(); PVA.lm <- list()
-  
-    y.count <- y[1:yrs] #Annual count for site
-    x.years <- x[1:yrs] #Years of counts (can have missing years)
-    ySpecies <- log10(y.count[-1]/y.count[-length(y.count)])
-    yr <- sqrt(x.years[-1]-x.years[-length(x.years)])
-    
-		PVA.lm <- lm(ySpecies ~ -1 + yr)
-		mu_sp <- predict(PVA.lm, level= 0.95,
-		                 interval = "confidence",
-		                 se.fit = T)$fit[1,]
-    rsq <- c(rsq, R2 = summary(PVA.lm)$adj.r.squared)	# pull R squared values from each year interval 
-    LM.table <- rbind(LM.table,data.frame(rsq,RangeStart=min(x),RangeEnd=x[yrs],t(mu_sp)))    
-	}
-	Year1 <- x.years[-length(x.years)]
-	Year2 <- x.years[-1]
-	PVA.table <-data.frame(yr,ySpecies,Year1,Year2)
-  
-  list(PVA = PVA.table,LM = LM.table)
-}
-
-```
-
 #PVA count based
 
 ```{r}
@@ -1234,11 +1249,9 @@ all.count <- lapply(unique(sg_sum$Site), function(x){
 
 names(all.count) <- unique(sg_sum$Site)
 
-all.count
 ```
 
 
-###START HERE!!
 #how do climatic variables explain growth rates?   
 ```{r}
 lambdas <- do.call(rbind, lapply(all.count, '[[', 1))
@@ -1256,7 +1269,31 @@ step1 <- as.formula(paste("ySpecies ~(",
 
 lm4step <- do.call("lm", list(step1, quote(sg.pc.lambda)))
 summary(step(lm4step))
-                   
+
+ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
+  geom_point()+
+  stat_smooth(method="lm")
+
+
+#Don't do all interactions
+steplinear <- as.formula(paste("ySpecies ~",
+                          paste(names(sg.pc.lambda)[10:21],
+                                collapse="+")))
+
+lm4steplinear <- do.call("lm", list(steplinear, quote(sg.pc.lambda)))
+summary(step(lm4steplinear))
+
+ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
+  geom_point()+
+  stat_smooth(method="lm")
+
+
+stepComps <- as.formula(paste("ySpecies ~",
+                          paste(names(sg.pc.lambda)[3:4],
+                                collapse="+")))
+
+lm4stepComps <- do.call("lm", list(stepComps, quote(sg.pc.lambda)))
+summary(lm4stepComps)                   
 ```
 
 
@@ -1353,21 +1390,32 @@ sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
 ```
 
 ```{r}
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig5a.jpg", sep=""), width=200, height=125, units="mm", res=300)
+
 ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
+  ggtitle("a)")+
   ylab(expression("Height year"[y]))+
   xlab(expression("Height year"[y-1]))+
   theme_bw() +
   facet_grid(~NS)
+
+dev.off()
 ```
 
 ```{r}
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig5b.jpg", sep=""), width=200, height=125, units="mm", res=300)
+
+
 ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
   stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
+  ggtitle("b)")+
   ylab(expression("Width year"[y]))+
   xlab(expression("Width year"[y-1]))+
   theme_bw() +
   facet_grid(~NS)
+
+dev.off()
 ```
 
 ```{r}
