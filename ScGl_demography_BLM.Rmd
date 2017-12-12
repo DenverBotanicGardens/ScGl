@@ -146,7 +146,6 @@ Need to split by Site - Atwell Gulch needs to be together:
      
 summarize 2008  
 ```{r}
-rm(scgl08)
 scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
 
 sg_summary08 <- ddply(scgl08,  
@@ -263,7 +262,8 @@ All sites
 ```{r}
 ggplot(sg_sum, aes(Year,X,colour=Site))+
   geom_point(size=3)+
-  geom_line()
+  geom_line()+
+  theme_classic()
 ```
 
 All sites separate plots
@@ -272,7 +272,8 @@ ggplot(sg_sum, aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   facet_wrap(~Site)+
-  ylab("Total individuals")
+  ylab("Total individuals")+
+  theme_bw()
 ```
 
 All the new ones
@@ -381,6 +382,19 @@ poststand <- sg_sum[sg_sum$Year == currentYr & sg_sum$Site %in% grep(paste(new,c
                                                         sg_sum$Site,value=TRUE),]
 
 sg_sum[sg_sum$Year == currentYr,]
+
+#Reproduction
+rep.per <- sg_sum
+rep.per$PRep <- rep.per$Rep/rep.per$X
+
+#Average percentage of reproductive individuals per site over the years
+summarySE(rep.per, measurevar="PRep")
+rep.summarySE <- summarySE(data=rep.per, measurevar="PRep", groupvars="Site")
+rep.summarySE[with(rep.summarySE, order(PRep)),]
+
+#Reproductive individuals with average width of plants
+#See also "#Reproduction" below; should match this
+summary(lm(PRep~avgW, data=rep.per))
 
 prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
                                                         sg_sum$Site,value=TRUE),]
