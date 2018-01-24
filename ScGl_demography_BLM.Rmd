@@ -112,7 +112,7 @@ In 2012 we switched from measuring the height and width indiviudals under 0.5 cm
 
 #2016
 # Need to strip white space and conform to 2015 data
-sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_", currentYr,".csv",
+sg <- read.csv(paste.("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_", currentYr,".csv",
                      sep=""))
 names(sg)
 
@@ -265,6 +265,9 @@ ggplot(sg_sum, aes(Year,X,colour=Site))+
   geom_line()+
   theme_classic()
 ```
+
+
+
 
 All sites separate plots
 ```{r}
@@ -1491,3 +1494,38 @@ summary(lm(Prepro~(avgH+avgW)^2, data=sg_sum))
 
 ```
 
+
+
+Annual report figure for Becky - 20180123
+```{r}
+plotout <- aggregate(X~Year, data=sg_sum, FUN = sum)
+annualppt <- aggregate(ppt~Site+Prev12, data=scgl.c.summary, FUN = sum)
+#Average total precipitation over sites
+annualppt.avg <- aggregate(ppt~Prev12, data=annualppt, FUN= mean)
+avgppt <- mean(annualppt.avg$ppt)
+plotout1 <- merge(plotout, annualppt.avg, by.x = "Year", by.y = "Prev12")
+plotout1$col[plotout1$ppt<avgppt] <- "Below Average PPT"
+plotout1$col[plotout1$ppt>=avgppt] <- "Above Average PPT"
+plotout1$growth <- plotout1$X-plotout1$X[1]
+plotout1$change <- c(0,plotout1$X[-1]-plotout1$X[-length(plotout1$X)])
+
+ggplot(plotout1, aes(Year,X))+
+  geom_bar(stat= "identity", aes(fill=col))+
+  theme_classic()
+
+ggplot(plotout1[plotout1$Year>2008,], aes(Year,change))+
+  geom_bar(stat= "identity", aes(fill=col))+
+  theme_classic()+
+  ggtitle("Change in population size from previous year")+
+  scale_x_continuous(breaks=seq(2009,2017,1))
+
+ggsave("Q:/Research/MEDL_folder/ScGl_yr.jpg",device="jpeg",
+       ggplot(plotout1, aes(Year,X))+
+         geom_line(colour="blue")+
+         ylab("Total Population")+
+         scale_x_continuous(breaks=seq(2009,2017,1))+
+         theme_classic()+
+         ggtitle("Sclerocactus glaucus"))
+
+write.csv(plotout1, "Q:/Research/MEDL_folder/ScGl_data.csv")
+```
