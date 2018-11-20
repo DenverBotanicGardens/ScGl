@@ -765,21 +765,6 @@ cor.level <- .5
 cor.table86.current<-cor(cc.season[,-c(1:2)])
 data86.current <- as.data.frame(as.table(cor.table86.current))
 colexclude <- c(1:2)
-#Not sure this is quite right
-# while(max(data86.current$Freq[abs(data86.current$Freq)>cor.level&
-#                               data86.current$Freq<1])>cor.level){
-#   #Now have correlations that are not identical (<1) but are over the allowed level
-#   cor86current <- data86.current[abs(data86.current$Freq)>cor.level&
-#                                             data86.current$Freq<1,]
-#   #order by most correlated
-#   cor86current <- cor86current[with(cor86current, order(-abs(Freq))),]
-#   exclude <- rsqs$var[rsqs$r2 == min(rsqs$r2[rsqs$var==as.character(cor86current[1,1])],
-#                                      rsqs$r2[rsqs$var==as.character(cor86current[1,2])])]
-#   #need to iteratively get rid of exclude
-#   colexclude <- c(colexclude,grep(as.character(exclude), names(cc.season)))
-#   cor.table86.current<-cor(cc.season[,-colexclude]) 
-#   data86.current <- as.data.frame(as.table(cor.table86.current))
-# }
 
 
 #New way to find the variable that has the better r2 between the two correlated varaiables
@@ -800,7 +785,7 @@ keepvars <- apply(data86.currentrsqs2, 1, function(x){
 })
 
 tokeep <- unique(do.call(rbind,keepvars[!unlist(lapply(keepvars, is.null))]))
-
+colexclude <- which(!names(cc.season) %in% tokeep)
 
 # Climatic variables used in PCA 1986-current year
 names(cc.season[,-colexclude])
@@ -919,20 +904,23 @@ recent08current <- cc.season[cc.season$Prev12 > 2007 & cc.season$Prev12 < curren
 
 cor.table.r<-cor(recent08current[,-c(1:2)])
 data.r <- as.data.frame(as.table(cor.table.r))
-colexclude08 <- c(1:2)
 
-while(max(data.r$Freq[abs(data.r$Freq)>cor.level&
-                      data.r$Freq<1])>0.5){
-  cor08 <- data.r[abs(data.r$Freq)>cor.level & data.r$Freq<1,]
-  #order by most correlated
-  cor08 <- cor08[with(cor08, order(-abs(Freq))),]
-  exclude08 <- rsqs$var[rsqs$r2 == min(rsqs$r2[rsqs$var==as.character(cor08[1,1])],
-                                       rsqs$r2[rsqs$var==as.character(cor08[1,2])])]
-  #need to iteratively get rid of exclude
-  colexclude08 <- c(colexclude08,grep(as.character(exclude08), names(recent08current)))
-  cor.table08<-cor(recent08current[,-colexclude08]) 
-  data.r <- as.data.frame(as.table(cor.table08))
-}
+#New way to find the variable that has the better r2 between the two correlated varaiables
+data.rrsqs1 <- merge(rsqs,data.r, by.x = "var", by.y = "Var1")
+names(data.rrsqs1) <- c("var_Var1", "r2", "Var2","PCorr")
+data.rrsqs2 <- merge(rsqs, data.rrsqs1, by.x = "var", by.y = "Var2")
+apply(data.rrsqs2, 1, function(x) x[1])
+keepvars08 <- apply(data.rrsqs2, 1, function(x){
+  if(abs(as.numeric(x[5]))>cor.level & as.numeric(x[5])<1){
+    if(as.numeric(x[2])>as.numeric(x[4])){
+      out <- x[1]   # The first variable that would have a higher r square value
+    } else {
+      out <- x[3]   # The second varaiable that would have the higher r sq
+    }
+    out
+  }
+})
+tokeep08 <- unique(do.call(rbind,keepvars[!unlist(lapply(keepvars, is.null))]))
 
 #Variables kept for 2007 May - current year
 names(recent08current[,-colexclude08])
