@@ -886,12 +886,15 @@ ggplot(sg.pc86current, aes(Site, Comp.1, colour=NS))+
 
 dev.off()
 
+# 1986 to current year t.test
 t.test(Comp.1~NS, data=sg.pc86current)
 
 ```
 
 #### Figure 4: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
+sg.pc86current is 1986 to current year
 ```{r}
+
 ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=NS))+
   geom_point() +
   stat_ellipse() +
@@ -951,7 +954,7 @@ tokeep08 <- unique(do.call(rbind,keepvars[!unlist(lapply(keepvars, is.null))]))
 colexclude08 <- which(!names(recent08current) %in% tokeep08)
 
 #Variables kept for 2007 May - current year
-names(recent08current[,-colexclude08])
+unique(names(recent08current[,-colexclude08]))
 
 scgl.pca.r <- princomp(recent08current[,-colexclude08],cor=TRUE)
 summary(scgl.pca.r)
@@ -1008,23 +1011,13 @@ ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
 
 dev.off()
 
+
+#T-test for the 2008 to current year time
 t.test(Comp.1~NS, data=sg.pc.r)
 t.test(Comp.2~NS, data=sg.pc.r)
 
 
 ```
-
-Reults of the second PCA 
-```{r}
-ggplot(sg.pc.r, aes(tmin.fall,tmax.fall,colour=NS))+
-  geom_point()+
-  stat_ellipse()
-
-ggplot(sg.pc.r, aes(ppt.winter,ppt.spring,colour=NS))+
-  geom_point()+
-  stat_ellipse()
-```
-
 
 
 Figure 4 f) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
@@ -1033,36 +1026,54 @@ Figure 4 f) Site distribution along PC1 is shown with Tukey Honest Significant D
 #doesn't like "-" in the name
 levels(sg.pc.r$Site) <- c(as.character(unique(sg.pc.r$Site))[-(10)],"TJunction")
 
+
+#Comp.2
 sg.thsd2 <- TukeyHSD(aov(Comp.2~Site, data=sg.pc.r))
 lasign2 <- multcompLetters(extract_p(sg.thsd2$Site))
+tomerge2 <- lasign2$Letters
+names(tomerge2) <- c(names(tomerge2)[1:8],"T-Junction",names(tomerge2)[10])
 
-SiteLetters2 <- data.frame(Letter = lasign2$Letters[],
-                          Site = rownames(data.frame(lasign2$Letters)))
-Siteletters2 <- SiteLetters[order(SiteLetters2$Site),]
 
-sg.thsd1 <- TukeyHSD(aov(Comp.1~Site, data=sg.pc.r))
-lasign1 <- multcompLetters(extract_p(sg.thsd1$Site))
-
-SiteLetters1 <- data.frame(Letter = lasign1$Letters[],
-                          Site = rownames(data.frame(lasign1$Letters)))
-Siteletters1 <- SiteLetters[order(SiteLetters1$Site),]
-
+SiteLetters2 <- data.frame(Letter = lasign2$Letters,
+                          Site = names(tomerge2))
+Siteletters2 <- SiteLetters2[order(SiteLetters2$Site),]
 
 ggplot(sg.pc.r, aes(Site, Comp.2, colour=NS))+
   stat_boxplot(geom='errorbar')+
   geom_boxplot()+
   annotate("text",x=1:10, y = 4,
-           label = SiteLetters2$Letter[c(10,1:9)])+
+           label = SiteLetters2$Letter)+
   theme_bw()+
   guides(colour=guide_legend(title="Genetic region"))
+
+
+
+#Comp.1
+sg.thsd1 <- TukeyHSD(aov(Comp.1~Site, data=sg.pc.r))
+lasign1 <- multcompLetters(extract_p(sg.thsd1$Site))
+
+tomerge1 <- lasign1$Letters
+names(tomerge1) <- c(names(tomerge1)[1:8],"T-Junction",names(tomerge1)[10])
+
+SiteLetters1 <- data.frame(Letter = lasign1$Letters,
+                          Site = names(tomerge1))
+SiteLetters1 <- SiteLetters1[order(SiteLetters1$Site),]
+
+levels(sg.pc.r$Site)
+levels(SiteLetters1$Site)
+
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig4f.jpg", sep=""), width=275, height=125, units="mm", res=300)
+
 
 ggplot(sg.pc.r, aes(Site, Comp.1, colour=NS))+
   stat_boxplot(geom='errorbar')+
   geom_boxplot()+
   annotate("text",x=1:10, y = 4,
-           label = SiteLetters1$Letter[c(10,1:9)])+
+           label = SiteLetters1$Letter)+
   theme_bw()+
   guides(colour=guide_legend(title="Genetic region"))
+
+dev.off()
 ```
 
 #### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
@@ -1172,18 +1183,35 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),],
   theme_bw()
 ```
 
+Largest proportion of reproductive individuals over all years
 ```{r}
 sg_sum[sg_sum$Site=="Pond",]
 
 summarySEreproductive <- summarySE(sg_sum, measurevar = "Prepro", groupvars=c("Site"))
 
+summarySEreproductive[with(summarySEreproductive, order(Prepro)),]
 
+
+#Is percent reproductive explained by width, height, or both: volume?
 summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
 
-
+# Which is the better predictor of percent reproductive
 summary(lm(Prepro~avgVol, data=sg_sum))
 summary(lm(Prepro~avgW, data=sg_sum))
 summary(lm(Prepro~avgH, data=sg_sum))
+
+
+lm1 <- lm(Prepro~avgVol, sg_sum)
+lm2 <- lm(Prepro~avgW, sg_sum)
+lm3 <- lm(Prepro~avgH, sg_sum) 
+
+lm.list <- list(lm1,lm2, lm3)
+lm.names <- as.character(unlist(lapply(lm.list,formula)))
+(lm.results <- aictab(lm.list, modnames=lm.names))
+#evidence ratio 
+for(i in 2:length(lm.list)){
+  print(exp(0.5*lm.results$Delta_AICc[i]))
+}
 
 ```
 
