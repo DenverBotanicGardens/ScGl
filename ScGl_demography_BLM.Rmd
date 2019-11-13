@@ -64,46 +64,6 @@ CountPVA <- function(x,y){
 
 ```
 
-Don't run this, use it from Rmisc instead
-```{r}
-#summarySE function borrowed from http://www.cookbook-r.com/Manipulating_data/Summarizing_data/
-summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
-                      conf.interval=.95, .drop=TRUE) {
-    library(plyr)
-
-    # New version of length which can handle NA's: if na.rm==T, don't count them
-    length2 <- function (x, na.rm=FALSE) {
-        if (na.rm) sum(!is.na(x))
-        else       length(x)
-    }
-
-    # This does the summary. For each group's data frame, return a vector with
-    # N, mean, and sd
-    datac <- ddply(data, groupvars, .drop=.drop,
-      .fun = function(xx, col) {
-        c(N    = length2(xx[[col]], na.rm=na.rm),
-          mean = mean   (xx[[col]], na.rm=na.rm),
-          sd   = sd     (xx[[col]], na.rm=na.rm)
-        )
-      },
-      measurevar
-    )
-
-    # Rename the "mean" column    
-    datac <- rename(datac, c("mean" = measurevar))
-
-    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
-
-    # Confidence interval multiplier for standard error
-    # Calculate t-statistic for confidence interval: 
-    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
-    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
-    datac$ci <- datac$se * ciMult
-
-    return(datac)
-}
-```
-
 
 Need to calculate individuals from 2008 data seperate from following due to lack of measuring hight and width. Will need to get the total tagged individuals for number alive instead of number of individuals with a heigth > 0 from 2009 on. <https://research.botanicgardens.org/admin/>      
 
@@ -137,7 +97,8 @@ sg$Site <- factor(sg$Site)
 sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
 sg$Minis[sg$Minis > 1000] <- NA
 
-write.table(sg, file=paste("P:/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
+# write.table(sg, file=paste("P:/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
+write.table(sg, file=paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
 
 ```
 
@@ -177,6 +138,8 @@ sg$Br[sg$Br == "y"] <- "1"
 
 sg$Fl <- as.numeric(sg$Fl)
 sg$Br <- as.numeric(sg$Br)
+
+table(sg$Year, sg$Site)
 
 ```
 
@@ -288,7 +251,9 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
   facet_wrap(~Site)+
-  ylab("Total individuals")
+  ylab("Total individuals")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  scale_x_continuous(breaks = seq(2008, currentYr, 2))
 ```
 
 
@@ -438,13 +403,10 @@ options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/S
 ```
 
 #Update last year and get this year 
+Delete previous year from folder first, then update
 ```{r}
 get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = (currentYr-1):currentYr)
 
-```
-
-
-```{r}
 # Maximum temperature (average)
 get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = (currentYr-1):currentYr)
 
@@ -496,8 +458,6 @@ latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 
 # Go into folder "Q:\Research\All_Projects_by_Species\Sclerocactus SPECIES\Sclerocactus_glaucus\ScGl_climate\PRISM_ppt_provisional_4kmM3_201601_bil" and delete the provisional ones from last year    
 
-Make sure delete provisional from tmax, tmin, precip...
-
 Max temp   
 16 years 2000:currentYr
 Min temp   
@@ -508,7 +468,7 @@ ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
 
 m.ppt <- lapply(ppt, function(x){
   rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
-  data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
              date = ls_prism_data()[x,], Site = latlong$Site)
 })
 
@@ -516,7 +476,7 @@ tmax <- grep("tmax", ls_prism_data(absPath = TRUE)[,2])
 
 m.tmax <- lapply(tmax, function(x){
   rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
-  data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
              date = ls_prism_data()[x,], Site = latlong$Site)
 })
 
@@ -524,7 +484,7 @@ tmin <- grep("tmin", ls_prism_data(absPath = TRUE)[,2])
 
 m.tmin <- lapply(tmin, function(x){
   rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
-  data.frame(data = extract(rastertemps, latlong[,c("Long","Lat")]), 
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
              date = ls_prism_data()[x,], Site = latlong$Site)
 })
 ```
@@ -570,6 +530,7 @@ str(scgl.climate)
 #long to wide
 melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Prev12","Month","Year","Variable"))
 head(melt.scgl)
+table(melt.scgl$Variable) # variable is just 'data'
 
 sp.melt.scgl <- split(melt.scgl, melt.scgl$Variable)
 
@@ -603,6 +564,16 @@ table(scgl.c$Year,scgl.c$Month)
 6 Atwell Gulch  19.17   7.4 26.8 1895     6   1896 summer
 > names(scgl.c)
 [1] "Site"   "Precip" "tmin"   "tmax"   "Year"   "Month"  "Prev12" "season"
+
+```{r}
+ggplot(melt.scgl[melt.scgl$Month==5,], aes(Year,value,colour=Variable))+
+  geom_point()+
+  stat_smooth()
+
+
+```
+
+
 
 
 scgl.c <- scgl.climate[,c(1,3,5,7:9)]
@@ -668,7 +639,8 @@ ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
   ylab("Average precipitation per site") 
 
 ```
-Precipitation North vs. South
+Precipitation North vs. South  
+swtich to total instead of monthly average?
 ```{r}
 ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
                          scgl_sumSE[[1]]$Prev12<currentYr,],
@@ -712,7 +684,7 @@ Maximum temperature per site (C)
 ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
                          scgl_sumSE[[3]]$Prev12<currentYr+1,],
        aes(Prev12, tmax, colour=Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +→
+  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
   theme_bw() +
@@ -814,15 +786,16 @@ Table3acor <-cor(cc.season[,-c(1:2)])
 Table3a <- as.data.frame(as.table(Table3acor))
 
 Table3a <- Table3a[abs(Table3a$Freq)>cor.level&Table3a$Freq<1,]
-write.table(Table3a[with(Table3a, order(Table3a$Freq)),], "clipboard", sep="\t", row.names = FALSE)
 
+write.table(Table3a, file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table3a.csv", sep=""), 
+            sep=",", row.names=FALSE, col.names = TRUE)
+# write.table(Table3a[with(Table3a, order(Table3a$Freq)),], "clipboard", sep="\t", row.names = FALSE)
 
 
 ```
 
 Site differences
 #Figure 4b  
-1986-2016
 ```{r}
 jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig4b.jpg", sep=""), width=175, height=125, units="mm", res=300)
 
@@ -882,7 +855,8 @@ ggplot(sg.pc86current, aes(Site, Comp.1, colour=NS))+
   annotate("text",x=1:10, y = 5,
            label = SiteLetters$Letter)+
   theme_bw()+
-  guides(colour=guide_legend(title="Genetic region"))
+  guides(colour=guide_legend(title="Genetic region"))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 dev.off()
 
@@ -917,7 +891,7 @@ ggplot(sg.pc86current, aes(ppt.spring, ppt.fall, colour=NS))+
 
 
 
-# PCA 2008-2015
+# PCA 2008-currentYr
 Try for only the study period 
 Prev12 is the May of the previous year through the April of the current year
 #### 2008-currentYr
