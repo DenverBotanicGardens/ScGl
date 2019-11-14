@@ -379,9 +379,13 @@ summary(lm(PRep~avgW, data=rep.per))
 prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
                                                         sg_sum$Site,value=TRUE),]
 
-write.table(poststand, "clipboard", sep="\t", row.names=FALSE)
-write.table(prestand,  "clipboard", sep="\t", row.names=FALSE)
-#Report Tables_20XX
+write.table(poststand, file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_poststand.csv", sep=""), 
+            sep=",", row.names=FALSE, col.names = TRUE)
+
+
+write.table(prestand,  file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_prestand.csv", sep=""), 
+            sep=",", row.names=FALSE, col.names = TRUE)
+
 ```
 
 
@@ -804,7 +808,7 @@ ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=Site, shape=Site))+
   scale_shape_manual(values=1:nlevels(sg.pc86current$Site))+
   geom_point() +
   stat_ellipse() +
-  theme_bw() 
+  theme_bw()
 
 dev.off()
 ```
@@ -812,7 +816,7 @@ dev.off()
 North/South differences
 #Figure 4a
 ```{r}
-jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig4a.jpg", sep=""), width=175, height=125, units="mm", res=300)
+jpeg(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Fig4a.jpg", sep=""), width=125, height=125, units="mm", res=300)
 
 
 ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
@@ -820,7 +824,8 @@ ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
   stat_ellipse() +
   theme_bw()+
   guides(colour=guide_legend(title="Genetic region"))+
-  guides(shape=guide_legend(title="Genetic region"))
+  guides(shape=guide_legend(title="Genetic region")) +
+  theme(legend.position="bottom")
 
 dev.off()
 ```
@@ -855,8 +860,9 @@ ggplot(sg.pc86current, aes(Site, Comp.1, colour=NS))+
   annotate("text",x=1:10, y = 5,
            label = SiteLetters$Letter)+
   theme_bw()+
-  guides(colour=guide_legend(title="Genetic region"))+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  guides(colour=guide_legend(title="Genetic region"))
+# +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 dev.off()
 
@@ -954,7 +960,8 @@ Table3b <- as.data.frame(as.table(Table3bcor))
 
 Table3b <- Table3b[abs(Table3b$Freq)>cor.level&Table3b$Freq<1,]
 Table3b <- Table3b[with(Table3b, order(Table3b$Freq)),]
-write.table(Table3b[!duplicated(Table3b$Freq),], "clipboard", sep="\t", row.names=FALSE)
+write.table(Table3b[!duplicated(Table3b$Freq),], file = paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table3b.csv", sep=""), 
+            sep=",", row.names=FALSE, col.names = TRUE)
 
 ```
 
@@ -1046,6 +1053,8 @@ ggplot(sg.pc.r, aes(Site, Comp.1, colour=NS))+
            label = SiteLetters1$Letter)+
   theme_bw()+
   guides(colour=guide_legend(title="Genetic region"))
+# +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
 dev.off()
 ```
@@ -1112,7 +1121,8 @@ sg_sum1$X[which("Pond" == sg_sum1$Site)] <- sg_sum1$X[which("Pond" == sg_sum1$Si
 ```
 
 
-#Reproduction
+#Reproduction   
+Follow AsMi to look at probability of being reproductive as a function of width or height or both
 ```{r}
 mean(sg_sum$Rep[sg_sum$Year==currentYr &
                   sg_sum$Site %in% unique(grep("old",sg_sum$Site,
@@ -1391,10 +1401,6 @@ head(sg.pc86current)
 sg.pc.lambda <- merge(sg.pc86current, lambdas, by.x = c("Site","Prev12"), by.y = c("Site","Year2"))
 
 
-# Stepwize is so dependant on order of putting in, should do AIC intsead thinking through predictors first
-lm4step <- do.call("lm", list(step1, quote(sg.pc.lambda)))
-summary(step(lm4step))
-
 ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
   geom_point()+
   stat_smooth(method="lm")
@@ -1416,8 +1422,12 @@ lm3 <- lm(ySpecies ~ NS, sg.pc.lambda)
 lm4 <- lm(ySpecies ~ tmin.winter*ppt.winter, sg.pc.lambda)
 lm5 <- lm(ySpecies ~ (ppt.spring+tmax.spring+tmin.winter+ppt.winter+NS)^2, sg.pc.lambda)
 lm6 <- lm(ySpecies ~ (tmin.winter+ppt.winter+tmax.summer+ppt.summer+NS)^2, sg.pc.lambda)
+lm7 <- lm(ySpecies ~ (tmin.summer+ppt.summer+NS)^2, sg.pc.lambda)
+lm9 <- lm(ySpecies ~ (tmin.winter+NS)^2, sg.pc.lambda)
+lm8 <- lm(ySpecies ~ ppt.summer, sg.pc.lambda)
 
-lm.list <- list(lm1,lm2, lm3, lm4, lm5, lm6)
+
+lm.list <- list(lm1,lm2, lm3, lm4, lm5, lm6, lm7, lm8, lm9)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
 #evidence ratio 
@@ -1484,7 +1494,7 @@ ggplot(plot.noold[plot.noold$variable!="rsq",],
   theme_bw()+
   scale_shape_manual(values=c(1,6,2))+
   scale_colour_manual(values=c("black","red", "red"))+
-  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0, size = 12))+
+  theme(axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0, size = 12))+
   guides(colour= FALSE, shape= FALSE, size = FALSE)+
   labs(y="Lambda")+
   facet_grid(~NS, scales="free")
