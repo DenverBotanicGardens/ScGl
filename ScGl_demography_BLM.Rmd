@@ -597,6 +597,13 @@ scgl.c.summary <- aggregate(scgl.c[,c("ppt","tmax","tmin")],
                             scgl.c[,c("Site","Prev12","season")],
                             FUN = function(x) mean(x, na.rm = TRUE))
 
+scgl.c.summary.ppt <- aggregate(scgl.c[,"ppt"],
+                            scgl.c[,c("Site","Prev12","season")],
+                            FUN = function(x) sum(x, na.rm = TRUE))
+
+# scgl.c.summary <- merge(scgl.c.summary, scgl.c.summary.ppt, by = c("Site","Prev12","season"))
+# names(scgl.c.summary) <- c(names(scgl.c.summary)[-length(scgl.c.summary)],"sum.ppt")
+
 season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<currentYr+1,],
                   idvar = c("Site","Prev12"),
                   timevar = "season",
@@ -610,6 +617,33 @@ scgl_sumSE <- lapply(names(scgl.c[,c("ppt","tmin", "tmax")]),
                      function(x){
                        summarySE(scgl.c, measurevar=x, groupvars=c("Site","Prev12"))
                        }) 
+
+# t.test for min and max temp is below, search PCA summary t.tests
+# to get total annyal precipitation instead of average by month, might not be fully wet year. 
+scgl_totalannualppt <- aggregate(scgl.c[,"ppt"],
+                                 scgl.c[,c("Site","Prev12")],
+                                 FUN = function(x) sum(x, na.rm = TRUE))
+
+# annual total (summed) ppt and t.test between northern and southern sites
+scgl_totalannualppt_SE <- summarySE(scgl_totalannualppt,measurevar = "x",
+                                    groupvars = c("Site"))
+
+scgl_totalannualppt_SE$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+scgl_totalannualppt_SE$NS[scgl_totalannualppt_SE$Site %in%
+                            unique(grep(paste(southsites,collapse="|"),
+                                     scgl_totalannualppt_SE$Site,
+                                     value=TRUE))] <- "South"
+scgl_totalannualppt$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+scgl_totalannualppt$NS[scgl_totalannualppt$Site %in%
+                            unique(grep(paste(southsites,collapse="|"),
+                                     scgl_totalannualppt$Site,
+                                     value=TRUE))] <- "South"
+
+# t.test for north compared to south
+# t.test(x~NS, data = scgl_totalannualppt[scgl_totalannualppt$Prev12>1999,]) # don't know why I had 2000 before
+t.test(x~NS, data = scgl_totalannualppt)
 
 scgl_sumSE[[1]]$NS <- "North"
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
@@ -696,8 +730,9 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
 
 ```
 
+# PCA summary t.tests
 ```{r}
-ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
+ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>=2000&
                          scgl_sumSE[[3]]$Prev12<currentYr+1,],
        aes(Prev12, tmax, colour=NS))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
@@ -708,7 +743,7 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
 
 t.test(tmax~NS, data= scgl_sumSE[[3]])
 t.test(tmin~NS, data= scgl_sumSE[[2]])
-t.test(ppt~NS, data= scgl_sumSE[[1]])
+# t.test(ppt~NS, data= scgl_sumSE[[1]])
 ```
 
 Take out missing data, Years 1986 through current year as previous 12 years to the May survey
@@ -791,7 +826,8 @@ Table3a <- as.data.frame(as.table(Table3acor))
 
 Table3a <- Table3a[abs(Table3a$Freq)>cor.level&Table3a$Freq<1,]
 
-write.table(Table3a, file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table3a.csv", sep=""), 
+# To get rid of duplicated correlations
+write.table(Table3a[!duplicated(Table3a$Freq),], file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table3a.csv", sep=""), 
             sep=",", row.names=FALSE, col.names = TRUE)
 # write.table(Table3a[with(Table3a, order(Table3a$Freq)),], "clipboard", sep="\t", row.names = FALSE)
 
