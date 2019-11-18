@@ -141,7 +141,20 @@ sg$Br <- as.numeric(sg$Br)
 
 table(sg$Year, sg$Site)
 
+# Pond was not finished in 2015
+# Some data was entered but should be removed from the count data and trend analyses unless it is for individuals that were measured in 2015
+
 ```
+
+# 2019 post download raw data fixes, fixed in the SQL database   
+In 2019 we used the photoNumber column to track the number of flowers per plant
+```{r}
+sg$Height.cm.[sg$ScGl_data_id==21981] <- 0
+sg$PhotoNumber <- as.character(sg$PhotoNumber)
+sg$PhotoNumber[sg$ScGl_data_id==22068] <- 2
+
+```
+
 
 
 #Old and New data     
@@ -185,6 +198,13 @@ sg <- rbind(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old)
 sg$Site <- droplevels(sg$Site)
 
 table(sg$Site,sg$Year)
+
+sg_withPond2015 <- sg
+sg.foo <- sg[!(sg$Site %in% c("Pond","Pond (old)") & sg$Year == 2015),]
+table(sg.foo$Site,sg.foo$Year)
+
+sg <- sg.foo
+
 ```
 
 #Data checks
@@ -1154,6 +1174,45 @@ unique(sg_sum$Site)
 sg_sum1 <- sg_sum
 sg_sum1$X[which("Pond" == sg_sum1$Site)] <- sg_sum1$X[which("Pond" == sg_sum1$Site)]/2
 
+# Reproduction section
+updatedsites <- c("Atwell Gulch", "T-Junction", "Pond", "Oil Pad")
+
+matchingsites <- data.frame(table(sg_sum$Site,sg_sum$SiteSame))
+matchingsites[matchingsites$Freq>0,] # Number of years with data on that site. 
+
+# Site summary with percent reproductive
+sg_spr <-sg_sum
+sg_spr$PercentReprod <- sg_spr$Rep/sg_spr$X
+
+diffs <- lapply(split(sg_spr[sg_spr$SiteSame %in% updatedsites,], sg_spr$SiteSame[sg_spr$SiteSame %in% updatedsites]), function(x){
+  Sites <- unique(x$Site)
+  if(length(Sites==2)){
+    diffout <- lapply(2012:2015, function(y){
+      x$PercentReprod[x$Site==Sites[1]&x$Year==y]-x$PercentReprod[x$Site==Sites[2]&x$Year==y]
+      })
+    diffout
+    }
+  })
+
+ mean(unlist(diffs$`Atwell Gulch`))
+ sd(unlist(diffs$`Atwell Gulch`))
+ 
+ mean(unlist(diffs$`T-Junction`))
+ sd(unlist(diffs$`T-Junction`))
+ 
+ mean(unlist(diffs$Pond))
+ sd(unlist(diffs$Pond))
+ 
+ mean(unlist(diffs$`Oil Pad`))
+ sd(unlist(diffs$`Oil Pad`))
+ 
+ 
+PercentReproOverStudy <- do.call(rbind,lapply(split(sg_spr, sg_spr$Site), function(x){
+  out <- data.frame(Site = unique(x$SiteSame), Avg = mean(x$PercentReprod), SD = sd(x$PercentReprod),
+                    MinYr = min(x$Year), MaxYr = max(x$Year))
+}))
+
+PercentReproOverStudy[order(PercentReproOverStudy$Avg),]
 ```
 
 
@@ -1613,6 +1672,8 @@ ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
 dev.off()
 ```
 
+
+# Plant Size
 ```{r}
 
 summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
