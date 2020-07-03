@@ -147,7 +147,7 @@ minis0to1$survived <- (minis0to1$minis0 + minis0to1$minichange)/minis0to1$minis0
 # when there are new sub tags, new plants, NewIndiv, the negative survived ones assume became full plants. 
 minis0to1$survived[minis0to1$survived>1] <- 1
 
-surv_minis2 <- mean(minis0to1$survived, na.rm = TRUE)
+surv_minis2 <- mean(minis0to1$survived)
 
 surv_minis <- mean(c(surv_minis2, surv_minis1))
 ```
@@ -184,7 +184,7 @@ sg_ipm$szs1[sg_ipm$szs1==0] <- NA
 sg_ipm <- sg_ipm[!is.na(sg_ipm$szs0),]
 minsize_scgl <- min(c(sg_ipm$szs0,sg_ipm$szs1), na.rm = TRUE) - 0.09
 maxsize_scgl <- max(c(sg_ipm$szs0,sg_ipm$szs1), na.rm = TRUE) + 0.01
-size_scgl <- sg_ipm[,c("Site","Transect","szs0","szs1","minis0","survival","Fl.x")]
+size_scgl <- sg_ipm[,c("Site","Transect","szs0","szs1","minis0","survival","Fl.x", "Year.x", "Year.y")]
 
 table(size_scgl$Fl.x)
 size_scgl$Fl.x <- as.character(size_scgl$Fl.x)
@@ -192,7 +192,8 @@ size_scgl$Fl.x[size_scgl$Fl.x == "n"] <- "0"
 size_scgl$Fl.x[size_scgl$Fl.x == "y"] <- "1"
 size_scgl$Fl.x <- as.numeric(size_scgl$Fl.x)
 
-colnames(size_scgl) <- c("Site", "Transect", "t0","t1","minis0","survival","reproyesno")
+colnames(size_scgl) <- c("Site", "Transect", "t0","t1","minis0","survival","reproyesno","year0","year1")
+table(size_scgl$reproyesno)
 ```
 ScGl doesn't have bulbs, it has flowers that grow into minis, and there is some relationship between the number of flowers and the size of the plant.
 
@@ -246,7 +247,7 @@ sizeforrepro_scgl$flowers0 <- sapply(sizeforrepro_scgl$t0, function(x){
   })
 # size_scgl; sizeforrepro_scgl
 size_scgl <- merge(size_scgl, sizeforrepro_scgl, 
-                   by = c("Site","Transect","t0","t1","minis0","survival","reproyesno"))
+                   by = c("Site","Transect","t0","t1","minis0","survival","reproyesno","year0","year1"))
 #################### #################### 
 
 
@@ -266,17 +267,15 @@ plot(pdfsz2, type="l")
 plot(pdfsz2_scgl, type="l")
 ```
 
+# Bistort example
 ### Specify what range of classes/bins to evaluate -----------------------
 ```{r}
 bin.num <- c(3,4,5,6, 8, 10,seq(from = 15, to = 100, by = 10))
 #bin.num=20
-```
+
 ### Matrix Model ------------------------
-
-
 ## Estimate vital rates, populate matrix, for models with different numbers 
 ## of classes/ bins   
-```{r}
 lambdas_matrix <- rep(NA, length(bin.num))
 dampratio_matrix = rep(NA, length(bin.num))
 lifespan_matrix=rep(NA, length(bin.num))
@@ -352,29 +351,22 @@ for(i in 1:length(bin.num)){
 }
 ```
 
+# ScGl
 ### Specify what range of classes/bins to evaluate -----------------------
 ```{r}
-bin.num <- c(3,4,5,6)
-#bin.num=20
-```
+bin.num <- c(4,5,6)
+# ScGl
 
-ScGl
-```{r}
 lambdas_matrix <- rep(NA, length(bin.num))
 dampratio_matrix = rep(NA, length(bin.num))
 lifespan_matrix=rep(NA, length(bin.num))
 mincounts=NULL
 
-#test 
-# i<-3 # at 5 size bins, still have more than 2 in each class
-# mincounts<- NULL
-# rm(vec.bin)
-# breaks it into 3-95 size bins (by bin.num)
 for(i in 1:length(bin.num)){
   ss=as.numeric(size_scgl$t0)
   # vec.bin = c(minsize_scgl, minsize_scgl+1:bin.num[i]*(maxsize_scgl-minsize_scgl)*(1/bin.num[i]))  # really should split at < 0.6 and then < 2.5 as the non-reproductive sizes, then split above
-  breaks2add <- minsize_scgl+1:(bin.num[i])*(maxsize_scgl-minsize_scgl)*(1/(bin.num[i]))
-  vec.bin <- c(minsize_scgl, 2.5, breaks2add[3:(bin.num[i])])
+  breaks2add <- 2.5+1:(bin.num[i]-1)*(maxsize_scgl-2.1)*(1/(bin.num[i]-1))
+  vec.bin <- c(minsize_scgl, 2.5, breaks2add[1:(bin.num[i]-1)])
   nums=hist(ss,breaks=vec.bin, plot=FALSE)$counts 
   mincounts=c(mincounts,min(nums))
   
@@ -444,9 +436,37 @@ Climate and ScGl
 ```{r}
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 
-
+get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = 2019:2020)
+# Maximum temperature (average)
+get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 2019:2020)
+# Minimum temperature (average)
+get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 2019:2020)
 ```
 
+```{r}
+table(size_scgl$Site)
+size_scgl$Site <- as.character(size_scgl$Site)
+size_scgl$Site[grep("Atwell", size_scgl$Site)] <- "Atwell Gulch"
+
+latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
+#                            c(39.1969, -108.1298, "Atwell Gulch (old)"),
+                            c(38.8491, -108.3717, "Bridgeport"),   
+                            c(38.6593, -108.3466, "Escalante Canyon"),
+                            c(39.0612, -108.3799, "Fram"),
+                            c(39.3446, -108.3102, "Oil Pad"),
+#                            c(39.3446, -108.3102, "Oil Pad (old)"),
+                            c(38.6701, -108.3286, "Picnic Site"),
+                            c(39.3606, -108.3136, "Pond"),
+#                            c(39.3606, -108.3136, "Pond (old)"),
+                            c(38.7291, -108.1770, "Powerline"),
+                            c(39.3069, -108.2755, "Pyramid Rock"),
+                            c(39.3544, -108.3286, "T-Junciton")))
+#,
+#                            c(39.3544, -108.3286, "Road T-West (old)")))   
+names(latlong) <- c("Lat","Long","Site")
+latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
+
+```
 
 
 Lines 170-215: this is doing what you could also do with dredge, but that simpler here: getting a predictive model (as a function only of size in this case) for each demographic rate: survival, mean growth, variance in growth, prob of reproducing, and how much reproduction if reproducing. The code fits a few alternatives and chooses the best one for each rate, which will be used below. 
