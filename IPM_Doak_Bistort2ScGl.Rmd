@@ -25,9 +25,7 @@ sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/S
 setwd("C:/Users/DePrengm/OneDrive - Denver Botanic Gardens/P drive/My Documents/UCDenver_phd/Dissertation/Chapter3")
 # setwd("C:/Users/Dan Doak/Desktop/CurrentProjects/IPMmodels/Bistorts")
 
-
 ### Load, manipulate, and sort data --------------
-
  # load('BNdataforIPM.RData')
  # write.csv(alldata,file='bistortdata.csv')
  # 
@@ -74,18 +72,12 @@ sg <- sg[which(complete.cases(sg[,c("Tag")])),]
 # sg[which(sg$Width.cm. < 2.5 & sg$Fl == "y"),]
 
 sg$Width.cm.[sg$Year == 2017 & sg$Tag==363.00] <- 4.4
-# sg$Height.cm.[sg$Year == 2017 & sg$Tag==363.00] <- 1
+sg$Height.cm.[sg$Year == 2017 & sg$Tag==363.00] <- 1
 sg$Width.cm.[which(sg$Year == 2013 & sg$Tag==1242)] <- 11.8 
 sg$Width.cm.[which(sg$Year == 2009 & sg$Tag==96)] <- 9.8 
-
 sg$Fl[which(sg$Width.cm. < 2.5 & sg$Fl == "y")] <- "n"
-```
 
-```{r}
 sg_ipm <- subset(merge(sg[,c(2:5,10:14)], sg[,c(2:5,10:14)], by = c("Site","Tag","Transect")), Year.x == Year.y - 1)
-
-allminis <- sg_ipm[sg_ipm$szs0 <= minisz,]
-surv_minis1 <- sum(allminis$survival)/length(allminis$survival) # estimate survival of minis from when we didn't just count
 
 names(sg_ipm)[names(sg_ipm) == "Width.cm..x"] <- "szs0"
 names(sg_ipm)[names(sg_ipm) == "Width.cm..y"] <- "szs1"
@@ -97,7 +89,12 @@ sg_ipm <- sg_ipm[which(sg_ipm$szs0!=0),]
 
 sg_ipm$survival <- 1
 sg_ipm$survival[which(sg_ipm$szs1==0)] <- 0 
-table(sg_ipm$survival)
+# table(sg_ipm$survival)
+
+
+allminis <- sg_ipm[sg_ipm$szs0 <= minisz,]
+surv_minis1 <- sum(allminis$survival)/length(allminis$survival) # estimate survival of minis from when we didn't just count
+
 
 # minis are recruitment, some are lost the next year because they grow, some die. If there are more the next year, could be from a different tag (associated wrong or difference, should sum by truncated tag number)
 
@@ -120,7 +117,7 @@ ggplot(minismelt, aes(variable, value))+
 # There would be more individuals that are added to a tag if the decrease in number are ones that grew bigger. 
 # numpertag <- aggregate(cbind(count = MainTag) ~ MainTag+Transect+Site+Year.x+Year.y, data=sg_ipm, FUN = function(x){NROW(x)})
 # numpertag[numpertag$count>1,]
-sg[is.na(sg$Height.cm.),]
+# sg[is.na(sg$Height.cm.),]
 
 sg$MainTag <- floor(sg$Tag)
 # Ignore dead tags
@@ -140,7 +137,7 @@ When some died or grew, subtract the ones that are new individuals. minichange p
 ```{r}
 # numpertag; minis0to1
 minis0to1 <- merge(minis0to1, numpertag, by = c("MainTag","Transect","Site", "Year.x","Year.y"))
-minis0to1[with(minis0to1, order(MainTag, Transect, Site, Year.x)),]
+# minis0to1[with(minis0to1, order(MainTag, Transect, Site, Year.x)),]
 # If nimichange is negative, this could be accounted for with an increase in NewIndiv or due to death of minis. So should be conservative and say survival by adding new individuals (only positive values). NewIndiv being negative would be bigger than minis dying. Trying to get to death of minis, subtract out growth of minis
 # minichange is death, so ones that grew need to be subtracted from death or added to change but only when change is negative and newindiv is positive
 minis0to1$survived <- (minis0to1$minis0 + minis0to1$minichange)/minis0to1$minis0
@@ -149,7 +146,7 @@ minis0to1$survived[minis0to1$survived>1] <- 1
 
 surv_minis2 <- mean(minis0to1$survived)
 
-surv_minis <- mean(c(surv_minis2, surv_minis1))
+(surv_minis <- mean(c(surv_minis2, surv_minis1)))
 ```
 
 
@@ -173,11 +170,11 @@ lifespan <- function(nx){
 
 
 ```{r}
-minsize <- min(c(alldata[,1],alldata[,2]), na.rm=TRUE) -0.1
-#maxsize <- max(c(alldata[,1],alldata[,2]), na.rm=TRUE) +0.1
-maxsize=60 # this is set manually to not have a large category at end that has no plants.
-alldata[which(alldata[,1]>maxsize),1]=maxsize
-alldata[which(alldata[,2]>maxsize),2]=maxsize
+# minsize <- min(c(alldata[,1],alldata[,2]), na.rm=TRUE) -0.1
+# #maxsize <- max(c(alldata[,1],alldata[,2]), na.rm=TRUE) +0.1
+# maxsize=60 # this is set manually to not have a large category at end that has no plants.
+# alldata[which(alldata[,1]>maxsize),1]=maxsize
+# alldata[which(alldata[,2]>maxsize),2]=maxsize
 
 # ScGl
 sg_ipm$szs1[sg_ipm$szs1==0] <- NA
@@ -195,7 +192,7 @@ size_scgl$Fl.x <- as.numeric(size_scgl$Fl.x)
 colnames(size_scgl) <- c("Site", "Transect", "t0","t1","minis0","survival","reproyesno","year0","year1")
 table(size_scgl$reproyesno)
 ```
-ScGl doesn't have bulbs, it has flowers that grow into minis, and there is some relationship between the number of flowers and the size of the plant.
+ScGl doesn't have bulbs, it has flowers that grow into minis, and there is a relationship between the number of flowers and the size of the plant.
 
 ```{r}
 sg[sg$Year == 2019,] # where we co-opted photo number for number of flowers
@@ -231,8 +228,7 @@ summary(lm(PhotoNumber~Width.cm., data=sg2019[sg2019$Fl=="y",])) # y = 1.26x+ -3
 ```{r}
 size=alldata
 colnames(size)=c('t0','t1','bulbs0','survival')
-
-table(size$bulbs0)
+# table(size$bulbs0)
 
 size$reproyesno = size$bulbs0
 size$reproyesno[size$reproyesno >0]=1 # so, turn into yes no variable
@@ -256,7 +252,6 @@ pdfsz=density(size$t0, n=1024, cut=0)
 pdfsz2=cbind(pdfsz$x,pdfsz$y)
 #so, this is a set of smoothed values that can then be used with weightedMedian in the matrixStats package to get a 'good' median for each class.
 ######---------------
-plot(pdfsz2)
 
 #ScGl
 pdfsz_scgl <- density(size_scgl$t0, n=1024, cut=0, na.rm = TRUE)
@@ -443,8 +438,11 @@ get_prism_monthlys(type="tmax", mon = 1:12, keepZip = FALSE, years = 2019:2020)
 get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 2019:2020)
 ```
 
+## How to deal with plants that are double counted, could start and stop each site in 2012, could eliminate the new, eliminate just the duplicate by tag and transect, Pond (old) 2010 through 2013 and Pond 2015 to 2019. Where is my 2019 data? 
 ```{r}
 table(size_scgl$Site)
+table(size_scgl$Site, size_scgl$year0)
+
 size_scgl$Site <- as.character(size_scgl$Site)
 size_scgl$Site[grep("Atwell", size_scgl$Site)] <- "Atwell Gulch"
 
@@ -466,6 +464,16 @@ latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
 names(latlong) <- c("Lat","Long","Site")
 latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 
+
+### Keep only data that follows the whole way through
+sg_entire <- sg[grep("Road", sg$Site, invert = TRUE),]
+sg_entire <-sg_entire[sg_entire$Year > 2011, ]
+sg_entire <- sg_entire[grep("Pond", sg_entire$Site, invert = TRUE),]
+sg_entire <- sg_entire[grep("Fram", sg_entire$Site, invert = TRUE),]
+sg_entire <- sg_entire[grep("(old)", sg_entire$Site, invert = TRUE),]
+table(sg_entire$Site, sg_entire$Year)
+
+sg <- sg_entire
 ```
 
 
