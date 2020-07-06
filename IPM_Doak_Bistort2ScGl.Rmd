@@ -357,6 +357,17 @@ dampratio_matrix = rep(NA, length(bin.num))
 lifespan_matrix=rep(NA, length(bin.num))
 mincounts=NULL
 
+
+### Keep only data that follows the whole way through <-- do this for sie_scgl
+sg_entire <- sg[grep("Road", sg$Site, invert = TRUE),]
+sg_entire <-sg_entire[sg_entire$Year > 2011, ]
+sg_entire <- sg_entire[grep("Pond", sg_entire$Site, invert = TRUE),]
+sg_entire <- sg_entire[grep("Fram", sg_entire$Site, invert = TRUE),]
+sg_entire <- sg_entire[grep("(old)", sg_entire$Site, invert = TRUE),]
+table(sg_entire$Site, sg_entire$Year)
+
+
+
 for(i in 1:length(bin.num)){
   ss=as.numeric(size_scgl$t0)
   # vec.bin = c(minsize_scgl, minsize_scgl+1:bin.num[i]*(maxsize_scgl-minsize_scgl)*(1/bin.num[i]))  # really should split at < 0.6 and then < 2.5 as the non-reproductive sizes, then split above
@@ -385,7 +396,7 @@ for(i in 1:length(bin.num)){
       n[j] <- length(subset$t0)
       medians[j] <- median(subset$t0)
       # calculate survivorship for this class
-      surv[j] <- sum(subset$survival) / length(subset$t0)
+      surv[j] <- sum(subset$survival) / length(subset$t0) # of those alive in year 1, how many survived by bin/size class
       # store histo as object, to access counts per bin
       histo <- hist(subset$t1, breaks = vec.bin, plot = FALSE)
       # $counts returns the number of individuals of a certain size class
@@ -465,15 +476,6 @@ names(latlong) <- c("Lat","Long","Site")
 latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 
 
-### Keep only data that follows the whole way through
-sg_entire <- sg[grep("Road", sg$Site, invert = TRUE),]
-sg_entire <-sg_entire[sg_entire$Year > 2011, ]
-sg_entire <- sg_entire[grep("Pond", sg_entire$Site, invert = TRUE),]
-sg_entire <- sg_entire[grep("Fram", sg_entire$Site, invert = TRUE),]
-sg_entire <- sg_entire[grep("(old)", sg_entire$Site, invert = TRUE),]
-table(sg_entire$Site, sg_entire$Year)
-
-sg <- sg_entire
 ```
 
 
