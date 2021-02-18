@@ -91,32 +91,62 @@ sg$Stage[sg$Fl == "y"] <- "Reproductive"
 sg$Stage[sg$Fl == "n"] <- "Vegetative"
 
 # Testing
-# sgsite <- split(sg, sg$Site)[[1]]
+# sgsite <- split(sg, sg$Site)[[11]]
 # years <- min(sgsite$Year):max(sgsite$Year) 
-# yr <- 2
+# yr <- 5
+rm(years)
 # Make matrix models not in popbio, make wide and same as BLM data
 # Recruitment will be new tags each year and sum of all 'minis'
+# remove Pond and Fram 2015
 TMx_sg <- lapply(split(sg, sg$Site), function(sgsite){
-  years <- min(sgsite$Year):max(sgsite$Year)
+  print(unique(sgsite$Site))
+  if(unique(sgsite$Site) %in% c("Fram","Pond","Pond (old)")){
+    years <- c(min(sgsite$Year):2014,2016:max(sgsite$Year))
+  } else {
+    years <- min(sgsite$Year):max(sgsite$Year)
+  }
+  if(unique(sgsite$Site) %in% c("Escalante Canyon", "Picnic Site", "Powerline","Pyramid Rock")){
+    years <- c(2009:max(sgsite$Year))
+  }
+  if(unique(sgsite$Site) %in% "Pond (old)"){
+    years <- min(sgsite$Year):2013
+  }
   sgMinis <- sgsite
   sgsite <- sgsite[!is.na(sgsite$Width.cm.),]
   Mx <- list() # vegetative and reproductive
   for(yr in 2:length(years)){
+    print(years[yr])
     repro <- nrow(sgsite[sgsite$Fl == "y" & sgsite$Year == years[yr-1],]) # Reproductive last year
     newtags <- setdiff(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]]) # tags in yr that weren't in yr-1
-    recruit <- length(newtags) # how many in t1 that weren't in t0
-    recruitStage <- table(sgsite$Stage[sgsite$Tag %in% newtags & sgsite$Year == years[yr-1]])
-    minis <- sum(sgMinis$Minis[sgMinis$Year == years[yr]], na.rm = TRUE)
-    fecund2Veg <- (recruitStage[2] + minis)/repro
-    fecund2Rep <- recruitStage[1]/repro
+    if(length(newtags)==0){
+      newtags <- NA
+      recruit <- 0
+      recruitStage <- c(0,0)
+    } else {
+      recruit <- length(newtags) # how many in t1 that weren't in t0
+      recruitStage <- table(sgsite$Stage[sgsite$Tag %in% newtags & sgsite$Year == years[yr]]) # new this year since last year
+    }
+    minis <- sum(sgMinis$Minis[sgMinis$Year == years[yr]], na.rm = TRUE)  
+    fecund2Veg <- (recruitStage[2] + minis)/repro # how many vegetative individuals 
+    fecund2Rep <- recruitStage[1]/repro # how many newly discovered individuals are reproductive - this should be assigned to on fertility transition
+    R <- (recruit + minis)/repro
+    # How many tags were found in year-1 and year, survived, and what was their stage in year-1
+    # survStage <- data.frame(Reproductive = 0, Vegetative = 0)
     survStage <- table(sgsite$Stage[sgsite$Tag %in% intersect(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]]) &
                                       sgsite$Year == years[yr-1]])
+    if(length(survStage) < 2) {
+      survStage <- c(survStage, 0)
+      names(survStage) <- c(names(survStage)[1], setdiff(c("Reproductive","Vegetative"), names(survStage)))
+      }
+    # How many tags grew from veg in year-1 to reproductive in year, 
     growthVegRep <- length(intersect(sgsite$Tag[sgsite$Year == years[yr] & sgsite$Stage == "Reproductive"],
                                      sgsite$Tag[sgsite$Year == years[yr-1]& sgsite$Stage == "Vegetative"]))
-    Staget0 <- table(sgsite$Stage[sgsite$Year == years[yr-1]])
-    Mx[[yr-1]] <- matrix(c(survStage[2]/Staget0[2],growthVegRep/Staget0[2],
-                         sum(survStage[1]/Staget0[1], fecund2Veg, na.rm = TRUE), 
-                         sum(survStage[1]/Staget0[1], fecund2Rep, na.rm = TRUE)), nrow = 2)
+    G <- growthVegRep/survStage["Vegetative"]
+    Staget0 <- table(sgsite$Stage[sgsite$Year == years[yr-1]]) # this is how many there were in year-1 but not all survived
+    Mx[[yr-1]] <- matrix(c(survStage["Vegetative"]/Staget0["Vegetative"], # stasis of vegetative
+                           growthVegRep/Staget0["Vegetative"], # growth from veg to reproductive
+                           R, # fecundity (collapse recruitment to veg and repro)
+                           survStage["Reproductive"]/Staget0["Reproductive"]), nrow = 2) # stasis of reproductive
   }
   names(Mx) <- paste(unique(sgsite$Site), unique(sgsite$Population), years[-length(years)], sep="_")
   Mx
@@ -124,12 +154,13 @@ TMx_sg <- lapply(split(sg, sg$Site), function(sgsite){
 
 # sgsite[sgsite$Tag %in% intersect(sgsite$Tag[sgsite$Year == yr],sgsite$Tag[sgsite$Year == (yr-1)]),]
 
-TMx_sg[[5]] # Fram missing data
-TMx_sg[[4]] # Why does Escalante have numbers larger than 1 for stasis of reproductive? 
-TMx_sg[[9]] # Pond has missing but not issues for the matrices
+# TMx_sg[[5]] # Fram missing data
+# TMx_sg[[4]] # Why does Escalante have numbers larger than 1 for stasis of reproductive? 
+# TMx_sg[[9]] # Pond has missing data in 2015 but not issues for the matrices
+# TMx_sg[[12]]
 elasts <- do.call(rbind,lapply(c(1:length(TMx_sg)), function(i){
             out <- do.call(rbind,lapply(TMx_sg[[i]], function(x){
-              print(i)
+              # print(i)
               e_ij <- elasticity(x)
               G <- e_ij[2]
               S <- sum(e_ij[c(1,4)])
@@ -139,10 +170,41 @@ elasts <- do.call(rbind,lapply(c(1:length(TMx_sg)), function(i){
             out
             }))
 
+# Estimated generation time
+mean(elasts$gentime[!is.infinite(elasts$gentime)], na.rm = TRUE) # 10 years
+
+# Estimated lambda
+mean(elasts$lam) # 1.16
+max(elasts$lam) # 0.43
+min(elasts$lam) # 0.43
+lambdasDBG <- lapply(split(elasts, unlist(lapply(row.names(elasts), function(x) strsplit(x, "_")[[1]][1]))),
+       function(y){
+         out <- data.frame(Mu_lam = mean(y$lam), Median_lam = median(y$lam), SD_lam = sd(y$lam))
+       })
+
+
+# ggtern(elasts, aes(R, G, S, colour = lam))+ #, size = floor(gentim)))+ #, size = as.factor(floor(GenTime))))+ #lam))+
+#   geom_point(shape = 16)+
+#   scale_color_viridis_c(name = expression(lambda))+
+#   scale_size_continuous()+
+#   theme_showarrows()+
+#   theme_clockwise()
+
 
 # As a table for Gail at USFWS and Phil and Carol to compare to BLM data
 surv_recruit <- do.call(rbind,lapply(split(sg, sg$Site), function(sgsite){
   years <- min(sgsite$Year):max(sgsite$Year)
+  if(unique(sgsite$Site) %in% c("Fram","Pond","Pond (old)")){
+    years <- c(min(sgsite$Year):2014,2016:max(sgsite$Year))
+  } else {
+    years <- min(sgsite$Year):max(sgsite$Year)
+  }
+  if(unique(sgsite$Site) %in% c("Escalante Canyon", "Picnic Site", "Powerline","Pyramid Rock")){
+    years <- c(2009:max(sgsite$Year))
+  }
+  if(unique(sgsite$Site) %in% "Pond (old)"){
+    years <- min(sgsite$Year):2013
+  }
   sgMinis <- sgsite
   sgsite <- sgsite[!is.na(sgsite$Width.cm.),]
   dfout <- list() # vegetative and reproductive
