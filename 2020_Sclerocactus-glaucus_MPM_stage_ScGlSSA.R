@@ -209,20 +209,34 @@ surv_recruit <- do.call(rbind,lapply(split(sg, sg$Site), function(sgsite){
   sgsite <- sgsite[!is.na(sgsite$Width.cm.),]
   dfout <- list() # vegetative and reproductive
   for(yr in 2:length(years)){
-    repro <- nrow(sgsite[sgsite$Fl == "y" & sgsite$Year == years[yr-1],])
-    recruit <- length(setdiff(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]])) # how many in t1 that weren't in t0
-    recruitStage <- table(sgsite$Stage[sgsite$Tag %in% setdiff(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]])])
-    minis <- sum(sgMinis$Minis[sgMinis$Year == years[yr]], na.rm = TRUE)
-    fecund2Veg <- (recruitStage[2] + minis)/repro
-    fecund2Rep <- recruitStage[1]/repro
+    repro <- nrow(sgsite[sgsite$Fl == "y" & sgsite$Year == years[yr-1],]) # Reproductive last year
+    newtags <- setdiff(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]]) # tags in yr that weren't in yr-1
+    if(length(newtags)==0){
+      newtags <- NA
+      recruit <- 0
+      recruitStage <- c(0,0)
+    } else {
+      recruit <- length(newtags) # how many in t1 that weren't in t0
+      recruitStage <- table(sgsite$Stage[sgsite$Tag %in% newtags & sgsite$Year == years[yr]]) # new this year since last year
+    }
+    minis <- sum(sgMinis$Minis[sgMinis$Year == years[yr]], na.rm = TRUE)  
+    fecund2Veg <- (recruitStage[2] + minis)/repro # how many vegetative individuals 
+    fecund2Rep <- recruitStage[1]/repro # how many newly discovered individuals are reproductive - this should be assigned to on fertility transition
+    R <- (recruit + minis)/repro
     survStage <- table(sgsite$Stage[sgsite$Tag %in% intersect(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]]) &
                                       sgsite$Year == years[yr-1]])
+    if(length(survStage) < 2) {
+      survStage <- c(survStage, 0)
+      names(survStage) <- c(names(survStage)[1], setdiff(c("Reproductive","Vegetative"), names(survStage)))
+    }
+    # How many tags grew from veg in year-1 to reproductive in year, 
     growthVegRep <- length(intersect(sgsite$Tag[sgsite$Year == years[yr] & sgsite$Stage == "Reproductive"],
                                      sgsite$Tag[sgsite$Year == years[yr-1]& sgsite$Stage == "Vegetative"]))
-    Staget0 <- table(sgsite$Stage[sgsite$Year == years[yr-1]])
-    dfout[[yr-1]] <- data.frame(survVeg = survStage[2]/Staget0[2], 
-                                growthVeg = growthVegRep/Staget0[2],
-                                survRep = survStage[1]/Staget0[1],
+    G <- growthVegRep/survStage["Vegetative"]
+    Staget0 <- table(sgsite$Stage[sgsite$Year == years[yr-1]]) # this is how many there were in year-1 but not all survived
+    dfout[[yr-1]] <- data.frame(survVeg = survStage["Vegetative"]/Staget0["Vegetative"], 
+                                growthVeg = growthVegRep/Staget0["Vegetative"],
+                                survRep = survStage["Reproductive"]/Staget0["Reproductive"],
                                 Recruitment2Veg =  fecund2Veg,
                                 Recruitment2Rep = fecund2Rep,
                                 Site = unique(sgsite$Site), 
@@ -234,11 +248,14 @@ surv_recruit <- do.call(rbind,lapply(split(sg, sg$Site), function(sgsite){
   out
 }))
 
-write.table(surv_recruit, "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus glaucus_SSA_2020/survivalFecundDBG.csv",
+write.table(surv_recruit, paste("C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/2020_Sclerocactus-glaucus_SSA/survivalFecundDBG",
+                                paste(strsplit(date()," ")[[1]][c(5,2,3)],collapse = ""),
+                                ".csv",
+                                sep = ""),
             sep=",", row.names = FALSE)
-load(file ="C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus glaucus_SSA_2020/BLMsurvival.Rdata")
-load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus glaucus_SSA_2020/BLMrecruit.Rdata")
-load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus glaucus_SSA_2020/BLMsurvXstage.Rdata")
+load(file ="C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/2020_Sclerocactus-glaucus_SSA/BLMsurvival.Rdata")
+load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/2020_Sclerocactus-glaucus_SSA/BLMrecruit.Rdata")
+load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/2020_Sclerocactus-glaucus_SSA/BLMsurvXstage.Rdata")
 
 
 # test
@@ -248,14 +265,46 @@ load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/All
 
 DBG_surv <- do.call(rbind,lapply(split(sg, sg$Site), function(sgsite){
   years <- min(sgsite$Year):max(sgsite$Year)
+  if(unique(sgsite$Site) %in% c("Fram","Pond","Pond (old)")){
+    years <- c(min(sgsite$Year):2014,2016:max(sgsite$Year))
+  } else {
+    years <- min(sgsite$Year):max(sgsite$Year)
+  }
+  if(unique(sgsite$Site) %in% c("Escalante Canyon", "Picnic Site", "Powerline","Pyramid Rock")){
+    years <- c(2009:max(sgsite$Year))
+  }
+  if(unique(sgsite$Site) %in% "Pond (old)"){
+    years <- min(sgsite$Year):2013
+  }
+  sgMinis <- sgsite
+  sgsite <- sgsite[!is.na(sgsite$Width.cm.),]
   dfout <- do.call(rbind,lapply(2:length(years), function(yr){
+    repro <- nrow(sgsite[sgsite$Fl == "y" & sgsite$Year == years[yr-1],]) # Reproductive last year
+    newtags <- setdiff(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]]) # tags in yr that weren't in yr-1
+    if(length(newtags)==0){
+      newtags <- NA
+      recruit <- 0
+      recruitStage <- c(0,0)
+    } else {
+      recruit <- length(newtags) # how many in t1 that weren't in t0
+      recruitStage <- table(sgsite$Stage[sgsite$Tag %in% newtags & sgsite$Year == years[yr]]) # new this year since last year
+    }
+    minis <- sum(sgMinis$Minis[sgMinis$Year == years[yr]], na.rm = TRUE)  
+    # fecund2Veg <- (recruitStage[2] + minis)/repro # how many vegetative individuals 
+    # fecund2Rep <- recruitStage[1]/repro # how many newly discovered individuals are reproductive - this should be assigned to on fertility transition
+    # R <- (recruit + minis)/repro
+    # How many tags were found in year-1 and year, survived, and what was their stage in year-1
+    # survStage <- data.frame(Reproductive = 0, Vegetative = 0)
+    surv1 <- nrow(sgsite[sgsite$Tag %in% intersect(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]]) &
+                                      sgsite$Year == years[yr-1],])
     individuals_t0 <- nrow(sgsite[sgsite$Width.cm. > 0 & sgsite$Year == years[yr-1],])
     surv <- length(intersect(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]])) # the tags in t1 that were in t0
     n_t0 <- nrow(sgsite[sgsite$Year == years[yr-1],])
     data.frame(Site = unique(sgsite$Site), Pop = unique(sgsite$Population), PercSurv = surv/n_t0)
-  }))
+    }))
   dfout
-}))
+  }))
+
 
 load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus glaucus_SSA_2020/BLM_scgl_annualsurivval.Rdata")
 
