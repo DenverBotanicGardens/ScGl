@@ -5,6 +5,8 @@ date: "Monday, October 05, 2015"
 output: html_document
 ---
 
+*** Are you not Michelle DePrenger-Levin?? -->   
+    Set userpath to "C:/Users/<yourname>/" in the first chunk to run code as is. 
 The repository is named "ScGl"   
 Will need: git push ScGl master   
 
@@ -18,17 +20,17 @@ rm(list=ls())
 library(ggplot2)
 library(plyr)
 library(devtools)
-#library(multcompView)
+#library(multcompView)H
 library(reshape2)
 library(raster)
 library(prism)
 library(RCurl)
-library(psych)
+# library(psych)
 library(Rmisc)
 require(AICcmodavg)
 #Set wd for prism data if not already
-options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
-library(multcompView)
+# options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+# library(multcompView)
 
 
 #Some global variables
@@ -62,12 +64,15 @@ CountPVA <- function(x,y){
   list(PVA = PVA.table,LM = LM.table)
 }
 
+
+# "C:\Users\deprengm\Denver Botanic Gardens\Conservation - General\AllProjectsBySpecies\Sclerocactus-glaucus\Sclerocactus-glaucus_AnnualReports\2008-currentyr_Sclerocactus_glaucus_R_tables\RawData_scgl_2021.csv"
+userpath <-"C:/Users/deprengm/" 
 ```
 
 
 Need to calculate individuals from 2008 data seperate from following due to lack of measuring hight and width. Will need to get the total tagged individuals for number alive instead of number of individuals with a heigth > 0 from 2009 on. <https://research.botanicgardens.org/admin/>      
 
-In 2012 we switched from measuring the height and width indiviudals under 0.5 cm in width to counting them as "minis". 
+In 2012 we switched from measuring the height and width individuals under 0.5 cm in width to counting them as "minis". 
 
 2008-currentYr data  
 ```{r}
@@ -77,8 +82,9 @@ In 2012 we switched from measuring the height and width indiviudals under 0.5 cm
 
 #2016
 # Need to strip white space and conform to 2015 data
-sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_", currentYr,".csv",
-                     sep=""))
+# sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_", currentYr,".csv",
+#                      sep=""))
+sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
 
 table(sg$Site,sg$Year) 
@@ -98,7 +104,7 @@ sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
 sg$Minis[sg$Minis > 1000] <- NA
 
 # write.table(sg, file=paste("P:/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
-write.table(sg, file=paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
+write.table(sg, file=paste(userpath,"OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
 
 ```
 
@@ -112,7 +118,8 @@ Need to split by Site - Atwell Gulch needs to be together:
      
 summarize 2008  
 ```{r}
-scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
+# scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
+scgl08 <- read.delim(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/All2008.txt", sep=""),sep=",")
 
 sg_summary08 <- ddply(scgl08,  
                     .(SiteName,Year), summarise,
@@ -143,6 +150,7 @@ table(sg$Year, sg$Site)
 
 # Pond was not finished in 2015
 # Some data was entered but should be removed from the count data and trend analyses unless it is for individuals that were measured in 2015
+# No data was collected in 2020 due to COVID-19, SARS-CoV-2
 
 ```
 
@@ -214,6 +222,10 @@ ggplot(sg[sg$Site == "Picnic Site",], aes(Transect,Height.cm.))+
 
 ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
   geom_point()
+
+sg[sg$Height.cm. > 7.5 & sg$Site == "Picnic Site" & !is.na(sg$Height.cm.),]
+
+sg[sg$Height.cm. > 7.5 & sg$Site == "Pond" & !is.na(sg$Height.cm.),]
 ```
 
 
@@ -278,6 +290,8 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
 
 
 ```{r}
+sg_sum$Site <- as.factor(sg_sum$Site)
+
 ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site, shape=Site))+
   scale_shape_manual(values=1:nlevels(sg_sum$Site[grep("old",sg_sum$Site,invert=TRUE)]))+
   geom_point()+
@@ -399,11 +413,12 @@ summary(lm(PRep~avgW, data=rep.per))
 prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
                                                         sg_sum$Site,value=TRUE),]
 
-write.table(poststand, file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_poststand.csv", sep=""), 
-            sep=",", row.names=FALSE, col.names = TRUE)
+# write.table(poststand, file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_poststand.csv", 
+write.table(poststand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/Table2_poststand.csv", sep=""), sep=",", row.names=FALSE, col.names = TRUE)
 
 
-write.table(prestand,  file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_prestand.csv", sep=""), 
+# write.table(prestand,  file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_prestand.csv", sep=""), 
+write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/Table2_prestand.csv", sep=""),
             sep=",", row.names=FALSE, col.names = TRUE)
 
 ```
@@ -413,11 +428,12 @@ Climate directly from PRISM
 ### update only the previous year each year  
 ```{r, eval=FALSE}
 #devtools::install_github("ropensci/prism")
-library(prism)
 
 # Set wd for prism
-options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+# options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
+options(prism.path = "Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
 
+# options(prism.path = )
 ```
 
 
@@ -487,14 +503,26 @@ Max temp
 Min temp   
 16 years 2000:currentYr
 ```{r}
-ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
-#ppt2 <- grep(paste("ppt_stable",paste("ppt_provisional_4kmM3_",currentYr,sep=""),collapse="|"),ls_prism_data(absPath = TRUE)[,2])
+# ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
+# ppt <- grep("ppt", prism_archive_ls())
 
-m.ppt <- lapply(ppt, function(x){
-  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
-  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
-             date = ls_prism_data()[x,], Site = latlong$Site)
+# Test
+# x <- ppt[[100]]
+# x <- m.ppt[1]
+
+m.ppt <- prism_archive_subset("ppt", "monthly", years = 2008:currentYr)
+m.ppt2 <- lapply(m.ppt, function(x){
+  x_rast <- pd_to_file(x)
+  rastertemps <- raster(x_rast)
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]),
+             date = x, Site = latlong$Site)
 })
+
+# m.ppt <- lapply(ppt, function(x){
+#   rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+#   data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
+#              date = ls_prism_data()[x,], Site = latlong$Site)
+# })
 
 tmax <- grep("tmax", ls_prism_data(absPath = TRUE)[,2])
 
