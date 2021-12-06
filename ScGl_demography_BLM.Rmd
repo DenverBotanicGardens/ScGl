@@ -730,9 +730,9 @@ ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
 Precipitation North vs. South  
 swtich to total instead of monthly average?
 ```{r}
-ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
+ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2007&
                          scgl_sumSE[[1]]$Prev12<currentYr,],
-       aes(Prev12, ppt, colour=NS, group=NS))+
+       aes(Prev12, ppt, colour=NS, group=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.1)) +
@@ -744,9 +744,9 @@ t.test(ppt~NS, data = scgl_sumSE[[1]])
 
 Minimum temperature per site (Celcius)
 ```{r}
-ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
+ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2007&
                          scgl_sumSE[[2]]$Prev12<currentYr+1,],
-       aes(Prev12, tmin, colour=NS, group=NS))+
+       aes(Prev12, tmin, colour=NS, group=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
@@ -758,7 +758,7 @@ ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
 ```{r}
 ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
                          scgl_sumSE[[2]]$Prev12<currentYr+1,],
-       aes(Prev12, tmin, colour=NS))+
+       aes(Prev12, tmin, colour=NS, group=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
@@ -769,9 +769,9 @@ ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
 
 Maximum temperature per site (C)
 ```{r}
-ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
+ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2007&
                          scgl_sumSE[[3]]$Prev12<currentYr+1,],
-       aes(Prev12, tmax, colour=Site))+
+       aes(Prev12, tmax, colour=NS, group=Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
@@ -780,11 +780,11 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2000&
 
 ```
 
-# PCA summary t.tests
+# Climate summary t.tests
 ```{r}
 ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>=2000&
                          scgl_sumSE[[3]]$Prev12<currentYr+1,],
-       aes(Prev12, tmax, colour=NS))+
+       aes(Prev12, tmax, colour=NS, group = Site))+
   geom_point(position=position_dodge(0.1), shape=21, fill="white") +
   stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
   geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
@@ -793,7 +793,7 @@ ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>=2000&
 
 t.test(tmax~NS, data= scgl_sumSE[[3]])
 t.test(tmin~NS, data= scgl_sumSE[[2]])
-# t.test(ppt~NS, data= scgl_sumSE[[1]])
+t.test(ppt~NS, data= scgl_sumSE[[1]])
 ```
 
 Take out missing data, Years 1986 through current year as previous 12 years to the May survey
@@ -802,14 +802,14 @@ Take out missing data, Years 1986 through current year as previous 12 years to t
 nrow(season) #320
 cc.season <- season[complete.cases(season),]
 nrow(cc.season) #310
-unique(sort(cc.season$Prev12)) #1986:current year
+unique(sort(cc.season$Prev12)) #1987:current year
 
-cor.plot(cor(cc.season[,-c(1:2,grep("Year", names(cc.season)),
-                        grep("Month", names(cc.season)))]), numbers = TRUE)
+
 ```
 
+
+# forcing variables (climate drivers) of growth, survival, and reproduction 1987 through current year
 Ditch anything 50% or more correlated of the pair that explains less variation, get r^2 values
-## PCA for 1986 through current year
 ```{r}
 
 #mlogit(Site~1|ppt.fall+tmax.fall+tmin.fall, cc.season)
@@ -853,19 +853,6 @@ names(cc.season[,-colexclude])
 
 forpca86.current <- cc.season[,-colexclude]
 
-scgl.pca86current <- princomp(forpca86.current,cor=TRUE)
-summary(scgl.pca86current)
-scgl.load86current <- loadings(scgl.pca86current)
-write.table(scgl.load86current, "clipboard", sep="\t", row.names=TRUE)
-scgl.pc86current <- predict(scgl.pca86current)
-
-sg.pc86current <- data.frame(scgl.pc86current,cc.season)
-# Assign genetic regions
-sg.pc86current$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg.pc86current$NS[sg.pc86current$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     sg.pc86current$Site,
-                                     value=TRUE))] <- "South"
 ```
 
 #Table 3a)    
@@ -882,263 +869,6 @@ write.table(Table3a[!duplicated(Table3a$Freq),], file=paste(userpath, "Denver Bo
 # write.table(Table3a[with(Table3a, order(Table3a$Freq)),], "clipboard", sep="\t", row.names = FALSE)
 
 
-```
-
-Site differences
-#Figure 4b  
-```{r}
-sg.pc86current$Site <- as.factor(sg.pc86current$Site)
-
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4b.jpg", sep=""), width=175, height=125, units="mm", res=300)
-
-
-ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=Site, shape=Site))+
-  scale_shape_manual(values=1:nlevels(sg.pc86current$Site))+
-  geom_point() +
-  stat_ellipse() +
-  theme_bw()
-
-dev.off()
-```
-
-North/South differences
-#Figure 4a
-```{r}
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4a.jpg", sep=""), width=125, height=125, units="mm", res=300)
-
-
-ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
-  geom_point() +
-  stat_ellipse() +
-  theme_bw()+
-  guides(colour=guide_legend(title="Genetic region"))+
-  guides(shape=guide_legend(title="Genetic region")) +
-  theme(legend.position="bottom")
-
-dev.off()
-```
-
-#Figure 4c
-Use all years of data for all plots comparison?
-The letters won't line up with the sites unless specified
-```{r}
-#doesn't like "-" in the name
-levels(sg.pc86current$Site) <- c(as.character(unique(sg.pc86current$Site))[-10], "TJunction")
-sg.thsd <- TukeyHSD(aov(Comp.1~Site, data=sg.pc86current))
-
-lasign <- multcompLetters(extract_p(sg.thsd$Site))
-tomerge <- lasign$Letters
-names(tomerge) <- c(names(tomerge)[1:8],"T-Junction",names(tomerge)[10])
-
-
-SiteLetters <- data.frame(Letter = lasign$Letters,
-                          Site = names(tomerge))
-SiteLetters<-SiteLetters[with(SiteLetters, order(Site)),]
-
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4c.jpg", sep=""), width=275, height=125, units="mm", res=300)
-
-ggplot(sg.pc86current, aes(Site, Comp.1, colour=NS))+
-  stat_boxplot(geom='errorbar')+
-  geom_boxplot()+
-  annotate("text",x=1:10, y = 5,
-           label = SiteLetters$Letter)+
-  theme_bw()+
-  guides(colour=guide_legend(title="Genetic region")) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-dev.off()
-
-# 1986 to current year t.test
-t.test(Comp.1~NS, data=sg.pc86current)
-
-```
-
-#### Figure 4: The Principal Components Analysis (PCA) of climatic variables with loadings  by a) genetic region and b) site. c) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
-sg.pc86current is 1986 to current year
-```{r}
-
-ggplot(sg.pc86current, aes(Comp.1,Comp.2, colour=NS))+
-  geom_point() +
-  stat_ellipse() +
-  theme_bw() +
-  theme(legend.justification=c(0,1), legend.position=c(0,1))
-
-t.test(Comp.1~NS, data=sg.pc86current)
-```
-
-Results of first PCA  
-```{r}
-ggplot(sg.pc86current, aes(tmax.fall, tmax.spring, colour = NS))+
-  geom_point()+
-  stat_ellipse()
-
-ggplot(sg.pc86current, aes(ppt.spring, ppt.fall, colour=NS))+
-  geom_point()+
-  stat_ellipse()
-```
-
-
-
-# PCA 2008-currentYr
-Try for only the study period 
-Prev12 is the May of the previous year through the April of the current year
-#### 2008-currentYr
-Ditch anything 50% or more correlated 
-
-```{r}
-
-recent08current <- cc.season[cc.season$Prev12 > 2007 & cc.season$Prev12 < currentYr+1,]
-rsqs08 <- do.call(rbind,lapply(3:length(recent08current), function(x){
-  lm <- summary(lm(recent08current$Prev12~recent08current[,x]))
-  data.frame(var=names(recent08current)[x],r2=lm$adj.r.squared)
-}))
-
-cor.table.r<-cor(recent08current[,-c(1:2)])
-data.r <- as.data.frame(as.table(cor.table.r))
-
-#New way to find the variable that has the better r2 between the two correlated varaiables
-data.rrsqs1 <- merge(rsqs08,data.r, by.x = "var", by.y = "Var1")
-names(data.rrsqs1) <- c("var_Var1", "r2", "Var2","PCorr")
-data.rrsqs2 <- merge(rsqs08, data.rrsqs1, by.x = "var", by.y = "Var2")
-apply(data.rrsqs2, 1, function(x) x[1])
-keepvars08 <- apply(data.rrsqs2, 1, function(x){
-  if(abs(as.numeric(x[5]))>cor.level & as.numeric(x[5])<1){
-    if(as.numeric(x[2])>as.numeric(x[4])){
-      out <- x[1]   # The first variable that would have a higher r square value
-    } else {
-      out <- x[3]   # The second varaiable that would have the higher r sq
-    }
-    out
-  }
-})
-tokeep08 <- unique(do.call(rbind,keepvars[!unlist(lapply(keepvars, is.null))]))
-
-colexclude08 <- which(!names(recent08current) %in% tokeep08)
-
-#Variables kept for 2007 May - current year
-unique(names(recent08current[,-colexclude08]))
-
-scgl.pca.r <- princomp(recent08current[,-colexclude08],cor=TRUE)
-summary(scgl.pca.r)
-scgl.load.r <- loadings(scgl.pca.r)
-write.table(scgl.load.r, "clipboard", sep="\t", row.names=TRUE)
-
-scgl.pc.r <- predict(scgl.pca.r)
-
-sg.pc.r <- data.frame(scgl.pc.r,recent08current)
-# Assign genetic regions
-sg.pc.r$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg.pc.r$NS[sg.pc.r$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     sg.pc.r$Site,
-                                     value=TRUE))] <- "South"
-
-```
-
-# Table 3b) 2008 - current year
-```{r}
-Table3bcor <- cor(recent08current[,-c(1:2)])
-Table3b <- as.data.frame(as.table(Table3bcor))
-
-Table3b <- Table3b[abs(Table3b$Freq)>cor.level&Table3b$Freq<1,]
-Table3b <- Table3b[with(Table3b, order(Table3b$Freq)),]
-write.table(Table3b[!duplicated(Table3b$Freq),], file = paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports",currentYr,"Table3b.csv", sep=""), 
-            sep=",", row.names=FALSE, col.names = TRUE)
-
-```
-
-In case of "Error in .Call.graphics(C_palette2, .Call..."  
-use dev.off()
-Figure 4
-
-```{r}
-jpeg( paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports",currentYr,"Fig4e.jpg", sep=""), width=175, height=125, units="mm", res=300)
-
-ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=Site, shape=Site))+
-  scale_shape_manual(values=1:nlevels(sg_sum$Site[grep("old",sg_sum$Site,invert=TRUE)]))+
-  geom_point() +
-  stat_ellipse() +
-  theme_bw()
-
-dev.off()
-
-
-jpeg(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports",currentYr,"Fig4d.jpg", sep=""), width=175, height=125, units="mm", res=300)
-
-ggplot(sg.pc.r, aes(Comp.1,Comp.2, colour=NS, shape=NS))+
-  geom_point() +
-  stat_ellipse() +
-  theme_bw()+
-  guides(colour=guide_legend(title="Genetic region"))+
-  guides(shape=guide_legend(title="Genetic region")) 
-
-dev.off()
-
-
-#T-test for the 2008 to current year time
-t.test(Comp.1~NS, data=sg.pc.r)
-t.test(Comp.2~NS, data=sg.pc.r)
-
-
-```
-
-
-Figure 4 f) Site distribution along PC1 is shown with Tukey Honest Significant Differences. 
-
-```{r}
-#doesn't like "-" in the name
-sg.pc.r$Site <- as.character(sg.pc.r$Site)
-sg.pc.r$Site[sg.pc.r$Site == "T-Junciton"] <- "TJunction"
-sg.pc.r$Site <- as.factor(sg.pc.r$Site)
-# levels(sg.pc.r$Site) <- c(as.character(unique(sg.pc.r$Site))[-(10)],"TJunction")
-
-#Comp.2
-sg.thsd2 <- TukeyHSD(aov(Comp.2~Site, data=sg.pc.r))
-lasign2 <- multcompLetters(extract_p(sg.thsd2$Site))
-tomerge2 <- lasign2$Letters
-# names(tomerge2) <- c(names(tomerge2)[1:8],"T-Junction",names(tomerge2)[10])
-
-
-SiteLetters2 <- data.frame(Letter = lasign2$Letters,
-                          Site = names(tomerge2))
-Siteletters2 <- SiteLetters2[order(SiteLetters2$Site),]
-
-ggplot(sg.pc.r, aes(Site, Comp.2, colour=NS))+
-  stat_boxplot(geom='errorbar')+
-  geom_boxplot()+
-  annotate("text",x=1:10, y = 4,
-           label = SiteLetters2$Letter)+
-  theme_bw()+
-  guides(colour=guide_legend(title="Genetic region"))
-
-#Comp.1
-sg.thsd1 <- TukeyHSD(aov(Comp.1~Site, data=sg.pc.r))
-lasign1 <- multcompLetters(extract_p(sg.thsd1$Site))
-
-tomerge1 <- lasign1$Letters
-names(tomerge1) <- c(names(tomerge1)[1:8],"T-Junction",names(tomerge1)[10])
-
-SiteLetters1 <- data.frame(Letter = lasign1$Letters,
-                          Site = names(tomerge1))
-SiteLetters1 <- SiteLetters1[order(SiteLetters1$Site),]
-
-levels(sg.pc.r$Site)
-levels(SiteLetters1$Site)
-
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4f.jpg", sep=""), width=275, height=125, units="mm", res=300)
-
-
-ggplot(sg.pc.r, aes(Site, Comp.1, colour=NS))+
-  stat_boxplot(geom='errorbar')+
-  geom_boxplot()+
-  annotate("text",x=1:10, y = 4,
-           label = SiteLetters1$Letter)+
-  theme_bw()+
-  guides(colour=guide_legend(title="Genetic region"))
-# +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-
-dev.off()
 ```
 
 #### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
