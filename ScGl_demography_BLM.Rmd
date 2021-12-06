@@ -18,6 +18,7 @@ rm(list=ls())
 
 ```{r, echo=FALSE}
 library(ggplot2)
+library(patchwork)
 library(plyr)
 library(devtools)
 #library(multcompView)H
@@ -812,46 +813,25 @@ unique(sort(cc.season$Prev12)) #1987:current year
 Ditch anything 50% or more correlated of the pair that explains less variation, get r^2 values
 ```{r}
 
-#mlogit(Site~1|ppt.fall+tmax.fall+tmin.fall, cc.season)
-
-rsqs <- do.call(rbind,lapply(3:length(cc.season), function(x){
-  lm <- summary(lm(cc.season$Prev12~cc.season[,x]))
-  data.frame(var=names(cc.season[x]),r2=lm$adj.r.squared)
-}))
-
-
 #keep the one with bigger r2 from var1 and var2 when Freq is > 50% 
 cor.level <- .5 
 
 cor.table86.current<-cor(cc.season[,-c(1:2)])
 data86.current <- as.data.frame(as.table(cor.table86.current))
-colexclude <- c(1:2)
+data86.current[abs(data86.current$Freq) >= 0.5,]
+corrforcing <- data86.current[abs(data86.current$Freq) >= 0.5 & data86.current$Freq < 1,]
 
+## 
+corrforcing[order(corrforcing$Var1),]
+corrforcing[!duplicated(corrforcing$Freq),]
 
-#New way to find the variable that has the better r2 between the two correlated varaiables
-data86.currentrsqs1 <- merge(rsqs,data86.current, by.x = "var", by.y = "Var1")
-names(data86.currentrsqs1) <- c("var_Var1", "r2", "Var2","PCorr")
-data86.currentrsqs2 <- merge(rsqs, data86.currentrsqs1, by.x = "var", by.y = "Var2")
-apply(data86.currentrsqs2, 1, function(x) x[1])
-
-keepvars <- apply(data86.currentrsqs2, 1, function(x){
-  if(abs(as.numeric(x[5]))>cor.level & as.numeric(x[5])<1){
-    if(as.numeric(x[2])>as.numeric(x[4])){
-      out <- x[1]   # The first variable that would have a higher r square value
-    } else {
-      out <- x[3]   # The second varaiable that would have the higher r sq
-    }
-    out
-  }
-})
-
-tokeep <- unique(do.call(rbind,keepvars[!unlist(lapply(keepvars, is.null))]))
-colexclude <- which(!names(cc.season) %in% tokeep)
+toexclude <- corrforcing$Var1[!duplicated(corrforcing$Freq)]
+colexclude <- which(names(cc.season) %in% toexclude)
 
 # Climatic variables used in PCA 1986-current year
 names(cc.season[,-colexclude])
-
-forpca86.current <- cc.season[,-colexclude]
+cc.season.notcor <- cc.season[,-colexclude]
+sg_sum <- merge(sg_sum, cc.season.notcor, by.x = c("Site","Year"), by.y = c("Site","Prev12"))
 
 ```
 
@@ -1100,6 +1080,7 @@ Figure 3a Number of sclerocactus glaucus
 jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3a.jpg", sep=""), width=250, height=125, units="mm", res=300)
 
 
+
 ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
@@ -1237,8 +1218,7 @@ interaction.plot(sg_sum$Year, factor(sg_sum$Site),
 # old and new
 oldnew <- c("Oil","Pond","T-","Atwell")
 
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""), width=250, height=125, units="mm", res=300)
-
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
                    sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
@@ -1247,9 +1227,10 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   ylab("Total individuals") +
   facet_wrap(~SiteSame)+
   theme_bw()+
-  scale_x_continuous(breaks = seq(2009, currentYr, 1))
+  scale_x_continuous(breaks = seq(2009, currentYr, 1)),
 
-dev.off()
+ width=250, height=125, units="mm", dpi=300)
+
 
 ```
 
@@ -1267,23 +1248,22 @@ names(all.count) <- unique(sg_sum$Site)
 ```
 
 
-#how do climatic variables explain growth rates?   
+#how do climatic variables explain growth rates? 
+cc.season.notcor are all variables not correlated 50% +
 ```{r}
 lambdas <- do.call(rbind, lapply(all.count, '[[', 1))
 lambdas$Site <- sub("\\.[0-9]","",row.names(lambdas)) #get rid of numbers following .
 
 head(lambdas)
-head(sg.pc86current)
+head(cc.season.notcor)
 
 # merge the growth rate of the climatic factors of year 2 (so the climate shaping the change from Year 1 to year 2, not before year 1)
-sg.pc.lambda <- merge(sg.pc86current, lambdas, by.x = c("Site","Prev12"), by.y = c("Site","Year2"))
+sg.pc.lambda <- merge(cc.season.notcor, lambdas, by.x = c("Site","Prev12"), by.y = c("Site","Year2"))
 
 
-ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
+ggplot(sg.pc.lambda, aes(ppt.fall, ySpecies))+
   geom_point()+
   stat_smooth(method="lm")
-
-
 
 ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
   geom_point()+
@@ -1428,33 +1408,34 @@ sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
 ```
 
 ```{r}
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5a.jpg", sep=""), width=200, height=125, units="mm", res=300)
 
-ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
-  stat_smooth(method=lm, aes(y=Height.cm..x, x=Height.cm..y))+
+
+ggheight <- ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
+  stat_smooth(method=glm, aes(y=Height.cm..x, x=Height.cm..y))+
   ggtitle("a)")+
   ylab(expression("Height year"[y]))+
   xlab(expression("Height year"[y-1]))+
   theme_bw() +
   facet_grid(~NS)
 
-dev.off()
-```
 
-```{r}
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5b.jpg", sep=""), width=200, height=125, units="mm", res=300)
-
-
-ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
-  stat_smooth(method=lm, aes(y=Width.cm..x, x=Width.cm..y))+
+ggwidth <- ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
+  stat_smooth(method=glm, aes(y=Width.cm..x, x=Width.cm..y))+
   ggtitle("b)")+
   ylab(expression("Width year"[y]))+
   xlab(expression("Width year"[y-1]))+
   theme_bw() +
   facet_grid(~NS)
 
-dev.off()
+
+ggsave(filename = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5a_b.jpg", sep=""),
+ggheight/ggwidth,
+       width=200, height=230,units='mm', dpi=300)
+  
+
 ```
+
+
 
 
 # Plant Size
