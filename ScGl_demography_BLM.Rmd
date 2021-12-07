@@ -32,7 +32,7 @@ require(AICcmodavg)
 #Set wd for prism data if not already
 # options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 # library(multcompView)
-
+library(magrittr)
 
 #Some global variables
 currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
@@ -429,6 +429,26 @@ write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservatio
 table2 <- rbind(poststand,prestand[prestand$Site != "Atwell Gulch (old)",])
 sum(table2$Rep)/sum(table2$X)
 
+# Atwell gulch: reproduction detected in new vs. old design
+AG_rep <- sg_sum[grep("Atwell",sg_sum$Site),]
+lapply(split(AG_rep, AG_rep$Site, drop = TRUE ), function(x){
+  data.frame(muRep = mean(x$Rep[x$Year>=2012]/x$X[x$Year>=2012]), sdRep = sd(x$Rep[x$Year>=2012]/x$X[x$Year>=2012]))
+})
+
+AtwellRep <- lapply(split(AG_rep, AG_rep$Site, drop = TRUE ), function(x){
+  x$Rep[x$Year>=2012]/x$X[x$Year>=2012]
+})
+
+tRepAtwell <- t.test(AtwellRep[[1]],AtwellRep[[2]])
+tRepAtwell
+diff(tRepAtwell$estimate)
+
+# Average reproduction of each site
+repsall <- do.call(rbind,lapply(split(sg_sum, sg_sum$Site), function(x){
+  data.frame(muRep = mean(x$Rep/x$X), sdRep = sd(x$Rep/x$X))
+}))
+
+repsall[order(repsall$muRep),]
 ```
 
 
@@ -485,7 +505,7 @@ Lat longs for 10 sites
 39.3544Â°N, 108.3286Â°W T-Junciton   
 ```{r}
 latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
-#                            c(39.1969, -108.1298, "Atwell Gulch (old)"),
+                           # c(39.1969, -108.1298, "Atwell Gulch (old)"),
                             c(38.8491, -108.3717, "Bridgeport"),   
                             c(38.6593, -108.3466, "Escalante Canyon"),
                             c(39.0612, -108.3799, "Fram"),
@@ -580,7 +600,13 @@ scgl.climate$Variable <- sapply(scgl.climate$date, function(x) {
   unlist(strsplit(x, split="_", fixed=TRUE))[[2]]
   })
 
-str(scgl.climate)
+
+##Annual measures in the previous 12 months
+scgl.annualtemp <- aggregate(data ~ Variable + Site + Prev12, scgl.climate[scgl.climate$Variable %in% c("tmin","tmax"),], mean)
+scgl.annualppt <- aggregate(data ~ Variable + Site + Prev12, scgl.climate[scgl.climate$Variable == "ppt",], sum)
+
+scgl.annual <- rbind(scgl.annualtemp, scgl.annualppt)
+
 
 #long to wide
 melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Prev12","Month","Year","Variable"))
@@ -605,9 +631,12 @@ scgl.c[scgl.c$Month>5 & scgl.c$Month<9, "season"] <- "summer"
 scgl.c[scgl.c$Month>8 & scgl.c$Month<12, "season"] <- "fall"
 scgl.c[scgl.c$Month>2 & scgl.c$Month<6, "season"] <- "spring"
 
+
 table(scgl.c$Year)
 scgl.c[scgl.c$Year>2016,]
 table(scgl.c$Year,scgl.c$Month)
+
+
 ```
 
           Site Precip  tmin tmax Year Month Prev12 season
@@ -831,7 +860,6 @@ colexclude <- which(names(cc.season) %in% toexclude)
 # Climatic variables used in PCA 1986-current year
 names(cc.season[,-colexclude])
 cc.season.notcor <- cc.season[,-colexclude]
-sg_sum <- merge(sg_sum, cc.season.notcor, by.x = c("Site","Year"), by.y = c("Site","Prev12"))
 
 ```
 
@@ -906,8 +934,6 @@ sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
 
 require(scales)
 
-unique(sg_sum$Site)
-
 sg_sum1 <- sg_sum
 sg_sum1$X[which("Pond" == sg_sum1$Site)] <- sg_sum1$X[which("Pond" == sg_sum1$Site)]/2
 
@@ -952,6 +978,39 @@ PercentReproOverStudy <- do.call(rbind,lapply(split(sg_spr, sg_spr$Site), functi
 # Average percentage of reproductive individuals 
 PercentReproOverStudy[order(PercentReproOverStudy$Avg),]
 mean(PercentReproOverStudy$Avg) # not weighted equally as the sum of all repro and sum of all indiviudals across sites
+```
+
+
+
+####Figure 6: The plot design for four ScGl sites were changed in 2012...   
+```{r}
+# old and new
+oldnew <- c("Oil","Pond","T-","Atwell")
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals") +
+  facet_wrap(~SiteSame)+
+  theme_bw()+
+  scale_x_continuous(breaks = seq(2009, currentYr, 2)),
+
+ width=200, height=125, units="mm", dpi=300)
+
+
+```
+
+```{r}
+
+## Need to merge with SiteSame since Site doesn't have 'old' for climate data
+sg_sum <- merge(sg_sum, cc.season.notcor, by.x = c("Site","Year"), by.y = c("Site","Prev12"))
+
+scgl.annual.wide <- reshape(scgl.annual, idvar = c("Site","Prev12") , v.names = "data", timevar = "Variable", direction="wide")
+
+sg_sum <- merge(sg_sum, scgl.annual.wide, by.x = c("Site","Year"), by.y = c("Site","Prev12"))
 ```
 
 
@@ -1002,7 +1061,8 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),],
   theme_bw()
 ```
 
-Largest proportion of reproductive individuals over all years
+# AICc climate and width on Reproduction   
+Largest proportion of reproductive individuals over all years   
 ```{r}
 sg_sum[sg_sum$Site=="Pond",]
 
@@ -1020,15 +1080,15 @@ summary(lm(Prepro~avgW, data=sg_sum))
 summary(lm(Prepro~avgH, data=sg_sum))
 
 ## Should be binomial
-lm1 <- glm(Prepro~avgVol,family = "binomial", sg_sum)
-lm2 <- glm(Prepro~avgW, family = "binomial",sg_sum)
-lm3 <- glm(Prepro~avgH, family = "binomial",sg_sum) 
-lm4 <- glm(Prepro~avgVol*Site,family = "binomial", sg_sum)
-lm5 <- glm(Prepro~avgW*Site, family = "binomial",sg_sum)
-lm6 <- glm(Prepro~avgH*Site, family = "binomial",sg_sum) 
-lm7 <- glm(Prepro~avgVol*NS,family = "binomial", sg_sum)
-lm8 <- glm(Prepro~avgW*NS, family = "binomial",sg_sum)
-lm9 <- glm(Prepro~avgH*NS, family = "binomial",sg_sum) 
+lm1 <- glm(Prepro~avgVol,family = "binomial", sg_sum, weights = X)
+lm2 <- glm(Prepro~avgW, family = "binomial",sg_sum, weights = X)
+lm3 <- glm(Prepro~avgH, family = "binomial",sg_sum, weights = X) 
+lm4 <- glm(Prepro~avgVol*Site,family = "binomial", sg_sum, weights = X)
+lm5 <- glm(Prepro~avgW*Site, family = "binomial",sg_sum, weights = X)
+lm6 <- glm(Prepro~avgH*Site, family = "binomial",sg_sum, weights = X) 
+lm7 <- glm(Prepro~avgVol*NS,family = "binomial", sg_sum, weights = X)
+lm8 <- glm(Prepro~avgW*NS, family = "binomial",sg_sum, weights = X)
+lm9 <- glm(Prepro~avgH*NS, family = "binomial",sg_sum, weights = X) 
 
 lm.list <- list(lm1,lm2, lm3, lm4, lm5, lm6, lm7, lm8,lm9)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
@@ -1048,40 +1108,122 @@ sjPlot::plot_model(lm2, type = "est", show.values = T)
 sjPlot::tab_model(lm2)
 ```
 
+
 # What describes reproduction
 ### Is percent reproductive explained by climate variables?
 ```{r}
-lm1 <- glm(Prepro~avgVol,family = "binomial", sg_sum)
+# +ppt.spring +tmax.spring +ppt.summer+ ppt.winter+ tmax.winter
 
+lm10 <- glm(Prepro~avgW*data.ppt,
+            family = "binomial", sg_sum, weights = X)
+lm11 <- glm(Prepro~avgW*data.ppt*data.tmax,
+            family = "binomial", sg_sum, weights = X)
+lm12 <- glm(Prepro~avgW*data.tmin,
+            family = "binomial", sg_sum, weights = X)
+lm13 <- glm(Prepro~avgW*data.tmin*data.ppt,
+            family = "binomial", sg_sum, weights = X)
+lm1 <- glm(Prepro~avgW*data.tmin*data.tmax*data.ppt,
+           family = "binomial", sg_sum, weights = X)
+lm2 <- glm(Prepro~avgW*data.tmax, 
+           family = "binomial",sg_sum, weights = X)
+
+lm.list <- list(lm1,lm2, lm10,lm11,lm12,lm13)
+lm.names <- as.character(unlist(lapply(lm.list,formula)))
+(lm.results <- aictab(lm.list, modnames=lm.names))
+print(evidence(aic.table = lm.results),
+      digits = 2)
+#evidence ratio 
+for(i in 2:length(lm.list)){
+  print(exp(0.5*lm.results$Delta_AICc[i]))
+}
+
+# more percent reproductive with avg width
+summary(lm1)
+effectsize::standardize(lm1) %>% summary()
+sjPlot::plot_model(lm1, type = "eff", show.data = T) 
+## meansd : mean value +/- one SD
+# "int" for continuous variables the min and max are chosen as grouping levels
+set_theme(base = theme_bw())
+p1 <- sjPlot::plot_model(lm1, type = "int", mdrt.values = "meansd")
+p1[[11]] + 
+  scale_colour_discrete("Min Temp")+
+  plot_annotation(title = "Probability of Reproduction",
+                  tag_levels = "a")+
+  ggtitle("")+
+  xlab("")
+    
+## Break it down into parts
+all1 <- p1[[11]][[1]]+
+  ylab("% reproductive")+
+  labs(title = "", subtitle = "Annual precipitation = 271.53")+
+  ggtitle("a)")
+all2 <- p1[[11]][[2]]+
+  ylab("% reproductive")+
+  labs(title = "", subtitle = "Annual precipitation = 182.47")+
+  ggtitle("b)")
+all3 <- p1[[11]][[3]]+
+  ylab("% reproductive")+
+  xlab("average width (mm)")+
+  labs(title = "", subtitle = "Annual precipitation = 360.59")+
+  scale_color_discrete("Min temp")+
+  ggtitle("c)")
+  
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4.jpg", sep=""),
+       all1 / all2 / all3,
+width = 150, height = 170, units = 'mm', dpi=300)
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4_tmin_avgW.jpg", sep=""),
+  p1[[1]] +
+    scale_colour_discrete("Min Temp")+
+    ggtitle("")+
+    ylab("% reproductive")+
+    xlab("average width"),
+  width = 150, height = 100, units = "mm", dpi=300)
+
+p1[[2]] +
+  scale_colour_discrete("Max Temp")+
+  ggtitle("")+
+  ylab("Probability of Reproduction")+
+  xlab("average width")
+
+# The effect of min and max temperatures when ppt is held constant
+p1[[3]] +
+  scale_colour_discrete("Max Temp")+
+  ggtitle("")+
+  ylab("Probability of Reproduction")+
+  xlab("Minimum temperature")
+
+# Precipitation and width
+p1[[4]] 
+
+# ppt and tmax
+p1[[6]]
+
+p1[[7]]
+
+  # theme_sjplot(axis_title.X = "average width")
+sjPlot::plot_model(lm11, type = "est", show.values = T, transform = NULL)
+sjPlot::tab_model(lm11, transform = NULL) # estimates on linear scale
+
+sg_sum$annual.tminbin <- cut_width(sg_sum$data.tmin, 5) # ((max(sg_sum$ppt.winter)+0.01)-(min(sg_sum$ppt.winter)-0.01))/2 )
+
+ggplot(sg_sum, aes( data.tmin, Prepro, colour = avgW))+
+  geom_point()+
+  stat_smooth(method = "glm", method.args = list(family = "binomial"))+
+  theme_bw()
+
+ggplot(sg_sum, aes( avgW, Prepro,colour = data.tmin))+
+  geom_point()+
+  stat_smooth(method = "glm", method.args = list(family = "binomial")) +
+  facet_wrap(~annual.tminbin)
 ```
 
 
 
+Figure 3a Number of Sclerocactus glaucus
+```{r Figure remove pond}
 
-#### Table 3: Correlations stronger than 0.5 between environmental variables at all sites for the months preceding yearly May monitoring of Sclerocactus glaucus. 
-
-```{r}
-
-as.data.frame(as.table(cor(recent08current[,-c(1:2,grep("Year", names(recent08current)),
-                        grep("Month", names(recent08current)))])))
-
-
-cor.table<-cor(recent08current[,-c(1:2,grep("Year", names(recent08current)),
-                        grep("Month", names(recent08current)))])
-data <- as.data.frame(as.table(cor.table))
-combins <- combn(colnames(cor.table),2,FUN = function(x) {paste(x,collapse="_")})
-cor.data <- data[data$Var1 != data$Var2,]
-data <- cor.data[paste(cor.data$Var1, cor.data$Var2, sep="_") %in% combins,]
-```
-
-
-Figure 3a Number of sclerocactus glaucus
-```{r Figure  remove pond}
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3a.jpg", sep=""), width=250, height=125, units="mm", res=300)
-
-
-
-ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
+Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
   ggtitle("a)")+
@@ -1095,17 +1237,12 @@ ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
                                 "#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#8B0000"))
 
-dev.off()
-
 ```
 
 
 ### Figure 3b
 ```{r}
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3b.jpg", sep=""), width=250, height=125, units="mm", res=300)
-
-
-ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
+Fig3b <- ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
   geom_line()+
   geom_point()+
   ggtitle("b)")+
@@ -1118,8 +1255,6 @@ ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
                                 "#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#8B0000"))+
   theme_bw()
-
-dev.off()
 ```
 
 
@@ -1130,19 +1265,30 @@ Figure 3c
 minis <- aggregate(sg$Minis, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
 names(minis) <- c("Site","Year","Minis")
 
+minisXsize <- aggregate(Width.cm. ~ Site + Year,
+                        data = sg[sg$Width.cm.<0.5 & sg$Width.cm.>0 & !is.na(sg$Width.cm.),], function(x) length(x))
+minis <- merge(minis, minisXsize, by = c("Site","Year"), all = TRUE)
+
+minis$TotMinis <- rowSums(minis[,3:4],na.rm = TRUE)
+
 repro <- aggregate(sg$Fl, by = list(sg$Site, sg$Year), function(x) sum(x, na.rm = TRUE))
 names(repro) <- c("Site","Year","Reproductive")
 minis.p.repro <- merge(minis,repro, by = c("Site","Year"))
-minis.p.repro$PerM <- minis.p.repro$Minis/minis.p.repro$Reproductive
+## Should be year1 repro to how many minis year2
+minis.repro <- subset(merge(minis.p.repro,minis.p.repro, by = "Site", sort = FALSE), Year.x == Year.y-1)
+minis.repro$MiniXRepro <- minis.repro$TotMinis.y/minis.repro$Reproductive.x
 
 sg[sg$Minis>20 & !is.na(sg$Minis),]
 
-#Minis per reproductive plant
-ggplot(minis.p.repro, aes(Year, PerM))+
+#Minis per reproductive plant  # [!(minis.repro$Site %in% "old"),]
+ggplot(minis.repro, aes(Year.y, MiniXRepro, colour = Site))+
   geom_line()+
-  facet_wrap(~Site)
+  scale_x_continuous(breaks = min(minis.repro$Year.y):max(minis.repro$Year.y))+
+  xlab("Year")+
+  ylab("Recruitment per reproductive individuals")
+  
 
-sgminis <- merge(sg_sum, minis, by = c("Site","Year"))
+sgminis <- merge(sg_sum, minis.repro[,c(1,2,5:7,10,12)], by.x = c("Site","Year"),by.y = c("Site","Year.y"))
 
 #want average minis per adult plant per site per year
 
@@ -1150,26 +1296,15 @@ ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site, group = Year))+
   geom_boxplot()+
   facet_wrap(~Site)
 
-ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site))+
-  geom_point()+
-  facet_wrap(~Site)
-
-#Some die, some grow into big ones. 
-ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = as.factor(Tag)))+
-  geom_line()+
-  facet_wrap(~Site)+
-  theme(legend.position = "none")
 ```
 
 ##FIGURE 3c
 ```{r}
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3c.jpg", sep=""), width=250, height=125, units="mm", res=300)
-
-ggplot(sgminis, aes(Year, Minis,colour= Site))+
+Fig3c <- ggplot(sgminis, aes(Year, TotMinis.x,colour= Site))+
   geom_line()+
   geom_point()+
   ggtitle("c)")+
-  facet_wrap(~NS + SiteSame, ncol =5)+
+  facet_wrap(~NS + SiteSame, ncol =5)+ # , scales = "free_y"
   ylab("Total seedlings (< 0.5cm width)")+
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
   scale_x_continuous(breaks = seq(2008, currentYr, 4))+
@@ -1179,23 +1314,25 @@ ggplot(sgminis, aes(Year, Minis,colour= Site))+
                                 "#71C671","#388E8E","#7D9EC0","#8B0000"))+
   theme_bw()
 
-  
-dev.off()
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3.jpg", sep=""),
+Fig3a/Fig3b/Fig3c,
+width=250, height=350, units="mm", dpi=300)
+
 ```
 
 ```{r}
 
-summary(lm(X/area ~ avgVol*Minis, data=sgminis))
+summary(lm(X/area ~ avgVol*TotMinis.y, data=sgminis))
 
-ggplot(sgminis, aes(Minis, X/area))+
+ggplot(sgminis, aes(TotMinis.y, X/area))+
   geom_point()+
   stat_smooth(method="lm")
 
-ggplot(sgminis, aes(Minis, Rep))+
+ggplot(sgminis, aes(TotMinis.y, Rep))+
   geom_point()+
   stat_smooth(method="lm")
 
-ggplot(sgminis, aes(Minis/Rep, X/area))+
+ggplot(sgminis, aes(TotMinis.y/Rep, X/area))+
   geom_point()+
   stat_smooth(method="lm")
 ```
@@ -1212,27 +1349,6 @@ interaction.plot(sg_sum$Year, factor(sg_sum$Site),
 
 ```
 
-
-####Figure 6: The plot design for four ScGl sites were changed in 2012...   
-```{r}
-# old and new
-oldnew <- c("Oil","Pond","T-","Atwell")
-
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
-
-ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
-                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  ylab("Total individuals") +
-  facet_wrap(~SiteSame)+
-  theme_bw()+
-  scale_x_continuous(breaks = seq(2009, currentYr, 1)),
-
- width=250, height=125, units="mm", dpi=300)
-
-
-```
 
 
 ### statistics
@@ -1271,7 +1387,7 @@ ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
 ```
 
 
-#Should come back and test the different 3 hightest PCA loading variables
+#AIC
 ## Yarg, should find best fit model for each part - reproduction, survival of juveniles, survival of adults
 ```{r}
 
