@@ -5,6 +5,8 @@ library(MASS)
 # library(dplyr)
 library(reshape2)
 
+install.packages("geosphere")
+
 
 rm(list=ls())
 # read in data
@@ -300,13 +302,13 @@ DBG_surv <- do.call(rbind,lapply(split(sg, sg$Site), function(sgsite){
     individuals_t0 <- nrow(sgsite[sgsite$Width.cm. > 0 & sgsite$Year == years[yr-1],])
     surv <- length(intersect(sgsite$Tag[sgsite$Year == years[yr]],sgsite$Tag[sgsite$Year == years[yr-1]])) # the tags in t1 that were in t0
     n_t0 <- nrow(sgsite[sgsite$Year == years[yr-1],])
-    data.frame(Site = unique(sgsite$Site), Pop = unique(sgsite$Population), PercSurv = surv/n_t0)
+    data.frame(Site = unique(sgsite$Site), Pop = unique(sgsite$Population), PercSurv = surv/n_t0) #, Year = years)
     }))
   dfout
   }))
 
 
-load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus glaucus_SSA_2020/BLM_scgl_annualsurivval.Rdata")
+load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/2020_Sclerocactus-glaucus_SSA/BLM_scgl_annualsurivval_2021Feb18.Rdata")
 
 BLM_surv
 BLM_DBG_survival <- rbind(data.frame(Org = "DBG", DBG_surv[!is.na(DBG_surv$PercSurv),]), # fram and pond, missing years of data
@@ -326,9 +328,6 @@ aggregate(PercSurv ~ Pop, sd, data = BLM_DBG_survival)
 
 BLM_DBG_survival$SPP <- "ScGl"
 BLM_DBG_survival$SPP[BLM_DBG_survival$Pop %in% c("Roan Creek", "Plateau Creek")] <- "ScDa"
-
-
-
 
 # Add northern and southern group
 # Plateau Creek Roan Creek, 
