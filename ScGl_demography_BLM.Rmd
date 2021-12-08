@@ -1122,12 +1122,25 @@ lm12 <- glm(Prepro~avgW*data.tmin,
             family = "binomial", sg_sum, weights = X)
 lm13 <- glm(Prepro~avgW*data.tmin*data.ppt,
             family = "binomial", sg_sum, weights = X)
-lm1 <- glm(Prepro~avgW*data.tmin*data.tmax*data.ppt,
+  lm1 <- glm(Prepro~avgW*data.tmin*data.tmax*data.ppt,
            family = "binomial", sg_sum, weights = X)
 lm2 <- glm(Prepro~avgW*data.tmax, 
            family = "binomial",sg_sum, weights = X)
+lm3 <- glm(Prepro~NS*avgW*data.ppt,
+            family = "binomial", sg_sum, weights = X)
+lm4 <- glm(Prepro~NS*avgW*data.ppt*data.tmax,
+            family = "binomial", sg_sum, weights = X)
+lm5 <- glm(Prepro~NS*avgW*data.tmin,
+            family = "binomial", sg_sum, weights = X)
+lm6 <- glm(Prepro~NS*avgW*data.tmin*data.ppt,
+            family = "binomial", sg_sum, weights = X)
+  lm7 <- glm(Prepro~NS*avgW*data.tmin*data.tmax*data.ppt,
+           family = "binomial", sg_sum, weights = X)
+lm8 <- glm(Prepro~NS*avgW*data.tmax, 
+           family = "binomial",sg_sum, weights = X)
 
-lm.list <- list(lm1,lm2, lm10,lm11,lm12,lm13)
+# lm1,lm7,
+lm.list <- list(lm2,lm3,lm4,lm5,lm6,lm8, lm10,lm11,lm12,lm13)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
 print(evidence(aic.table = lm.results),
@@ -1138,20 +1151,48 @@ for(i in 2:length(lm.list)){
 }
 
 # more percent reproductive with avg width
-summary(lm1)
-effectsize::standardize(lm1) %>% summary()
-sjPlot::plot_model(lm1, type = "eff", show.data = T) 
+summary(lm6)
+effectsize::standardize(lm6) %>% summary()
+sjPlot::plot_model(lm6, type = "eff", show.data = T) 
 ## meansd : mean value +/- one SD
 # "int" for continuous variables the min and max are chosen as grouping levels
 set_theme(base = theme_bw())
-p1 <- sjPlot::plot_model(lm1, type = "int", mdrt.values = "meansd")
-p1[[11]] + 
-  scale_colour_discrete("Min Temp")+
-  plot_annotation(title = "Probability of Reproduction",
-                  tag_levels = "a")+
-  ggtitle("")+
-  xlab("")
-    
+
+p1 <- sjPlot::plot_model(lm6, type = "int", mdrt.values = "meansd")
+## Change facet order to mean-SD, mean, mean+SD
+for(i in 1:3){
+  p1[[11]][[i]]$data$facet <- factor(p1[[11]][[i]]$data$facet,
+                                      levels = c(levels(p1[[11]][[i]]$data$facet)[2],
+                                                 levels(p1[[11]][[i]]$data$facet)[1],
+                                                 levels(p1[[11]][[i]]$data$facet)[3]))
+  ## Change facet labels
+  levels(p1[[11]][[i]]$data$facet) <- gsub(pattern = "data.tmin", 
+                                            replacement = "Min Temp",
+                                            levels(p1[[11]][[i]]$data$facet) )
+}
+
+p1[[11]][[1]]$labels$title <- gsub("Prepro", "\n% reproduction", p1[[11]][[1]]$labels$title)
+
+for(i in 1:3){
+  p1[[11]][[i]]$labels$subtitle <- gsub("data.ppt","ppt", p1[[11]][[i]]$labels$subtitle)
+}
+
+p1[[11]][[1]]$labels$y <- "Probability of Reproduction"
+for(i in 2:3){
+  p1[[11]][[i]]$labels$y <- ""
+}
+
+p1[[11]]+
+  ylab("Probability of Reproduction")+
+  xlab("Region")+
+  scale_color_discrete("Size")
+
+p1[[11]]$data$group
+p1[[11]]$data$facet
+p1[[11]]$data$panel
+
+p1[[10]]
+  
 ## Break it down into parts
 all1 <- p1[[11]][[1]]+
   ylab("% reproductive")+
@@ -1163,7 +1204,7 @@ all2 <- p1[[11]][[2]]+
   ggtitle("b)")
 all3 <- p1[[11]][[3]]+
   ylab("% reproductive")+
-  xlab("average width (mm)")+
+  xlab("average width (cm)")+
   labs(title = "", subtitle = "Annual precipitation = 360.59")+
   scale_color_discrete("Min temp")+
   ggtitle("c)")
@@ -1203,19 +1244,27 @@ p1[[7]]
 
   # theme_sjplot(axis_title.X = "average width")
 sjPlot::plot_model(lm11, type = "est", show.values = T, transform = NULL)
-sjPlot::tab_model(lm11, transform = NULL) # estimates on linear scale
 
-sg_sum$annual.tminbin <- cut_width(sg_sum$data.tmin, 5) # ((max(sg_sum$ppt.winter)+0.01)-(min(sg_sum$ppt.winter)-0.01))/2 )
+## Change names of coefficients in Predictors column
+sjPlot::tab_model(lm11, transform = NULL,   # estimates on linear scale
+                  pred.labels = c("Intercept", "size","ppt","max temp",
+                                  "size:ppt","size:Max Temp","ppt:max temp",
+                                  "size:ppt:max temp"),
+                  string.ci = "CI (95%)",
+                  string.p = "p-value",
+                  show.reflvl = TRUE)  # show reference level for categorical (none here)
 
-ggplot(sg_sum, aes( data.tmin, Prepro, colour = avgW))+
-  geom_point()+
-  stat_smooth(method = "glm", method.args = list(family = "binomial"))+
-  theme_bw()
-
-ggplot(sg_sum, aes( avgW, Prepro,colour = data.tmin))+
-  geom_point()+
-  stat_smooth(method = "glm", method.args = list(family = "binomial")) +
-  facet_wrap(~annual.tminbin)
+# sg_sum$annual.tminbin <- cut_width(sg_sum$data.tmin, 5) 
+# 
+# ggplot(sg_sum, aes( data.tmin, Prepro, colour = avgW))+
+#   geom_point()+
+#   stat_smooth(method = "glm", method.args = list(family = "binomial"))+
+#   theme_bw()
+# 
+# ggplot(sg_sum, aes( avgW, Prepro,colour = data.tmin))+
+#   geom_point()+
+#   stat_smooth(method = "glm", method.args = list(family = "binomial")) +
+#   facet_wrap(~annual.tminbin)
 ```
 
 
@@ -1388,7 +1437,7 @@ ggplot(sg.pc.lambda, aes(tmax.spring, ySpecies))+
 
 
 #AIC
-## Yarg, should find best fit model for each part - reproduction, survival of juveniles, survival of adults
+## find best fit model for each part - reproduction, survival of juveniles, survival of adults
 ```{r}
 
 lm1 <- lm(ySpecies ~ Prev12, sg.pc.lambda)
