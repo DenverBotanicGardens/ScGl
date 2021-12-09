@@ -578,6 +578,9 @@ save(scgl.climate, file=paste(userpath, "Denver Botanic Gardens/Conservation - G
 ```{r}
 load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
+## Fix 2021 typo T-Junciton
+scgl.climate$Site[grep("T-Jun",scgl.climate$Site)] <- "T-Junction"
+
 #turn factors into characters
 scgl.climate$date <- sapply(scgl.climate$date, as.character)
 
@@ -1122,20 +1125,24 @@ lm12 <- glm(Prepro~avgW*data.tmin,
             family = "binomial", sg_sum, weights = X)
 lm13 <- glm(Prepro~avgW*data.tmin*data.ppt,
             family = "binomial", sg_sum, weights = X)
-  lm1 <- glm(Prepro~avgW*data.tmin*data.tmax*data.ppt,
-           family = "binomial", sg_sum, weights = X)
+  # lm1 <- glm(Prepro~avgW*data.tmin*data.tmax*data.ppt,
+  #          family = "binomial", sg_sum, weights = X)
 lm2 <- glm(Prepro~avgW*data.tmax, 
            family = "binomial",sg_sum, weights = X)
 lm3 <- glm(Prepro~NS*avgW*data.ppt,
             family = "binomial", sg_sum, weights = X)
+
+#######################################################
 lm4 <- glm(Prepro~NS*avgW*data.ppt*data.tmax,
-            family = "binomial", sg_sum, weights = X)
-lm5 <- glm(Prepro~NS*avgW*data.tmin,
             family = "binomial", sg_sum, weights = X)
 lm6 <- glm(Prepro~NS*avgW*data.tmin*data.ppt,
             family = "binomial", sg_sum, weights = X)
-  lm7 <- glm(Prepro~NS*avgW*data.tmin*data.tmax*data.ppt,
-           family = "binomial", sg_sum, weights = X)
+#######################################################
+
+lm5 <- glm(Prepro~NS*avgW*data.tmin,
+            family = "binomial", sg_sum, weights = X)
+  # lm7 <- glm(Prepro~NS*avgW*data.tmin*data.tmax*data.ppt,
+  #          family = "binomial", sg_sum, weights = X)
 lm8 <- glm(Prepro~NS*avgW*data.tmax, 
            family = "binomial",sg_sum, weights = X)
 
@@ -1151,13 +1158,19 @@ for(i in 2:length(lm.list)){
 }
 
 # more percent reproductive with avg width
+### Best are 4 and 6
 summary(lm6)
 effectsize::standardize(lm6) %>% summary()
+effectsize::standardize(lm4) %>% summary()
+
 sjPlot::plot_model(lm6, type = "eff", show.data = T) 
 ## meansd : mean value +/- one SD
 # "int" for continuous variables the min and max are chosen as grouping levels
 set_theme(base = theme_bw())
 
+p2 <- sjPlot::plot_model(lm4, type = "int", mdrt.values = "meansd")
+ # sjPlot::plot_model(lm4, type = "int",  mdrt.values = "meansd")
+                    # terms = c("avgW [all]", "data.ppt [meansd]","data.tmax [meansd]")) 
 p1 <- sjPlot::plot_model(lm6, type = "int", mdrt.values = "meansd")
 ## Change facet order to mean-SD, mean, mean+SD
 for(i in 1:3){
