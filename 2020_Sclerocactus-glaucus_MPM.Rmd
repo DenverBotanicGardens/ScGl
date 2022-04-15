@@ -160,6 +160,9 @@ ggplot(sg.ann, aes(Width.cm..x, surv, colour = Site))+
   theme_bw()+
   facet_wrap(~NS)+
   xlab("width (cm)")
+
+
+save(sg.ann, file = "")
 ```
 
 
@@ -260,9 +263,9 @@ sg$Stage[sg$Fl == "y"] <- "Reproductive"
 sg$Stage[sg$Fl == "n"] <- "Vegetative"
 
 # Testing; what happened to T-Junction? 
-sgsite <- split(sg, sg$Site, drop = TRUE)[[7]]
-years <- min(sgsite$Year):max(sgsite$Year)
-yr <- length(years)-1
+# sgsite <- split(sg, sg$Site, drop = TRUE)[[7]]
+# years <- min(sgsite$Year):max(sgsite$Year)
+# yr <- length(years)-1
 # Make matrix models not in popbio, make wide and same as BLM data
 # Recruitment will be new tags each year and sum of all 'minis'
 TMx_sg <- lapply(split(sg, sg$Site), function(sgsite){
@@ -351,8 +354,8 @@ load(file = "C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/All
 
 
 # test
-# sgsite <- split(sg, sg$Site)[[1]]
-# yr <- 2
+sgsite <- split(sg, sg$Site)[[1]]
+yr <- 2
 # -------------------- Survival by year DBG --------- Annual survival per plot DBG -----------------------------
 
 DBG_surv <- do.call(rbind,lapply(split(sg, sg$Site), function(sgsite){
