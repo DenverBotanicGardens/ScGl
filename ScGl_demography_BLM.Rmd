@@ -65,8 +65,6 @@ CountPVA <- function(x,y){
   list(PVA = PVA.table,LM = LM.table)
 }
 
-
-# "C:\Users\deprengm\Denver Botanic Gardens\Conservation - General\AllProjectsBySpecies\Sclerocactus-glaucus\Sclerocactus-glaucus_AnnualReports\2008-currentyr_Sclerocactus_glaucus_R_tables\RawData_scgl_2021.csv"
 userpath <-"C:/Users/deprengm/" 
 ```
 
@@ -83,8 +81,6 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 
 #2016
 # Need to strip white space and conform to 2015 data
-# sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_", currentYr,".csv",
-#                      sep=""))
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
 
@@ -101,11 +97,14 @@ sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
 
 nrow(sg[sg$Year == 2008,])
 sg$Site <- factor(sg$Site)
-sg[sg$Year == 2013 & sg$Site == "Atwell Gulch",]
-sg$Minis[sg$Minis > 1000] <- NA
+# table(sg$Year[ grep("Atwell Gulch",sg$Site)]) 
+sg$Minis[sg$Minis > 1000 & !is.na(sg$Minis)] <- NA ## two have photo numbers instead of mini number
 
-# write.table(sg, file=paste("P:/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
-write.table(sg, file=paste(userpath,"OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
+
+## Will only work for Michelle DePrenger-Levin - set to my OneDrive
+if(grepl("deprengm",userpath)){
+  write.table(sg, file=paste(userpath,"OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/sg",currentYr,".csv",sep=""), sep=",")
+}
 
 ```
 
@@ -119,7 +118,6 @@ Need to split by Site - Atwell Gulch needs to be together:
      
 summarize 2008  
 ```{r}
-# scgl08 <- read.delim(path.expand("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/All2008.txt"),sep=",")
 scgl08 <- read.delim(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/All2008.txt", sep=""),sep=",")
 
 sg_summary08 <- ddply(scgl08,  
@@ -155,12 +153,16 @@ table(sg$Year, sg$Site)
 
 ```
 
-# 2019 post download raw data fixes, fixed in the SQL database   
-In 2019 we used the photoNumber column to track the number of flowers per plant
+ 
+Starting in 2019 we use the photoNumber column to track the number of flowers per plant
 ```{r}
-sg$Height.cm.[sg$ScGl_data_id==21981] <- 0
-sg$PhotoNumber <- as.character(sg$PhotoNumber)
-sg$PhotoNumber[sg$ScGl_data_id==22068] <- 2
+
+sg$FlNum <- ifelse(sg$Year >= 2019, as.numeric(sg$PhotoNumber), NA)
+
+ggplot(sg[sg$Year > 2018,], aes(Site, FlNum, color = Site, group = Site))+
+  geom_point(position = position_jitterdodge())+
+  geom_violin()+
+  facet_wrap(~Year)
 
 ```
 
@@ -414,12 +416,10 @@ summary(lm(PRep~avgW, data=rep.per))
 prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
                                                         sg_sum$Site,value=TRUE),]
 
-# write.table(poststand, file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_poststand.csv", 
-write.table(poststand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/Table2_poststand.csv", sep=""), sep=",", row.names=FALSE, col.names = TRUE)
+write.table(poststand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_poststand.csv", sep=""), sep=",", row.names=FALSE, col.names = TRUE)
 
 
-# write.table(prestand,  file=paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/Word/ScGl ",currentYr,"/Table2_prestand.csv", sep=""), 
-write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/Table2_prestand.csv", sep=""),
+write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_prestand.csv", sep=""),
             sep=",", row.names=FALSE, col.names = TRUE)
 
 ```
@@ -571,12 +571,12 @@ scgl.climate <- rbind(do.call(rbind, m.tmin),
                     do.call(rbind, m.tmax),
                     do.call(rbind, m.ppt2))
 
-save(scgl.climate, file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
+save(scgl.climate, file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
 ```
 
 ```{r}
-load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
+load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
 ## Fix 2021 typo T-Junciton
 scgl.climate$Site[grep("T-Jun",scgl.climate$Site)] <- "T-Junction"
@@ -875,7 +875,7 @@ Table3a <- as.data.frame(as.table(Table3acor))
 Table3a <- Table3a[abs(Table3a$Freq)>cor.level&Table3a$Freq<1,]
 
 # To get rid of duplicated correlations
-write.table(Table3a[!duplicated(Table3a$Freq),], file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Table3a.csv", sep=""), 
+write.table(Table3a[!duplicated(Table3a$Freq),], file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Table3a.csv", sep=""), 
             sep=",", row.names=FALSE, col.names = TRUE)
 # write.table(Table3a[with(Table3a, order(Table3a$Freq)),], "clipboard", sep="\t", row.names = FALSE)
 
@@ -983,6 +983,21 @@ PercentReproOverStudy[order(PercentReproOverStudy$Avg),]
 mean(PercentReproOverStudy$Avg) # not weighted equally as the sum of all repro and sum of all indiviudals across sites
 ```
 
+# 2021 ESA SSA delisting recommendation. Density across south and north for BLM
+```{r}
+
+head(sg_sum)
+
+sg_sum$density_m2 <- sg_sum$X/sg_sum$area
+
+ggplot(sg_sum, aes(NS, density_m2))+
+  geom_boxplot()
+
+write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
+
+```
+
+
 
 
 ####Figure 6: The plot design for four ScGl sites were changed in 2012...   
@@ -990,7 +1005,7 @@ mean(PercentReproOverStudy$Avg) # not weighted equally as the sum of all repro a
 # old and new
 oldnew <- c("Oil","Pond","T-","Atwell")
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
                    sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
@@ -1113,7 +1128,8 @@ sjPlot::tab_model(lm2)
 
 
 # What describes reproduction
-### Is percent reproductive explained by climate variables?
+### Is percent reproductive explained by climate variables?   
+Figure 5 (was figure 4 before adding survival interaction plots)   
 ```{r}
 # +ppt.spring +tmax.spring +ppt.summer+ ppt.winter+ tmax.winter
 
@@ -1133,7 +1149,7 @@ lm3 <- glm(Prepro~NS*avgW*data.ppt,
             family = "binomial", sg_sum, weights = X)
 
 #######################################################
-lm4 <- glm(Prepro~NS*avgW*data.ppt*data.tmax,
+lm4 <- glm(Prepro~NS*avgW*data.tmax*data.ppt,
             family = "binomial", sg_sum, weights = X)
 lm6 <- glm(Prepro~NS*avgW*data.tmin*data.ppt,
             family = "binomial", sg_sum, weights = X)
@@ -1159,14 +1175,18 @@ for(i in 2:length(lm.list)){
 
 # more percent reproductive with avg width
 ### Best are 4 and 6
-summary(lm6)
 effectsize::standardize(lm6) %>% summary()
 effectsize::standardize(lm4) %>% summary()
 
 sjPlot::plot_model(lm6, type = "eff", show.data = T) 
 ## meansd : mean value +/- one SD
 # "int" for continuous variables the min and max are chosen as grouping levels
-set_theme(base = theme_bw())
+```
+
+```{r}
+
+sjPlot::set_theme(base = theme_bw())
+
 
 p2 <- sjPlot::plot_model(lm4, type = "int", mdrt.values = "meansd")
  # sjPlot::plot_model(lm4, type = "int",  mdrt.values = "meansd")
@@ -1195,106 +1215,186 @@ for(i in 2:3){
   p1[[11]][[i]]$labels$y <- ""
 }
 
-p1[[11]]+
-  ylab("Probability of Reproduction")+
-  xlab("Region")+
-  scale_color_discrete("Size")
 
-p1[[11]]$data$group
-p1[[11]]$data$facet
-p1[[11]]$data$panel
-
-
-p1[[10]]
 # No size but region, ppt, and tmin
 # Facet order
 p1[[9]]$data$facet <- factor(p1[[9]]$data$facet,
                                     levels = c(levels(p1[[9]]$data$facet)[2],
                                                levels(p1[[9]]$data$facet)[1],
                                                levels(p1[[9]]$data$facet)[3]))
-  ## Change facet labels
+## Change facet labels
 levels(p1[[9]]$data$facet) <- gsub(pattern = "data.ppt", 
                                           replacement = "ppt",
                                           levels(p1[[9]]$data$facet) )
 
-Fig4_b_reproduction <- p1[[9]]+
-  # ggtitle("Predicted probablities of % reproduction")+
-  ggtitle("b)")+
-  scale_colour_discrete("Min Temp")+
-  xlab("Region")+
-  ylab("% reproduction")
+p2[[9]]$data$facet <- factor(p2[[9]]$data$facet,
+                                    levels = c(levels(p2[[9]]$data$facet)[2],
+                                               levels(p2[[9]]$data$facet)[1],
+                                               levels(p2[[9]]$data$facet)[3]))
+## Change facet labels
+levels(p2[[9]]$data$facet) <- gsub(pattern = "data.ppt", 
+                                          replacement = "ppt",
+                                          levels(p2[[9]]$data$facet) )
+
 
 p1[[8]]$data$facet <- factor(p1[[8]]$data$facet,
                                     levels = c(levels(p1[[8]]$data$facet)[2],
                                                levels(p1[[8]]$data$facet)[1],
                                                levels(p1[[8]]$data$facet)[3]))
-  ## Change facet labels
+## Change facet labels
 levels(p1[[8]]$data$facet) <- gsub(pattern = "data.ppt", 
                                           replacement = "ppt",
                                           levels(p1[[8]]$data$facet) )
 
-Fig4_a_reproduction <- p1[[8]]+
+# Fig4_a_reproduction <- p1[[8]]+
+#   # ggtitle("Predicted probablities of % reproduction")+
+#   ggtitle("a)")+
+#   scale_colour_discrete("Size")+
+#   xlab("Region")+
+#   ylab("% reproduction")+
+#   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1))
+## For other competitive model lm4
+## Change facet order to mean-SD, mean, mean+SD
+for(i in 1:3){
+  p2[[11]][[i]]$data$facet <- factor(p2[[11]][[i]]$data$facet,
+                                      levels = c(levels(p2[[11]][[i]]$data$facet)[2],
+                                                 levels(p2[[11]][[i]]$data$facet)[1],
+                                                 levels(p2[[11]][[i]]$data$facet)[3]))
+## Change facet labels
+  levels(p2[[11]][[i]]$data$facet) <- gsub(pattern = "data.tmax", 
+                                            replacement = "Max Temp",
+                                            levels(p2[[11]][[i]]$data$facet) )
+}
+
+p2[[11]][[1]]$labels$title <- gsub("Prepro", "\n% reproduction", p2[[11]][[1]]$labels$title)
+
+for(i in 1:3){
+  p2[[11]][[i]]$labels$subtitle <- gsub("data.ppt","ppt", p2[[11]][[i]]$labels$subtitle)
+}
+
+p2[[11]][[1]]$labels$y <- "Probability of Reproduction"
+for(i in 2:3){
+  p2[[11]][[i]]$labels$y <- ""
+}
+
+  
+```
+
+```{r}
+## Break it down into parts lm6 tmin
+p1[[11]]$labels$colour <- "Size"
+p2[[11]]$labels$colour <- "Size"
+
+Fig4_b_reproduction <- p1[[9]]+
   # ggtitle("Predicted probablities of % reproduction")+
+  ggtitle("c)")+
+  scale_colour_discrete("Min Temp")+
+  xlab("Region")+
+  ylab("% reproduction")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+Fig5_repro_max <- p2[[9]]+
+  scale_colour_discrete("Max Temp")+
+  xlab("Region")+
+  ggtitle("d)")+
+  ylab("% reproduction")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
+all2 <- p1[[11]][[1]]+
+  ylab("")+
+  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p1[[11]][[1]]$labels$subtitle))+
+  ggtitle("")+
+  ylim(c(0.2,0.84))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+all1 <- p1[[11]][[2]]+
+  ylab("% reproductive")+
+  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p1[[11]][[2]]$labels$subtitle))+
   ggtitle("a)")+
+  ylim(c(0.2,0.84))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+all3 <- p1[[11]][[3]]+
+  ylab("")+
+  xlab("")+
+  ylim(c(0.2,0.84))+
+  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p1[[11]][[3]]$labels$subtitle))+
+  # scale_color_discrete("Size")+
+  ggtitle("")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+all2max <- p2[[11]][[1]]+
+  ylab("")+
+  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p2[[11]][[1]]$labels$subtitle))+
+  ggtitle("")+
+  ylim(c(0.2,0.81))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+all1max <- p2[[11]][[2]]+
+  ylab("% reproductive")+
+  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p2[[11]][[2]]$labels$subtitle))+
+  ggtitle("b)")+
+  ylim(c(0.2,0.81))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+all3max <- p2[[11]][[3]]+
+  ylab("")+
+  xlab("Region")+
+  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p2[[11]][[3]]$labels$subtitle))+
+  # scale_color_discrete("Size")+╜
+  ggtitle("")+
+  ylim(c(0.2,0.81))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5_percReproductive.jpg", sep=""),
+       (all1 + all2 + all3)/
+        (all1max + all2max + all3max)/
+         (Fig4_b_reproduction  + Fig5_repro_max),
+       # Fig4_a_reproduction/Fig4_b_reproduction/Fig4_b_reproduction_lm4,
+width = 330, height = 210, units = 'mm', dpi=300)
+
+```
+
+
+
+```{r}
+
+# Facet order
+p2[[9]]$data$facet <- factor(p2[[9]]$data$facet,
+                                    levels = c(levels(p2[[9]]$data$facet)[2],
+                                               levels(p2[[9]]$data$facet)[1],
+                                               levels(p2[[9]]$data$facet)[3]))
+## Change facet labels
+levels(p2[[9]]$data$facet) <- gsub(pattern = "data.ppt", 
+                                          replacement = "ppt",
+                                          levels(p2[[9]]$data$facet) )
+
+Fig4_b_reproduction_lm4 <- p2[[9]]+
+  # ggtitle("Predicted probablities of % reproduction")+
+  ggtitle("c)")+
+  scale_colour_discrete("Max Temp")+
+  xlab("Region")+
+  ylab("% reproduction")
+
+p2[[8]]$data$facet <- factor(p2[[8]]$data$facet,
+                                    levels = c(levels(p2[[8]]$data$facet)[2],
+                                               levels(p2[[8]]$data$facet)[1],
+                                               levels(p2[[8]]$data$facet)[3]))
+  ## Change facet labels
+levels(p2[[8]]$data$facet) <- gsub(pattern = "data.ppt", 
+                                          replacement = "ppt",
+                                          levels(p2[[8]]$data$facet) )
+
+Fig4_a_reproduction_lm4 <- p2[[8]]+
+  # ggtitle("Predicted probablities of % reproduction")+
+  ggtitle("c)")+
   scale_colour_discrete("Size")+
   xlab("Region")+
   ylab("% reproduction")+
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1))
 
-  
-  
-## Break it down into parts
-all1 <- p1[[11]][[1]]+
-  ylab("% reproductive")+
-  labs(title = "", subtitle = "Annual precipitation = 271.53")+
-  ggtitle("a)")
-all2 <- p1[[11]][[2]]+
-  ylab("% reproductive")+
-  labs(title = "", subtitle = "Annual precipitation = 182.47")+
-  ggtitle("b)")
-all3 <- p1[[11]][[3]]+
-  ylab("% reproductive")+
-  xlab("average width (cm)")+
-  labs(title = "", subtitle = "Annual precipitation = 360.59")+
-  scale_color_discrete("Min temp")+
-  ggtitle("c)")
-  
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4.jpg", sep=""),
-       # all1 / all2 / all3,
-       Fig4_a_reproduction/Fig4_b_reproduction,
-width = 150, height = 170, units = 'mm', dpi=300)
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4_tmin_avgW.jpg", sep=""),
-  p1[[1]] +
-    scale_colour_discrete("Min Temp")+
-    ggtitle("")+
-    ylab("% reproductive")+
-    xlab("average width"),
-  width = 150, height = 100, units = "mm", dpi=300)
-
-p1[[2]] +
-  scale_colour_discrete("Max Temp")+
-  ggtitle("")+
-  ylab("Probability of Reproduction")+
-  xlab("average width")
-
-# The effect of min and max temperatures when ppt is held constant
-p1[[3]] +
-  scale_colour_discrete("Max Temp")+
-  ggtitle("")+
-  ylab("Probability of Reproduction")+
-  xlab("Minimum temperature")
-
-# Precipitation and width
-p1[[4]] 
-
-# ppt and tmax
-p1[[6]]
-
-p1[[7]]
-
-  # theme_sjplot(axis_title.X = "average width")
 sjPlot::plot_model(lm6, type = "est", show.values = T, transform = NULL)
+sjPlot::plot_model(lm4, type = "est", show.values = TRUE, transform = NULL)
 
 ## Change names of coefficients in Predictors column
 sjPlot::tab_model(lm6, transform = NULL,   # estimates on linear scale
@@ -1403,7 +1503,7 @@ Fig3c <- ggplot(sgminis, aes(Year, TotMinis.x,colour= Site))+
                                 "#71C671","#388E8E","#7D9EC0","#8B0000"))+
   theme_bw()
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3.jpg", sep=""),
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3.jpg", sep=""),
 Fig3a/Fig3b/Fig3c,
 width=250, height=350, units="mm", dpi=300)
 
@@ -1526,7 +1626,7 @@ plot.noold <- plot.currentYr[!grepl("old", plot.currentYr$Site),]
 plot.noold <- rbind(plot.noold, plot.currentYr[plot.currentYr$Site == "Atwell Gulch (old)",])
 
 
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2.jpg", sep=""), width=250, height=200, units="mm", res=300)
+jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2.jpg", sep=""), width=250, height=200, units="mm", res=300)
 
 ggplot(plot.noold[plot.noold$variable!="rsq",], 
        aes(Site,value, color= variable, group = variable, shape=variable))+
@@ -1569,7 +1669,7 @@ data.frame(as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN =mean)),
 
 
 Plant size
-
+## Figure 6
 ## Figure 5: Growth relationships between years for width (top) and height (bottom) for Sclerocactus glaucus individuals within demographic monitoring sites.    
 6 rows of Road T-West that don't have a tag number, one row for Road T-East
 
@@ -1609,7 +1709,7 @@ ggwidth <- ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Si
   facet_grid(~NS)
 
 
-ggsave(filename = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5a_b.jpg", sep=""),
+ggsave(filename = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5a_b.jpg", sep=""),
 ggheight/ggwidth,
        width=200, height=230,units='mm', dpi=300)
   
@@ -1665,7 +1765,7 @@ ggplot(plotout1[plotout1$Year>2008,], aes(Year,change))+
   ggtitle("Change in population size from previous year")+
   scale_x_continuous(breaks=seq(2009,currentYr,5))
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/ScGl_yr.jpg", sep=""),device="jpeg",
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_yr.jpg", sep=""),device="jpeg",
        ggplot(plotout1, aes(Year,X))+
          geom_line(colour="blue")+
          ylab("Total Population")+
@@ -1673,5 +1773,5 @@ ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProject
          theme_classic()+
          ggtitle("Sclerocactus glaucus"))
 
-write.csv(plotout1, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/ScGl_data.csv", sep=""))
+write.csv(plotout1, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_data.csv", sep=""))
 ```
