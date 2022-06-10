@@ -21,7 +21,7 @@ library(ggplot2)
 library(patchwork)
 library(plyr)
 library(devtools)
-#library(multcompView)H
+#library(multcompView)
 library(reshape2)
 library(raster)
 library(prism)
@@ -470,7 +470,9 @@ options(prism.path = "Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Ast
 ```
 
 #Update last year and get this year 
-Delete previous year from folder first, then update
+Delete previous year from folder first, then update    
+       search for previous year in File Explorer         
+       select all (provisional and stable) and delete     
 ```{r, eval=FALSE}
 get_prism_monthlys(type="ppt", mon = 1:12, keepZip = FALSE, years = (currentYr-1):currentYr)
 
