@@ -94,7 +94,6 @@ sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
 
 nrow(sg[sg$Year == 2008,]) ## 185
 sg$Site <- factor(sg$Site) ## 15 levels with (old)
-# table(sg$Year[ grep("Atwell Gulch",sg$Site)]) 
 sg$Minis[sg$Minis > 1000 & !is.na(sg$Minis)] <- NA ## two have photo numbers instead of mini number
 
 
@@ -178,13 +177,19 @@ sg$Site <- factor(sg$Site,
 # Rename all Atwell Gulch
 sg[grep("Atwell", sg$Site),"Site"] <- "Atwell Gulch"
 
+sg[sg$X.coord.m. > 1.1 & !is.na(sg$X.coord.m.) & sg$Site == "Atwell Gulch",]
+sg$X.coord.m.[sg$Tag == 251 & sg$Site == "Atwell Gulch"] <- 0
 
-# One copy of all Atwell Gulch 2012 on for new
+# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
 atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
 
 atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
 atwell.old$Site <- "Atwell Gulch (old)"
 
+ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
+  geom_point(position = position_dodge(width = 0.05))+
+  facet_wrap(~ Transect, nrow = 2)
+  
 ```
 
 #2016 on    
@@ -204,16 +209,18 @@ sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
 #Add back Atwell duplicated for old and new
-sg <- rbind(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old)
+sg <- do.call(rbind,list(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old))
+length(levels(sg$Site))
 sg$Site <- droplevels(sg$Site)
+levels(sg$Site)
 
 table(sg$Site,sg$Year)
 
-sg_withPond2015 <- sg
-sg.foo <- sg[!(sg$Site %in% c("Pond","Pond (old)") & sg$Year == 2015),]
-table(sg.foo$Site,sg.foo$Year)
-
-sg <- sg.foo
+# sg_withPond2015 <- sg
+# sg.foo <- sg[!(sg$Site %in% c("Pond","Pond (old)") & sg$Year == 2015),]
+# table(sg.foo$Site,sg.foo$Year)
+# 
+# sg <- sg.foo
 
 ```
 
@@ -222,15 +229,12 @@ sg <- sg.foo
 ggplot(sg[sg$Site == "Picnic Site",], aes(Transect,Height.cm.))+
   geom_point()
 
-# Missing values in 2015, need imputing
-ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
-  geom_point()
+table(sg$Site[which(sg$Height.cm. > 10 )])
 
 sg[sg$Height.cm. > 7.5 & sg$Site == "Picnic Site" & !is.na(sg$Height.cm.),]
 unique(sg$Comments[sg$Site == "Picnic Site" & is.na(sg$Height.cm.)]) ## Some are dead, some might be seedlings <0.5cm
 
-
-sg[sg$Height.cm. > 7.5 & sg$Site == "Pond" & !is.na(sg$Height.cm.),]
+sg[which(sg$Height.cm. > 7.5 & sg$Site == "Pond"),] 
 unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 
 ```
@@ -239,10 +243,14 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
-sg_summary <- ddply(sg[sg$Year>2008,],  
-                    .(Site,Year), summarise,
-                    X = length(Tag[Height.cm. > 0]),
-                    Rep = sum(Fl, na.rm = TRUE),
+## remove atwell and add in later
+sg_summary2 <- sg %>%
+  filter(Year > 2008) %>%
+  filter(!(Site %in% c("Atwell Gulch","Atwell Gulch (old)"))) %>%
+  group_by(Site,Year) %>%
+  dplyr::summarise(.groups = "keep",
+                   X = length(Tag[Height.cm. >0]),
+                Rep = sum(Fl, na.rm = TRUE),
                     Brs = sum(Br, na.rm = TRUE),
                     avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
                     sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
@@ -250,10 +258,25 @@ sg_summary <- ddply(sg[sg$Year>2008,],
                     sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
                     avgVol = mean(Vol, na.rm = TRUE),
                     sdVol = sd(Vol, na.rm = TRUE))
+table(sg_summary2$Site)
 
-head(sg_summary)
-table(sg_summary$Site,sg_summary$Year)
+# sg_summary <- ddply(sg[sg$Year>2008,],  
+#                     .(Site,Year), summarise,
+#                     X = length(Tag[Height.cm. > 0]),
+#                     Rep = sum(Fl, na.rm = TRUE),
+#                     Brs = sum(Br, na.rm = TRUE),
+#                     avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+#                     sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+#                     avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+#                     sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+#                     avgVol = mean(Vol, na.rm = TRUE),
+#                     sdVol = sd(Vol, na.rm = TRUE))
 
+table(sg_summary$Site)
+## Need to remove "old atwell" before 2012
+sg_summary[which(grep("Atwell", sg_summary$Site, invert = TRUE) & sg_summary)]
+
+atwellold_summary2 <- atwell.old
 atwellold_summary <- ddply(atwell.old,  
                     .(Site,Year), summarise,
                     X = length(Tag[Height.cm. > 0]),
@@ -500,7 +523,20 @@ write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservatio
 # Results: Reproduction
 ```{r}
 table2 <- rbind(poststand,prestand[prestand$Site != "Atwell Gulch (old)",])
-sum(table2$Rep)/sum(table2$X)
+sum(table2$Rep)/sum(table2$TotInd) # current year total reproductive
+
+
+## Pre-standardized after 2012
+rep_site <- sg_sum %>%
+  filter(Year >= 2012) %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
+  dplyr::mutate(MeanRep = mean(PR), SDRep = stats::sd(PR, na.rm = TRUE))
+
+ggplot(rep_site, aes(Year, MeanRep, color = Site))+
+  geom_point()+
+  geom_line()
+
 
 # Atwell gulch: reproduction detected in new vs. old design
 AG_rep <- sg_sum[grep("Atwell",sg_sum$Site),]
