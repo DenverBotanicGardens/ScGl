@@ -244,7 +244,7 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
 ## remove atwell and add in later
-sg_summary2 <- sg %>%
+sg_summary <- sg %>%
   filter(Year > 2008) %>%
   filter(!(Site %in% c("Atwell Gulch","Atwell Gulch (old)"))) %>%
   group_by(Site,Year) %>%
@@ -258,29 +258,13 @@ sg_summary2 <- sg %>%
                     sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
                     avgVol = mean(Vol, na.rm = TRUE),
                     sdVol = sd(Vol, na.rm = TRUE))
-table(sg_summary2$Site)
 
-# sg_summary <- ddply(sg[sg$Year>2008,],  
-#                     .(Site,Year), summarise,
-#                     X = length(Tag[Height.cm. > 0]),
-#                     Rep = sum(Fl, na.rm = TRUE),
-#                     Brs = sum(Br, na.rm = TRUE),
-#                     avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
-#                     sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
-#                     avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
-#                     sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
-#                     avgVol = mean(Vol, na.rm = TRUE),
-#                     sdVol = sd(Vol, na.rm = TRUE))
 
-table(sg_summary$Site)
-## Need to remove "old atwell" before 2012
-sg_summary[which(grep("Atwell", sg_summary$Site, invert = TRUE) & sg_summary)]
-
-atwellold_summary2 <- atwell.old
-atwellold_summary <- ddply(atwell.old,  
-                    .(Site,Year), summarise,
-                    X = length(Tag[Height.cm. > 0]),
-                    Rep = sum(Fl, na.rm = TRUE),
+atwell_summary <- bind_rows(atwell.old, atwell.new) %>%
+  group_by(Site,Year) %>%
+  dplyr::summarise(.groups = "keep",
+                   X = length(Tag[Height.cm. >0]),
+                Rep = sum(Fl, na.rm = TRUE),
                     Brs = sum(Br, na.rm = TRUE),
                     avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
                     sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
@@ -288,6 +272,7 @@ atwellold_summary <- ddply(atwell.old,
                     sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
                     avgVol = mean(Vol, na.rm = TRUE),
                     sdVol = sd(Vol, na.rm = TRUE))
+
                            
 ```
 
@@ -295,7 +280,7 @@ atwellold_summary <- ddply(atwell.old,
 Combine 2008 (with no height or width data) and remaining years 
 ```{r}
 names(sg_summary08) <- names(sg_summary)
-sg_sum <- do.call(rbind, list(sg_summary08,sg_summary, atwellold_summary))
+sg_sum <- do.call(rbind, list(sg_summary08,sg_summary, atwell_summary))
 ```
 
 Report Tables_current year
