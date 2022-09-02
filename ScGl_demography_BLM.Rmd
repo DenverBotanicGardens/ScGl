@@ -77,12 +77,7 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 
 2008-currentYr data  
 ```{r}
-# 2015
-#sg15 <- read.csv(path.expand("P:/hackathon/ScGl/RawData_scgl_2015_103015.csv"))
-#names(sg15)
 
-#2016
-# Need to strip white space and conform to 2015 data
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
 
@@ -161,10 +156,10 @@ Starting in 2019 we use the photoNumber column to track the number of flowers pe
 
 sg$FlNum <- ifelse(sg$Year >= 2019, as.numeric(sg$PhotoNumber), NA)
 
-ggplot(sg[sg$Year > 2018,], aes(Site, FlNum, color = Site, group = Site))+
+ggplot(sg[sg$Year > 2018,], aes(FlNum, Site, fill = Site, group = Site))+
   geom_point(position = position_jitterdodge())+
-  geom_violin()+ 
-  scale_x_discrete(labels = label_wrap(3))+
+  geom_boxplot()+ 
+  # scale_y_discrete(labels = label_wrap(3))+
   facet_wrap(~Year)
 
 ```
@@ -280,20 +275,79 @@ names(sg_summary08) <- names(sg_summary)
 sg_sum <- do.call(rbind, list(sg_summary08,sg_summary, atwellold_summary))
 ```
 
+Report Tables_current year
+Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008-2015).
+```{r}
+
+sg_sum[sg_sum$Site == "",]
+# sg_sum <- sg_sum[sg_sum$Site != "",]
+# reset levels to not include blank
+# sg_sum$Site <- factor(sg_sum$Site)
+
+# total area from table 2
+
+unique(sg_sum$Site)
+sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
+sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
+sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
+sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
+sg_sum$area[sg_sum$Site == "Fram"] <- 1300
+sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
+sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120
+sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
+sg_sum$area[sg_sum$Site == "Pond"] <- 36
+sg_sum$area[sg_sum$Site == "Pond (old)"] <- 235.6
+sg_sum$area[sg_sum$Site == "Powerline"] <- 40
+sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
+sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
+sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
+
+sg_sum$SiteSame <- sg_sum$Site
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Atwell",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Atwell Gulch"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Pond",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Pond"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Oil",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Oil Pad"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("T-",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "T-Junction"
+
+table(sg_sum$Site,sg_sum$SiteSame)
+
+# Assign genetic regions
+sg_sum$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     sg_sum$Site,
+                                     value=TRUE))] <- "South"
+
+sg_sum$Density <- sg_sum$X/sg_sum$area
+```
+
+
 All sites 
 ```{r}
-ggplot(sg_sum, aes(Year,X,colour=Site))+
+ggplot(sg_sum, aes(Year,Density,colour=Site))+
   geom_point(size=3)+
   geom_line()+
   xlim(c(2008, 2024))+
+  ylab("individuals per square meter") +
   theme_classic()+
   scale_colour_discrete(guide = "none")+
-  # geom_dag_label_repel(aes(label = Site), nudge_x = 1, na.rm = TRUE, label.padding = 0 )
-  annotate("text", x = aggregate(Year ~ Site, sg_sum, max)$Year + 1.5,
-           y = aggregate(X ~ Site, sg_sum, FUN = tail, n = 1)$X,
-           label = paste(unique(sg_sum$Site[sg_sum$X %in% aggregate(X ~ Site,sg_sum, 
-                                              FUN = tail, n = 1)$X &
-                        sg_sum$Year %in% aggregate(Year ~ Site, sg_sum, max)$Year])))
+  # annotate("text", x = aggregate(Year ~ Site, sg_sum, max)$Year + 1.5,
+  #          y = aggregate(Density ~ Site, sg_sum, FUN = tail, n = 1)$Density,
+  #          label = paste(unique(sg_sum$Site[sg_sum$Density %in% aggregate(Density ~ Site,sg_sum, 
+  #                                             FUN = tail, n = 1)$Density &
+  #                       sg_sum$Year %in% aggregate(Year ~ Site, sg_sum, max)$Year])))
+  facet_wrap(~NS, nrow = 2, scales = "free")
+
 ```
 
 
@@ -411,63 +465,10 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
   ylab("Total individuals")
 ```
 
-Report Tables_current year
-Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008-2015).
-```{r}
-
-sg_sum[sg_sum$Site == "",]
-# sg_sum <- sg_sum[sg_sum$Site != "",]
-# reset levels to not include blank
-# sg_sum$Site <- factor(sg_sum$Site)
-
-# total area from table 2
-
-unique(sg_sum$Site)
-sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
-sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
-sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
-sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
-sg_sum$area[sg_sum$Site == "Fram"] <- 1300
-sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
-sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120
-sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
-sg_sum$area[sg_sum$Site == "Pond"] <- 36
-sg_sum$area[sg_sum$Site == "Pond (old)"] <- 235.6
-sg_sum$area[sg_sum$Site == "Powerline"] <- 40
-sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
-sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
-sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
-
-sg_sum$SiteSame <- sg_sum$Site
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Atwell",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Atwell Gulch"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Pond",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Pond"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Oil",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Oil Pad"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("T-",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "T-Junction"
-
-table(sg_sum$Site,sg_sum$SiteSame)
-
-# Assign genetic regions
-sg_sum$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     sg_sum$Site,
-                                     value=TRUE))] <- "South"
-```
 
 Summary tables
 ```{r}
-# [,c(1:11)]
+
 tableout <- sg_sum %>%
   dplyr::select(Year, Site, X:area) %>%
   group_by(Year,Site) %>%
