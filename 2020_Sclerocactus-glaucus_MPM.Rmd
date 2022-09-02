@@ -4,14 +4,15 @@
 library(ggplot2)
 library(popbio)
 library(MASS)
-# library(dplyr)
+library(dplyr)
+library(tidyr)
 library(reshape2)
 ```
 
 ```{r}
 rm(list=ls())
 # read in data
-currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))  # 2019 #
+currentYr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y")) 
 sg.raw <- read.csv(paste("C:/Users/DePrengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_",
                      currentYr, ".csv",
                      sep=""))  
@@ -19,18 +20,25 @@ sg.raw <- read.csv(paste("C:/Users/DePrengm/Denver Botanic Gardens/Conservation 
 sg <- sg.raw
 
 ## load scgl.climate
+## Precip, tmin, tmax by site
 userpath <-"C:/Users/deprengm/" 
-load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2021_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
+load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",
+           currentYr, 
+           "_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 ```
 
 Correct typo in ScGl_demography_BLM.Rmd in 2021
 ```{r, eval=FALSE}
-scgl.climate$Site[grep("T-Ju", scgl.climate$Site)] <- "T-Junction"
+# scgl.climate$Site[grep("T-Ju", scgl.climate$Site)] <- "T-Junction"
 
 ```
 
 
 ```{r}
+scgl.climate.test <- scgl.climate %>%
+  mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-10,nchar(date)-6)),
+         Month = as.numeric(substr(date, (nchar(date)+1)-6, nchar(date)-4)))
+
 #turn factors into characters
 scgl.climate$date <- sapply(scgl.climate$date, as.character)
 scgl.climate$Year <- sapply(scgl.climate$date, function(x){

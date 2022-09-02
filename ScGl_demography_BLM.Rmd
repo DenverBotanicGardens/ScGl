@@ -19,7 +19,9 @@ rm(list=ls())
 ```{r, echo=FALSE}
 library(ggplot2)
 library(patchwork)
-library(plyr)
+# library(plyr)
+library(dplyr)
+library(tidyr)
 library(devtools)
 #library(multcompView)
 library(reshape2)
@@ -95,8 +97,8 @@ if(nrow(sg[-which(sg$Site == ""),])>0){
 # Vol calculated at pi*r^2*h
 sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
 
-nrow(sg[sg$Year == 2008,])
-sg$Site <- factor(sg$Site)
+nrow(sg[sg$Year == 2008,]) ## 185
+sg$Site <- factor(sg$Site) ## 15 levels with (old)
 # table(sg$Year[ grep("Atwell Gulch",sg$Site)]) 
 sg$Minis[sg$Minis > 1000 & !is.na(sg$Minis)] <- NA ## two have photo numbers instead of mini number
 
@@ -161,7 +163,8 @@ sg$FlNum <- ifelse(sg$Year >= 2019, as.numeric(sg$PhotoNumber), NA)
 
 ggplot(sg[sg$Year > 2018,], aes(Site, FlNum, color = Site, group = Site))+
   geom_point(position = position_jitterdodge())+
-  geom_violin()+
+  geom_violin()+ 
+  scale_x_discrete(labels = label_wrap(3))+
   facet_wrap(~Year)
 
 ```
@@ -179,6 +182,7 @@ sg$Site <- factor(sg$Site,
 
 # Rename all Atwell Gulch
 sg[grep("Atwell", sg$Site),"Site"] <- "Atwell Gulch"
+
 
 # One copy of all Atwell Gulch 2012 on for new
 atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
@@ -201,7 +205,7 @@ sg <- sg[grep("Road T-East", sg$Site, invert=TRUE),]
 #No "old" 2016 on
 sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 
-#No Pond in 2015
+#No Pond in 2015╣
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
 #Add back Atwell duplicated for old and new
@@ -223,12 +227,17 @@ sg <- sg.foo
 ggplot(sg[sg$Site == "Picnic Site",], aes(Transect,Height.cm.))+
   geom_point()
 
+# Missing values in 2015, need imputing
 ggplot(sg[sg$Site == "Pond",], aes(Transect,Height.cm.))+
   geom_point()
 
 sg[sg$Height.cm. > 7.5 & sg$Site == "Picnic Site" & !is.na(sg$Height.cm.),]
+unique(sg$Comments[sg$Site == "Picnic Site" & is.na(sg$Height.cm.)]) ## Some are dead, some might be seedlings <0.5cm
+
 
 sg[sg$Height.cm. > 7.5 & sg$Site == "Pond" & !is.na(sg$Height.cm.),]
+unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
+
 ```
 
 
@@ -249,13 +258,26 @@ sg_summary <- ddply(sg[sg$Year>2008,],
 
 head(sg_summary)
 table(sg_summary$Site,sg_summary$Year)
+
+atwellold_summary <- ddply(atwell.old,  
+                    .(Site,Year), summarise,
+                    X = length(Tag[Height.cm. > 0]),
+                    Rep = sum(Fl, na.rm = TRUE),
+                    Brs = sum(Br, na.rm = TRUE),
+                    avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+                    sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+                    avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                    sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                    avgVol = mean(Vol, na.rm = TRUE),
+                    sdVol = sd(Vol, na.rm = TRUE))
+                           
 ```
 
 #Data summary
 Combine 2008 (with no height or width data) and remaining years 
 ```{r}
 names(sg_summary08) <- names(sg_summary)
-sg_sum <- rbind(sg_summary08,sg_summary)
+sg_sum <- do.call(rbind, list(sg_summary08,sg_summary, atwellold_summary))
 ```
 
 All sites 
@@ -263,7 +285,15 @@ All sites
 ggplot(sg_sum, aes(Year,X,colour=Site))+
   geom_point(size=3)+
   geom_line()+
-  theme_classic()
+  xlim(c(2008, 2024))+
+  theme_classic()+
+  scale_colour_discrete(guide = "none")+
+  # geom_dag_label_repel(aes(label = Site), nudge_x = 1, na.rm = TRUE, label.padding = 0 )
+  annotate("text", x = aggregate(Year ~ Site, sg_sum, max)$Year + 1.5,
+           y = aggregate(X ~ Site, sg_sum, FUN = tail, n = 1)$X,
+           label = paste(unique(sg_sum$Site[sg_sum$X %in% aggregate(X ~ Site,sg_sum, 
+                                              FUN = tail, n = 1)$X &
+                        sg_sum$Year %in% aggregate(Year ~ Site, sg_sum, max)$Year])))
 ```
 
 
@@ -384,37 +414,79 @@ ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
 Report Tables_current year
 Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008-2015).
 ```{r}
-#save to clipboard to excel sheet in correct format ("$" says the end of the string)
-new <- c("Atwell Gulch$","Oil Pad","Pond","T-Junction")
-poststand <- sg_sum[sg_sum$Year == currentYr & sg_sum$Site %in% grep(paste(new,collapse="|"),
-                                                        sg_sum$Site,value=TRUE),]
 
-sg_sum[sg_sum$Year == currentYr,]
+sg_sum[sg_sum$Site == "",]
+# sg_sum <- sg_sum[sg_sum$Site != "",]
+# reset levels to not include blank
+# sg_sum$Site <- factor(sg_sum$Site)
 
-#Reproduction
-rep.per <- sg_sum
-rep.per$PRep <- rep.per$Rep/rep.per$X
-str(rep.per)
+# total area from table 2
 
-rep.per2 <- rep.per[rep.per$Year>2008,]
+unique(sg_sum$Site)
+sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
+sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
+sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
+sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
+sg_sum$area[sg_sum$Site == "Fram"] <- 1300
+sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
+sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120
+sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
+sg_sum$area[sg_sum$Site == "Pond"] <- 36
+sg_sum$area[sg_sum$Site == "Pond (old)"] <- 235.6
+sg_sum$area[sg_sum$Site == "Powerline"] <- 40
+sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
+sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
+sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
 
-#Average percentage of reproductive individuals per site over the years
-# summarySE(data=rep.per[rep.per$Year>2008,], measurevar=rep.per$PRep, groupvars="Site", na.rm=TRUE)
-summaryOut <- do.call(rbind,lapply(split(rep.per2, rep.per2$Site),
-       function(x){
-         data.frame(Count = length(x$PRep), Avg = mean(x$PRep), Std = sd(x$PRep), 
-                    SE = sd(x$PRep)/sqrt(length(x$PRep)),
-                    CI = sd(x$PRep)/sqrt(length(x$PRep)) * (qt(0.95/2 + 0.5, length(x$PRep)-1)))
-         }))
-# rep.summarySE <- summarySE(data=rep.per, measurevar="PRep", groupvars="Site")
-# rep.summarySE[with(rep.summarySE, order(PRep)),]
+sg_sum$SiteSame <- sg_sum$Site
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Atwell",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Atwell Gulch"
 
-#Reproductive individuals with average width of plants
-#See also "#Reproduction" below; should match this
-summary(lm(PRep~avgW, data=rep.per))
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Pond",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Pond"
 
-prestand <- sg_sum[sg_sum$Year == currentYr & !sg_sum$Site %in% grep(paste(new,collapse="|"),
-                                                        sg_sum$Site,value=TRUE),]
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Oil",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "Oil Pad"
+
+sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("T-",collapse="|"),
+                                        sg_sum$Site,
+                                        value=TRUE))] <- "T-Junction"
+
+table(sg_sum$Site,sg_sum$SiteSame)
+
+# Assign genetic regions
+sg_sum$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
+                                     sg_sum$Site,
+                                     value=TRUE))] <- "South"
+```
+
+Summary tables
+```{r}
+# [,c(1:11)]
+tableout <- sg_sum %>%
+  dplyr::select(Year, Site, X:area) %>%
+  group_by(Year,Site) %>%
+  mutate(TotInd = X, IndSqM = X/area, PercRepro = paste0(round(100*Rep/X, 1), "%"),
+         AvgHeight = paste(round(avgH,2), " (", round(sdH,2), ")", sep=""),
+         AvgWidth = paste(round(avgW,1), " (", round(sdW,2), ")", sep = ""),
+         PercBr = paste0(round(100*Brs/X, 2), "%")) %>%
+  dplyr::select(Site:Year, area, TotInd, IndSqM, Rep, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
+
+
+```
+
+
+
+```{r}
+new <- c("Atwell Gulch","Oil Pad","Pond","T-Junction")
+poststand <- tableout[tableout$Year == currentYr & tableout$Site %in% new,]
+
+prestand <- tableout[tableout$Year == currentYr & !(tableout$Site %in% new),]
 
 write.table(poststand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_poststand.csv", sep=""), sep=",", row.names=FALSE, col.names = TRUE)
 
@@ -755,9 +827,9 @@ Precipitation per site
 ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
                          scgl_sumSE[[1]]$Prev12<currentYr,],
        aes(Prev12, ppt, colour=Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
+  geom_point(position=position_dodge(0.5), shape=21, fill="white") +
   stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.1)) +
+  geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.5)) +
   theme_bw() +
   ylab("Average precipitation per site") 
 
@@ -888,54 +960,28 @@ write.table(Table3a[!duplicated(Table3a$Freq),], file=paste(userpath, "Denver Bo
 
 # Results: Reproduction
 ```{r}
-sg_sum[sg_sum$Site == "",]
-sg_sum <- sg_sum[sg_sum$Site != "",]
-#reset levels to not include blank
-sg_sum$Site <- factor(sg_sum$Site)
 
-# total area from table 2
+#Reproduction
+rep.per <- sg_sum
+rep.per$PRep <- rep.per$Rep/rep.per$X
+str(rep.per)
 
-unique(sg_sum$Site)
-sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
-sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
-sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
-sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
-sg_sum$area[sg_sum$Site == "Fram"] <- 1300
-sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
-sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120
-sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
-sg_sum$area[sg_sum$Site == "Pond"] <- 36
-sg_sum$area[sg_sum$Site == "Pond (old)"] <- 235.6
-sg_sum$area[sg_sum$Site == "Powerline"] <- 40
-sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
-sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
-sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
+rep.per2 <- rep.per[rep.per$Year>2008,]
 
-sg_sum$SiteSame <- sg_sum$Site
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Atwell",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Atwell Gulch"
+#Average percentage of reproductive individuals per site over the years
+# summarySE(data=rep.per[rep.per$Year>2008,], measurevar=rep.per$PRep, groupvars="Site", na.rm=TRUE)
+summaryOut <- do.call(rbind,lapply(split(rep.per2, rep.per2$Site),
+       function(x){
+         data.frame(Count = length(x$PRep), Avg = mean(x$PRep), Std = sd(x$PRep), 
+                    SE = sd(x$PRep)/sqrt(length(x$PRep)),
+                    CI = sd(x$PRep)/sqrt(length(x$PRep)) * (qt(0.95/2 + 0.5, length(x$PRep)-1)))
+         }))
+# rep.summarySE <- summarySE(data=rep.per, measurevar="PRep", groupvars="Site")
+# rep.summarySE[with(rep.summarySE, order(PRep)),]
 
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Pond",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Pond"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Oil",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Oil Pad"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("T-",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "T-Junction"
-
-table(sg_sum$Site,sg_sum$SiteSame)
-
-# Assign genetic regions
-sg_sum$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     sg_sum$Site,
-                                     value=TRUE))] <- "South"
+#Reproductive individuals with average width of plants
+#See also "#Reproduction" below; should match this
+summary(lm(PRep~avgW, data=rep.per))
 
 require(scales)
 
@@ -1069,6 +1115,20 @@ ggplot(sg_sum, aes(avgW,Prepro))+
 ```
 
 
+Density dependence? 
+```{r}
+## t = y, t+1 = x
+sg_lagged <- subset(merge(sg_sum, sg_sum, by = c("Site")), Year.x == Year.y + 1)
+
+## Really want growth rate on Y as a function of density
+ggplot(sg_lagged, aes(X.y, X.x))+
+  geom_point()+
+  stat_smooth()
+
+```
+
+
+
 ```{r}
 
 
@@ -1098,9 +1158,15 @@ summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
 summary(lm(Prepro~avgVol, data=sg_sum))
 summary(lm(Prepro~avgW, data=sg_sum))
 summary(lm(Prepro~avgH, data=sg_sum))
+```
 
-## Should be binomial
-lm1 <- glm(Prepro~avgVol,family = "binomial", sg_sum, weights = X)
+```{r}
+head(sg_sum)
+sort(sg_sum$Prepro) ## Never zero, never 1
+
+library(betareg)
+## Should be beta regression
+lm1 <- betareg(Prepro~avgVol, sg_sum) ## If used weights should be scaled such that sum(weights) corresponds to number of independent observations
 lm2 <- glm(Prepro~avgW, family = "binomial",sg_sum, weights = X)
 lm3 <- glm(Prepro~avgH, family = "binomial",sg_sum, weights = X) 
 lm4 <- glm(Prepro~avgVol*Site,family = "binomial", sg_sum, weights = X)
