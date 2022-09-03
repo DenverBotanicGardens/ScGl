@@ -81,7 +81,8 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
 
-table(sg$Site,sg$Year) 
+table(sg$Site,sg$Year)
+sg[which(sg$Width.cm. > 15),]
 
 #Remove rows where Site is blank, if any
 sg[which(sg$Site == ""),]
@@ -287,13 +288,7 @@ Report Tables_current year
 Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western Colorado (2008-2015).
 ```{r}
 
-sg_sum[sg_sum$Site == "",]
-# sg_sum <- sg_sum[sg_sum$Site != "",]
-# reset levels to not include blank
-# sg_sum$Site <- factor(sg_sum$Site)
-
 # total area from table 2
-
 unique(sg_sum$Site)
 sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
 sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
@@ -366,7 +361,7 @@ All sites separate plots
 ggplot(sg_sum, aes(Year,X,colour=Site))+
   geom_point()+
   geom_line()+
-  facet_wrap(~Site)+
+  facet_wrap(~SiteSame)+
   ylab("Total individuals")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -507,21 +502,87 @@ write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservatio
 
 # Results: Reproduction
 ```{r}
-table2 <- rbind(poststand,prestand[prestand$Site != "Atwell Gulch (old)",])
-sum(table2$Rep)/sum(table2$TotInd) # current year total reproductive
 
+## Size at reproduction
+sizeRep <- sg %>%
+  drop_na(Width.cm.) %>%
+  group_by(Site, Year, Fl) %>%
+  dplyr::summarise(.groups = "keep", 
+                   SizeMin = min(Width.cm., na.rm = TRUE), 
+                   SizeMean = mean(Width.cm., na.rm = TRUE),
+                   SizeMax = max(Width.cm., na.rm = TRUE))
 
-## Pre-standardized after 2012
-rep_site <- sg_sum %>%
-  filter(Year >= 2012) %>%
+ggplot(sg[sg$Width.cm. > 0,], aes(Site, Width.cm.,color = as.factor(Fl)))+
+  geom_boxplot()+
+  ylim(c(0,20))+
+  geom_jitter(height = 0)
+
+## all sites
+rep_site.all <- sg_sum %>%
   group_by(Year, Site) %>%
   dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
-  dplyr::mutate(MeanRep = mean(PR), SDRep = stats::sd(PR, na.rm = TRUE))
+  group_by(Year) %>%
+  dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR)) %>%
+  mutate(Group = "all")
 
-ggplot(rep_site, aes(Year, MeanRep, color = Site))+
+
+## Pre-standardized after 2012, NOT the new ones, the Old ones 
+# [1] "Atwell Gulch" "Oil Pad"      "Pond"         "T-Junction"
+sg_sum %>%
+  filter(Year >= 2012) %>%
+  filter(!(Site %in% new)) %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
+  group_by(Year) %>%
+  dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR)) %>%
+  summarise(Mean = mean(MeanRep), SD = sd(SDRep)) %>%
+  mutate(Group = "pre2012on")
+
+## all years
+rep_site <- sg_sum %>%
+  filter(!(Site %in% new)) %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
+  group_by(Year) %>%
+  dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR)) %>%
+  mutate(Group = "pre")
+
+
+whichsites <- sg_sum %>%
+  filter(!(Site %in% new)) %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep")
+table(whichsites$Site, whichsites$Year)
+
+ggplot(rep_site, aes(Year, MeanRep))+
   geom_point()+
-  geom_line()
+  geom_line()+
+  geom_errorbar(aes(ymin = MeanRep - SDRep, ymax = MeanRep + SDRep), width = 0.2)
 
+##Average percent repro >= 2012 pre-standard
+rep_site %>% 
+  summarise(Mean = mean(MeanRep), SD = sd(SDRep))
+
+
+# the ones that changed 
+rep_site.post <- sg_sum %>%
+  filter(Year >= 2012) %>%
+  filter((Site %in% new)) %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
+  group_by(Year) %>%
+  dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR)) %>%
+  mutate(Group = "post")
+
+rep_site.post %>%
+  summarise(Mean = mean(MeanRep), SD = sd(SDRep))
+
+compareall <- bind_rows(rep_site,rep_site.all, rep_site.post)
+ggplot(compareall, aes(Year, MeanRep, color = Group))+
+  geom_point(position = position_dodge(width = 0.5))+
+  geom_line(position = position_dodge(width = 0.5))+
+  geom_errorbar(aes(ymin = MeanRep - SDRep, ymax = MeanRep + SDRep), width = 0.2,
+                position = position_dodge(width = 0.5))
 
 # Atwell gulch: reproduction detected in new vs. old design
 AG_rep <- sg_sum[grep("Atwell",sg_sum$Site),]
