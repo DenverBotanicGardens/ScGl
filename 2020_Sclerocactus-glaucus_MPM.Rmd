@@ -35,40 +35,35 @@ Correct typo in ScGl_demography_BLM.Rmd in 2021
 
 
 ```{r}
-scgl.climate.test <- scgl.climate %>%
+scgl.climate.monthly <- scgl.climate %>%
   mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-10,nchar(date)-6)),
-         Month = as.numeric(substr(date, (nchar(date)+1)-6, nchar(date)-4)))
+         Month = as.numeric(substr(date, (nchar(date)+1)-6, nchar(date)-4)),
+         # Make previous 12 months match year (previous to May survey)
+         Prev12 = ifelse(Month > 5, Year+1, Year)) %>%
+  #extract the climate variable name from the prism long name
+  separate(date, sep = "_", into = c(NA,"Variable",NA,NA,NA,NA))
+  
+scgl.annual.ppt <- scgl.climate.monthly %>%
+  filter(Variable == "ppt") %>%
+  group_by(Variable, Site, Prev12) %>%
+  dplyr::summarise(Value = sum(data), .groups = "keep")
+  
+scgl.annual.temp <- scgl.climate.monthly %>%
+  filter(Variable != "ppt") %>%
+  group_by(Variable, Site, Prev12) %>%
+  dplyr::summarise(Value = mean(data), .groups = "keep")
 
-#turn factors into characters
-scgl.climate$date <- sapply(scgl.climate$date, as.character)
-scgl.climate$Year <- sapply(scgl.climate$date, function(x){
-  substr(x, (nchar(x)+1)-10,nchar(x)-6)
-})
-scgl.climate$Month <- sapply(scgl.climate$date, function(x){
-  substr(x, (nchar(x)+1)-6,nchar(x)-4)
-})
-#Character to numeric
-scgl.climate[,4:5] <- sapply(scgl.climate[,4:5], as.numeric)
+scgl.annual <- do.call(rbind, list(as.data.frame(scgl.annual.ppt),
+                                   as.data.frame(scgl.annual.temp)))
 
-# Make previous 12 months match year (previous to May survey)
-scgl.climate$Prev12 <- scgl.climate$Year 
-scgl.climate$Prev12[scgl.climate$Month > 5] <- scgl.climate$Year[scgl.climate$Month>5]+1
+ggplot(scgl.annual, aes(Prev12, Value))+
+  geom_point()+
+  stat_smooth(se = FALSE)+
+  facet_grid(Variable ~ Site, scales = "free")
 
-#extract the climate variable name from the prism long name
-scgl.climate$date <- as.character(scgl.climate$date)
-scgl.climate$Variable <- sapply(scgl.climate$date, function(x) {
-  unlist(strsplit(x, split="_", fixed=TRUE))[[2]]
-})
-
-
-##Annual measures in the previous 12 months
-scgl.annualtemp <- aggregate(data ~ Variable + Site + Prev12, scgl.climate[scgl.climate$Variable %in% c("tmin","tmax"),], mean)
-scgl.annualppt <- aggregate(data ~ Variable + Site + Prev12, scgl.climate[scgl.climate$Variable == "ppt",], sum)
-scgl.annual <- rbind(scgl.annualtemp, scgl.annualppt)
-
-scgl.annual.wide <- reshape(scgl.annual, idvar = c("Site","Prev12") , v.names = "data", timevar = "Variable", direction="wide")
-names(scgl.annual.wide) <- c(names(scgl.annual.wide)[1:2],"Annual.tmax","Annual.tmin","Annual.ppt")
-
+## a column for each variable instead of long
+scgl.annual.wide <- scgl.annual %>%
+  pivot_wider(names_from = Variable, values_from = Value)
 
 # sort 
 sg <- sg[order(sg$Site, sg$Transect, sg$Tag, sg$Year),]
@@ -76,8 +71,8 @@ sg <- sg[order(sg$Site, sg$Transect, sg$Tag, sg$Year),]
 sg$Width.cm.[sg$Width.cm. == 0] <- NA
 
 ## data clean
-sg <- sg[which(complete.cases(sg[,c("Tag")])),]
-sg <- sg[grep("T-East", sg$Site, invert = TRUE),]
+# sg <- sg[which(complete.cases(sg[,c("Tag")])),] # 6 road T-west don't have a tag
+sg <- sg[grep("T-East", sg$Site, invert = TRUE),] # dropping T-East completely
 sg$Site <- as.character(sg$Site)
 sg$Site <- as.factor(sg$Site)
 sg$MainTag <- floor(sg$Tag)
