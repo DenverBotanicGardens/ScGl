@@ -181,16 +181,6 @@ sg[grep("Atwell", sg$Site),"Site"] <- "Atwell Gulch"
 sg[sg$X.coord.m. > 1.1 & !is.na(sg$X.coord.m.) & sg$Site == "Atwell Gulch",]
 sg$X.coord.m.[sg$Tag == 251 & sg$Site == "Atwell Gulch"] <- 0
 
-# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
-atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
-
-atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
-atwell.old$Site <- "Atwell Gulch (old)"
-
-ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
-  geom_point(position = position_dodge(width = 0.05))+
-  facet_wrap(~ Transect, nrow = 2)
-  
 ```
 
 #2016 on    
@@ -217,12 +207,39 @@ levels(sg$Site)
 
 table(sg$Site,sg$Year)
 
-# sg_withPond2015 <- sg
-# sg.foo <- sg[!(sg$Site %in% c("Pond","Pond (old)") & sg$Year == 2015),]
-# table(sg.foo$Site,sg.foo$Year)
-# 
-# sg <- sg.foo
+sg$SiteSame <- sg$Site
+sg$SiteSame[sg$Site %in% unique(grep(paste("Atwell",collapse="|"),
+                                        sg$Site,
+                                        value=TRUE))] <- "Atwell Gulch"
 
+sg$SiteSame[sg$Site %in% unique(grep(paste("Pond",collapse="|"),
+                                        sg$Site,
+                                        value=TRUE))] <- "Pond"
+
+sg$SiteSame[sg$Site %in% unique(grep(paste("Oil",collapse="|"),
+                                        sg$Site,
+                                        value=TRUE))] <- "Oil Pad"
+
+sg$SiteSame[sg$Site %in% unique(grep(paste("T-",collapse="|"),
+                                        sg$Site,
+                                        value=TRUE))] <- "T-Junction"
+
+
+# Assign genetic regions
+sg$NS <- "North"
+southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
+sg$NS[sg$Site %in% southsites] <- "South"
+
+## 2008 has Escalante Canyon, Picnic Site, Powerline, and Pyramid Rock
+sg_summary08$SiteSame <- sg_summary08$Site
+
+# Assign genetic regions
+sg_summary08$NS <- "North"
+southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
+sg_summary08$NS[sg_summary08$SiteName %in% southsites] <- "South"
+
+# to match sg_summary later
+sg_summary08 <- sg_summary08[,c(1,12:13,2:11)]
 ```
 
 #Data checks
@@ -232,7 +249,7 @@ ggplot(sg[sg$Site == "Picnic Site",], aes(Transect,Height.cm.))+
 
 table(sg$Site[which(sg$Height.cm. > 10 )])
 
-sg[sg$Height.cm. > 7.5 & sg$Site == "Picnic Site" & !is.na(sg$Height.cm.),]
+sg[which(sg$Height.cm. > 7.5 & sg$Site == "Picnic Site"),]
 unique(sg$Comments[sg$Site == "Picnic Site" & is.na(sg$Height.cm.)]) ## Some are dead, some might be seedlings <0.5cm
 
 sg[which(sg$Height.cm. > 7.5 & sg$Site == "Pond"),] 
@@ -244,11 +261,22 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
+# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
+atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
+
+atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
+atwell.old$Site <- "Atwell Gulch (old)"
+
+ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
+  geom_point(position = position_dodge(width = 0.1))+
+  facet_wrap(~ Transect, nrow = 2)
+
+
 ## remove atwell and add in later
 sg_summary <- sg %>%
   filter(Year > 2008) %>%
   filter(!(Site %in% c("Atwell Gulch","Atwell Gulch (old)"))) %>%
-  group_by(Site,Year) %>%
+  group_by(Site,SiteSame,NS,Year) %>%
   dplyr::summarise(.groups = "keep",
                    X = length(Tag[Height.cm. >0]),
                 Rep = sum(Fl, na.rm = TRUE),
@@ -262,7 +290,7 @@ sg_summary <- sg %>%
 
 
 atwell_summary <- bind_rows(atwell.old, atwell.new) %>%
-  group_by(Site,Year) %>%
+  group_by(Site,SiteSame,NS,Year) %>%
   dplyr::summarise(.groups = "keep",
                    X = length(Tag[Height.cm. >0]),
                 Rep = sum(Fl, na.rm = TRUE),
@@ -305,32 +333,6 @@ sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
 sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
 sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
 
-sg_sum$SiteSame <- sg_sum$Site
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Atwell",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Atwell Gulch"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Pond",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Pond"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("Oil",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "Oil Pad"
-
-sg_sum$SiteSame[sg_sum$Site %in% unique(grep(paste("T-",collapse="|"),
-                                        sg_sum$Site,
-                                        value=TRUE))] <- "T-Junction"
-
-table(sg_sum$Site,sg_sum$SiteSame)
-
-# Assign genetic regions
-sg_sum$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg_sum$NS[sg_sum$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     sg_sum$Site,
-                                     value=TRUE))] <- "South"
-
 sg_sum$Density <- sg_sum$X/sg_sum$area
 ```
 
@@ -354,15 +356,13 @@ ggplot(sg_sum, aes(Year,Density,colour=Site))+
 ```
 
 
-
-
 All sites separate plots
 ```{r}
-ggplot(sg_sum, aes(Year,X,colour=Site))+
+ggplot(sg_sum, aes(Year,Density,colour=Site))+
   geom_point()+
   geom_line()+
   facet_wrap(~SiteSame)+
-  ylab("Total individuals")+
+  ylab("Density")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
@@ -504,20 +504,33 @@ write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservatio
 ```{r}
 
 ## Size at reproduction
+## don't double up the individuals that are in both old and new designs
 sizeRep <- sg %>%
-  drop_na(Width.cm.) %>%
-  group_by(Site, Year, Fl) %>%
+  drop_na(Width.cm.,Fl) %>%
+  distinct(Tag, SiteSame, .keep_all = TRUE) %>%
+  dplyr::group_by(NS,Site, Fl) %>%
   dplyr::summarise(.groups = "keep", 
                    SizeMin = min(Width.cm., na.rm = TRUE), 
                    SizeMean = mean(Width.cm., na.rm = TRUE),
+                   SizeMedian = median(Width.cm., na.rm = TRUE),
                    SizeMax = max(Width.cm., na.rm = TRUE))
 
-ggplot(sg[sg$Width.cm. > 0,], aes(Site, Width.cm.,color = as.factor(Fl)))+
+as.data.frame(sizeRep)
+sizeRep %>%
+  filter(Fl == 1) %>%
+  group_by(NS) %>%
+  dplyr::summarise(minSz = mean(SizeMin), meanSz = mean(SizeMean), medianSz = median(SizeMedian),
+                   .groups = "keep")
+
+ggplot(sg[which(sg$Width.cm. > 0 & !duplicated(sg[,c("Tag","SiteSame")])),], aes(Site,Width.cm., color = as.factor(Fl)))+
   geom_boxplot()+
-  ylim(c(0,20))+
-  geom_jitter(height = 0)
+  ylim(c(0,17))+
+  geom_point(position = position_jitterdodge(jitter.height = 0))+
+  facet_wrap(~NS,nrow = 2, scales = "free")+
+  scale_x_discrete(labels = label_wrap(5))
 
 ## all sites
+### Double counting the Atwell Gulch ones and some Pond, Oil Pad, and T-Junction ones
 rep_site.all <- sg_sum %>%
   group_by(Year, Site) %>%
   dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
@@ -584,27 +597,36 @@ ggplot(compareall, aes(Year, MeanRep, color = Group))+
   geom_errorbar(aes(ymin = MeanRep - SDRep, ymax = MeanRep + SDRep), width = 0.2,
                 position = position_dodge(width = 0.5))
 
+### Are larger non-reproductive individuals dying?
+table(sg$Comments[which(sg$Width.cm. > 6.5 & sg$Fl == 0)])
+
+
 # Atwell gulch: reproduction detected in new vs. old design
-AG_rep <- sg_sum[grep("Atwell",sg_sum$Site),]
-lapply(split(AG_rep, AG_rep$Site, drop = TRUE ), function(x){
-  data.frame(muRep = mean(x$Rep[x$Year>=2012]/x$X[x$Year>=2012]), sdRep = sd(x$Rep[x$Year>=2012]/x$X[x$Year>=2012]))
-})
+Atwell.oldPR <- sg_sum %>%
+  filter(SiteSame == "Atwell Gulch") %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
+  group_by(Year) %>%
+  dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR)) %>%
+  mutate(Group = "atwell")
 
-AtwellRep <- lapply(split(AG_rep, AG_rep$Site, drop = TRUE ), function(x){
-  x$Rep[x$Year>=2012]/x$X[x$Year>=2012]
-})
-
+###
 tRepAtwell <- t.test(AtwellRep[[1]],AtwellRep[[2]])
 tRepAtwell
 diff(tRepAtwell$estimate)
 
 # Average reproduction of each site
-repsall <- do.call(rbind,lapply(split(sg_sum, sg_sum$Site), function(x){
-  data.frame(muRep = mean(x$Rep/x$X), sdRep = sd(x$Rep/x$X))
-}))
+sg_sum %>%
+  group_by(Year, Site) %>%
+  dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
+  group_by(Site) %>%
+  dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR)) %>%
+  mutate(Group = "all") %>%
+  arrange(desc(MeanRep))
 
-repsall[order(repsall$muRep),]
 ```
+
+AIC for reproduction below after loading climate
 
 
 Climate directly from PRISM   
@@ -732,73 +754,88 @@ save(scgl.climate, file=paste(userpath, "Denver Botanic Gardens/Conservation - G
 
 ```
 
+
+
+###### Load once made
 ```{r}
 load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
-## Fix 2021 typo T-Junciton
-scgl.climate$Site[grep("T-Jun",scgl.climate$Site)] <- "T-Junction"
 
-#turn factors into characters
-scgl.climate$date <- sapply(scgl.climate$date, as.character)
+scgl.climate$NS <- "North"
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+scgl.climate$NS[scgl.climate$Site %in% southsites] <- "South"
 
-scgl.climate$Year <- sapply(scgl.climate$date, function(x){
-  substr(x, (nchar(x)+1)-10,nchar(x)-6)
-})
-scgl.climate$Month <- sapply(scgl.climate$date, function(x){
-  substr(x, (nchar(x)+1)-6,nchar(x)-4)
-})
+scgl.climate.monthly <- scgl.climate %>%
+  mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-10,nchar(date)-6)),
+         Month = as.numeric(substr(date, (nchar(date)+1)-6, nchar(date)-4)),
+         # Make previous 12 months match year (previous to May survey)
+         Prev12 = ifelse(Month > 5, Year+1, Year)) %>%
+  #extract the climate variable name from the prism long name
+  separate(date, sep = "_", into = c(NA,"Variable",NA,NA,NA,NA)) %>%
+  # mutate(season = "winter") %>%
+  mutate(season = case_when(Month %in% c(1,2,12) ~ "winter",
+                            Month>5 & Month<9 ~ "summer",
+                            Month>8 & Month<12 ~ "fall",
+                            Month>2 & Month<6 ~ "spring"))
 
-#Character to numeric
-scgl.climate[,4:5] <- sapply(scgl.climate[,4:5], as.numeric)
+scgl.c <- scgl.climate.monthly %>%
+  pivot_wider(names_from = Variable, values_from = data)
 
-scgl.climate$Prev12 <- scgl.climate$Year 
-scgl.climate$Prev12[scgl.climate$Month > 5] <- scgl.climate$Year[scgl.climate$Month>5]+1
+scgl.climate.season.ppt <- scgl.climate.monthly %>%
+  filter(Variable == "ppt") %>%
+  group_by(Variable, Site, NS, season, Prev12) %>%
+  dplyr::summarise(Value = sum(data), .groups = "keep") 
+  
 
-#extract the climate variable name from the prism long name
-scgl.climate$date <- as.character(scgl.climate$date)
-scgl.climate$Variable <- sapply(scgl.climate$date, function(x) {
-  unlist(strsplit(x, split="_", fixed=TRUE))[[2]]
-  })
+scgl.climate.season.temp <- scgl.climate.monthly %>%
+  filter(Variable != "ppt") %>%
+  group_by(Variable, Site, NS, season, Prev12) %>%
+  dplyr::summarise(Value = mean(data), .groups = "keep")
+  
+scgl.season <- bind_rows(list(scgl.climate.season.ppt, scgl.climate.season.temp))
+scgl.season.wide <- scgl.season %>%
+  pivot_wider(names_from = Variable, values_from = Value)
 
+scgl.annual.ppt <- scgl.climate.monthly %>%
+  filter(Variable == "ppt") %>%
+  group_by(Variable, Site, NS, Prev12) %>%
+  dplyr::summarise(Value = sum(data), .groups = "keep")
+  
+scgl.annual.temp <- scgl.climate.monthly %>%
+  filter(Variable != "ppt") %>%
+  group_by(Variable, Site, NS, Prev12) %>%
+  dplyr::summarise(Value = mean(data), .groups = "keep")
 
-##Annual measures in the previous 12 months
-scgl.annualtemp <- aggregate(data ~ Variable + Site + Prev12, scgl.climate[scgl.climate$Variable %in% c("tmin","tmax"),], mean)
-scgl.annualppt <- aggregate(data ~ Variable + Site + Prev12, scgl.climate[scgl.climate$Variable == "ppt",], sum)
+scgl.annual <- do.call(rbind, list(as.data.frame(scgl.annual.ppt),
+                                   as.data.frame(scgl.annual.temp)))
 
-scgl.annual <- rbind(scgl.annualtemp, scgl.annualppt)
+ggplot(scgl.annual, aes(Prev12, Value))+
+  geom_point()+
+  stat_smooth(se = FALSE)+
+  facet_grid(Variable ~ Site, scales = "free")
 
-
-#long to wide
-melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Prev12","Month","Year","Variable"))
-head(melt.scgl)
-table(melt.scgl$Variable) # variable is just 'data'
-
-sp.melt.scgl <- split(melt.scgl, melt.scgl$Variable)
-
-head(sp.melt.scgl[[2]])
-
-scgl.c.1 <- merge(sp.melt.scgl[[1]],sp.melt.scgl[[2]], by = c("Site","Prev12","Month","Year"))
-scgl.c.1 <- scgl.c.1[,c("Site","Prev12","Month","Year","value.x","value.y")]
-names(scgl.c.1) <- c("Site","Prev12","Month","Year","ppt","tmax")
-
-scgl.c.2 <- merge(scgl.c.1,sp.melt.scgl[[3]], by = c("Site","Prev12","Month","Year"))
-head(scgl.c.2)
-scgl.c <- scgl.c.2[,c("Site","Prev12","Month","Year","ppt","tmax","value")]
-names(scgl.c) <- c("Site","Prev12","Month","Year","ppt","tmax","tmin")
-
-scgl.c$season <- "winter"
-scgl.c[scgl.c$Month>5 & scgl.c$Month<9, "season"] <- "summer"
-scgl.c[scgl.c$Month>8 & scgl.c$Month<12, "season"] <- "fall"
-scgl.c[scgl.c$Month>2 & scgl.c$Month<6, "season"] <- "spring"
-
-
-table(scgl.c$Year)
-scgl.c[scgl.c$Year>2016,]
-table(scgl.c$Year,scgl.c$Month)
-
+## a column for each variable instead of long
+scgl.annual.wide <- scgl.annual %>%
+  pivot_wider(names_from = Variable, values_from = Value) 
 
 ```
 
+scgl.c is now:
+> scgl.c
+# A tibble: 4,370 x 8
+   Site              Year Month Prev12 season  tmin  tmax   ppt
+   <chr>            <dbl> <dbl>  <dbl> <chr>  <dbl> <dbl> <dbl>
+ 1 Atwell Gulch      2021    12   2022 winter -5.86  5.79  37.3
+ 2 Bridgeport        2021    12   2022 winter -5.45  6.85  31.5
+ 3 Escalante Canyon  2021    12   2022 winter -4.90  6.13  28.5
+ 4 Fram              2021    12   2022 winter -4.38  6.59  30.2
+ 5 Oil Pad           2021    12   2022 winter -4.68  5.34  39.2
+ 6 Picnic Site       2021    12   2022 winter -4.90  6.13  28.5
+ 7 Pond              2021    12   2022 winter -5.69  5.08  47.8
+ 8 Powerline         2021    12   2022 winter -6.19  7.32  15.3
+ 9 Pyramid Rock      2021    12   2022 winter -5.19  5.83  29.4
+
+Pre 2022 dplyr/tidyr version:
           Site Precip  tmin tmax Year Month Prev12 season
 1 Atwell Gulch  54.37 -10.1  2.0 1895     1   1895 winter
 2 Atwell Gulch  26.50 -10.0  4.0 1895     2   1895 winter
@@ -809,20 +846,6 @@ table(scgl.c$Year,scgl.c$Month)
 > names(scgl.c)
 [1] "Site"   "Precip" "tmin"   "tmax"   "Year"   "Month"  "Prev12" "season"
 
-```{r}
-ggplot(melt.scgl[melt.scgl$Month==5,], aes(Year,value,colour=Variable))+
-  geom_jitter(height=0.03)+
-  stat_smooth()
-
-
-```
-
-
-
-
-scgl.c <- scgl.climate[,c(1,3,5,7:9)]
-names(scgl.c) <- c("Site","Precip","tmin","tmax","Year","Month")
-
 ####Summarize climate data
 Climate of the previous 12 month to the May data collection
 
@@ -832,168 +855,20 @@ summer: June-August (6-8)
 fall: September-November (9-11)
 winter: December-February (12, 1-2)
 spring: March-May (3-5)
-```{r}
-scgl.c.summary <- aggregate(scgl.c[,c("ppt","tmax","tmin")],
-                            scgl.c[,c("Site","Prev12","season")],
-                            FUN = function(x) mean(x, na.rm = TRUE))
-
-scgl.c.summary.ppt <- aggregate(scgl.c[,"ppt"],
-                            scgl.c[,c("Site","Prev12","season")],
-                            FUN = function(x) sum(x, na.rm = TRUE))
-
-# scgl.c.summary <- merge(scgl.c.summary, scgl.c.summary.ppt, by = c("Site","Prev12","season"))
-# names(scgl.c.summary) <- c(names(scgl.c.summary)[-length(scgl.c.summary)],"sum.ppt")
-
-season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<currentYr+1,],
-                  idvar = c("Site","Prev12"),
-                  timevar = "season",
-                  direction = "wide")
-```
-
 
 summary statistics
 ```{r}
-scgl_sumSE <- lapply(names(scgl.c[,c("ppt","tmin", "tmax")]), 
+
+scgl_sumSE <- lapply(names(scgl.c[scgl.c$Year > 2008,c("ppt","tmin", "tmax")]), 
                      function(x){
                        summarySE(scgl.c, measurevar=x, groupvars=c("Site","Prev12"))
                        }) 
 
-# t.test for min and max temp is below, search PCA summary t.tests
-# to get total annyal precipitation instead of average by month, might not be fully wet year. 
-scgl_totalannualppt <- aggregate(scgl.c[,"ppt"],
-                                 scgl.c[,c("Site","Prev12")],
-                                 FUN = function(x) sum(x, na.rm = TRUE))
-
-# annual total (summed) ppt and t.test between northern and southern sites
-scgl_totalannualppt_SE <- summarySE(scgl_totalannualppt,measurevar = "x",
-                                    groupvars = c("Site"))
-
-scgl_totalannualppt_SE$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-scgl_totalannualppt_SE$NS[scgl_totalannualppt_SE$Site %in%
-                            unique(grep(paste(southsites,collapse="|"),
-                                     scgl_totalannualppt_SE$Site,
-                                     value=TRUE))] <- "South"
-scgl_totalannualppt$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-scgl_totalannualppt$NS[scgl_totalannualppt$Site %in%
-                            unique(grep(paste(southsites,collapse="|"),
-                                     scgl_totalannualppt$Site,
-                                     value=TRUE))] <- "South"
 
 # t.test for north compared to south
-# t.test(x~NS, data = scgl_totalannualppt[scgl_totalannualppt$Prev12>1999,]) # don't know why I had 2000 before
-t.test(x~NS, data = scgl_totalannualppt)
-
-scgl_sumSE[[1]]$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-scgl_sumSE[[1]]$NS[scgl_sumSE[[1]]$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     scgl_sumSE[[1]]$Site,
-                                     value=TRUE))] <- "South"
-
-scgl_sumSE[[2]]$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-scgl_sumSE[[2]]$NS[scgl_sumSE[[2]]$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     scgl_sumSE[[2]]$Site,
-                                     value=TRUE))] <- "South"
-
-scgl_sumSE[[3]]$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-scgl_sumSE[[3]]$NS[scgl_sumSE[[3]]$Site %in% unique(grep(paste(southsites,collapse="|"),
-                                     scgl_sumSE[[3]]$Site,
-                                     value=TRUE))] <- "South"
-
-```
-
-Precipitation per site
-```{r}
-ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2000&
-                         scgl_sumSE[[1]]$Prev12<currentYr,],
-       aes(Prev12, ppt, colour=Site))+
-  geom_point(position=position_dodge(0.5), shape=21, fill="white") +
-  stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.5)) +
-  theme_bw() +
-  ylab("Average precipitation per site") 
-
-```
-Precipitation North vs. South  
-swtich to total instead of monthly average?
-```{r}
-ggplot(scgl_sumSE[[1]][scgl_sumSE[[1]]$Prev12>2007&
-                         scgl_sumSE[[1]]$Prev12<currentYr,],
-       aes(Prev12, ppt, colour=NS, group=Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
-  stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=ppt-se, ymax=ppt+se),width=1, position = position_dodge(0.1)) +
-  theme_bw() +
-  ylab("Average precipitation per site") 
-
-t.test(ppt~NS, data = scgl_sumSE[[1]])
-```
-
-Minimum temperature per site (Celcius)
-```{r}
-ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2007&
-                         scgl_sumSE[[2]]$Prev12<currentYr+1,],
-       aes(Prev12, tmin, colour=NS, group=Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
-  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
-  theme_bw() +
-  ylab("Average monthly minimum temperature") 
-
-```
-
-```{r}
-ggplot(scgl_sumSE[[2]][scgl_sumSE[[2]]$Prev12>2000&
-                         scgl_sumSE[[2]]$Prev12<currentYr+1,],
-       aes(Prev12, tmin, colour=NS, group=Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
-  stat_summary(fun.y = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=tmin-se, ymax=tmin+se),width=1, position = position_dodge(0.1)) +
-  theme_bw() +
-  ylab("Average minimum temperature per site") 
-
-```
-
-Maximum temperature per site (C)
-```{r}
-ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>2007&
-                         scgl_sumSE[[3]]$Prev12<currentYr+1,],
-       aes(Prev12, tmax, colour=NS, group=Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
-  stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
-  theme_bw() +
-  ylab("Average maximum temperature per site") 
-
-```
-
-# Climate summary t.tests
-```{r}
-ggplot(scgl_sumSE[[3]][scgl_sumSE[[3]]$Prev12>=2000&
-                         scgl_sumSE[[3]]$Prev12<currentYr+1,],
-       aes(Prev12, tmax, colour=NS, group = Site))+
-  geom_point(position=position_dodge(0.1), shape=21, fill="white") +
-  stat_summary(fun = function(x) mean(x, na.rm = TRUE), geom="line") +
-  geom_errorbar(aes(ymin=tmax-se, ymax=tmax+se),width=1, position = position_dodge(0.1)) +
-  theme_bw() +
-  ylab("Average maximum temperature per site") 
-
-t.test(tmax~NS, data= scgl_sumSE[[3]])
-t.test(tmin~NS, data= scgl_sumSE[[2]])
-t.test(ppt~NS, data= scgl_sumSE[[1]])
-```
-
-Take out missing data, Years 1986 through current year as previous 12 years to the May survey
-
-```{r}
-nrow(season) #320
-cc.season <- season[complete.cases(season),]
-nrow(cc.season) #310
-unique(sort(cc.season$Prev12)) #1987:current year
-
+t.test(ppt~NS, data = scgl.annual.wide)
+t.test(tmax~NS, data = scgl.annual.wide)
+t.test(tmin~NS, data = scgl.annual.wide)
 
 ```
 
@@ -1005,7 +880,7 @@ Ditch anything 50% or more correlated of the pair that explains less variation, 
 #keep the one with bigger r2 from var1 and var2 when Freq is > 50% 
 cor.level <- .5 
 
-cor.table86.current<-cor(cc.season[,-c(1:2)])
+cor.table86.current<-cor(scgl.season.wide[,c(5:7)])
 data86.current <- as.data.frame(as.table(cor.table86.current))
 data86.current[abs(data86.current$Freq) >= 0.5,]
 corrforcing <- data86.current[abs(data86.current$Freq) >= 0.5 & data86.current$Freq < 1,]
