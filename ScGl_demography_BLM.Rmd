@@ -137,6 +137,7 @@ scgl08 <- read.delim(paste(userpath, "Denver Botanic Gardens/Conservation - Gene
 sg_summary08 <- scgl08 %>%
   dplyr::select(Year:SumOfMinis) %>% # exclude monthly climate data
   group_by(SiteName, Year) %>%
+  rename(Site = SiteName) %>%
   dplyr::summarise(X = sum(CountofHeight),
                    Rep = sum(SumFlowered),
                    Brs = sum(SumBrowsed),
@@ -217,6 +218,18 @@ sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 #No Pond in 2015╣
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
+
+# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
+atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
+# One copy of all Atwell Gulch for all years but transects not extended
+atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
+atwell.old$Site <- "Atwell Gulch (old)"
+
+ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
+  geom_point(position = position_dodge(width = 0.03), pch=21)+
+  facet_wrap(~ Transect, nrow = 2)+
+  theme_bw()
+
 #Add back Atwell duplicated for old and new
 sg <- do.call(rbind,list(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old))
 length(levels(sg$Site))
@@ -243,7 +256,7 @@ sg$SiteSame[sg$Site %in% unique(grep(paste("T-",collapse="|"),
                                         value=TRUE))] <- "T-Junction"
 
 
-# Assign genetic regions
+# Assign genetic regions; now new species, still have not seen the publication 2022
 sg$NS <- "S. dawsonii"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
 sg$NS[sg$Site %in% southsites] <- "S. glaucus"
@@ -254,7 +267,7 @@ sg_summary08$SiteSame <- sg_summary08$Site
 # Assign genetic regions
 sg_summary08$NS <- "S. dawsonii"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
-sg_summary08$NS[sg_summary08$SiteName %in% southsites] <- "S. glaucus"
+sg_summary08$NS[sg_summary08$Site %in% southsites] <- "S. glaucus"
 
 # to match sg_summary later
 sg_summary08 <- sg_summary08[,c(1,12:13,2:11)]
@@ -299,16 +312,6 @@ save(sg.merged,  file=paste(userpath, "Denver Botanic Gardens/Conservation - Gen
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
-# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
-atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
-
-atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
-atwell.old$Site <- "Atwell Gulch (old)"
-
-ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
-  geom_point(position = position_dodge(width = 0.01))+
-  facet_wrap(~ Transect, nrow = 2)
-
 
 ## remove atwell and add in later
 sg_summary <- sg %>%
