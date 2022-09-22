@@ -24,12 +24,12 @@ library(dplyr)
 library(tidyr)
 library(devtools)
 #library(multcompView)
-library(reshape2)
+# library(reshape2)
 library(raster)
 library(prism)
+prism_set_dl_dir("Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
 library(RCurl)
-# library(psych)
-library(Rmisc)
+# library(Rmisc)
 require(AICcmodavg)
 #Set wd for prism data if not already
 # options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
@@ -122,19 +122,31 @@ summarize 2008
 ```{r}
 scgl08 <- read.delim(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/All2008.txt", sep=""),sep=",")
 
-sg_summary08 <- ddply(scgl08,  
-                    .(SiteName,Year), summarise,
-                    X = sum(CountofHeight),
-                    Rep = sum(SumFlowered),
-                    Brs = sum(SumBrowsed),
-                    avgH = NA,
-                    sdH = NA,
-                    avgW = NA,
-                    sdW = NA,
-                    avgVol = NA,
-                    sdVol = NA)
-
-
+### plyr way
+# sg_summary08 <- ddply(scgl08,  
+#                     .(SiteName,Year), summarise,
+#                     X = sum(CountofHeight),
+#                     Rep = sum(SumFlowered),
+#                     Brs = sum(SumBrowsed),
+#                     avgH = NA,
+#                     sdH = NA,
+#                     avgW = NA,
+#                     sdW = NA,
+#                     avgVol = NA,
+#                     sdVol = NA)
+sg_summary08 <- scgl08 %>%
+  dplyr::select(Year:SumOfMinis) %>% # exclude monthly climate data
+  group_by(SiteName, Year) %>%
+  dplyr::summarise(X = sum(CountofHeight),
+                   Rep = sum(SumFlowered),
+                   Brs = sum(SumBrowsed),
+                   avgH = NA,
+                   sdH = NA,
+                   avgW = NA,
+                   sdW = NA,
+                   avgVol = NA,
+                   sdVol = NA, .groups = "keep")
+  
 sg$Fl <- as.character(sg$Fl)
 sg$Br <- as.character(sg$Br)
 
@@ -154,6 +166,7 @@ table(sg$Year, sg$Site)
 # No data was collected in 2020 due to COVID-19, SARS-CoV-2
 
 ```
+
 
  
 Starting in 2019 we use the photoNumber column to track the number of flowers per plant
@@ -231,17 +244,17 @@ sg$SiteSame[sg$Site %in% unique(grep(paste("T-",collapse="|"),
 
 
 # Assign genetic regions
-sg$NS <- "North"
+sg$NS <- "S. dawsonii"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
-sg$NS[sg$Site %in% southsites] <- "South"
+sg$NS[sg$Site %in% southsites] <- "S. glaucus"
 
 ## 2008 has Escalante Canyon, Picnic Site, Powerline, and Pyramid Rock
 sg_summary08$SiteSame <- sg_summary08$Site
 
 # Assign genetic regions
-sg_summary08$NS <- "North"
+sg_summary08$NS <- "S. dawsonii"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
-sg_summary08$NS[sg_summary08$SiteName %in% southsites] <- "South"
+sg_summary08$NS[sg_summary08$SiteName %in% southsites] <- "S. glaucus"
 
 # to match sg_summary later
 sg_summary08 <- sg_summary08[,c(1,12:13,2:11)]
@@ -263,6 +276,26 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 ```
 
 
+Merge for size changes year to year by location
+```{r}
+sg.new <- sg %>%
+  dplyr::select(Site:Y.coord.m., Width.cm.:Minis, SiteSame, NS) %>%
+  filter(!grepl("old",Site)) 
+
+sg.merged <- sg.new %>%
+  group_by(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m.) %>%
+  left_join(sg.new, by = c("Site","Tag","Transect","X.coord.m.","Y.coord.m.")) %>%
+  dplyr::select(Site:Y.coord.m., Width.cm..x:Minis.x, Year.y, Width.cm..y:Minis.y) %>%
+  filter(Year.x == Year.y-1)
+
+ggplot(sg.merged, aes(Width.cm..x, Width.cm..y, colour = as.factor(Transect)))+
+  geom_point()+
+  stat_smooth()+
+  facet_wrap(~Site)+
+  scale_color_discrete(guide = "none")
+
+save(sg.merged,  file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_Projects/2022_DoakPortfolioEffectNSFProposal/",currentYr,"sgSizeMerged.Rdata", sep=""))
+```
 
 2008 is a summary already, need to summarize rest before combining with 2008. 
 ```{r}
@@ -343,46 +376,102 @@ sg_sum$Density <- sg_sum$X/sg_sum$area
 ```
 
 
-All sites 
+All sites   
+Add baseline for each facet
 ```{r}
-ggplot(sg_sum, aes(Year,Density,colour=Site))+
-  geom_point(size=3)+
-  geom_line()+
-  xlim(c(2008, 2024))+
-  ylab("individuals per square meter") +
-  theme_classic()+
-  scale_colour_discrete(guide = "none")+
-  # annotate("text", x = aggregate(Year ~ Site, sg_sum, max)$Year + 1.5,
-  #          y = aggregate(Density ~ Site, sg_sum, FUN = tail, n = 1)$Density,
-  #          label = paste(unique(sg_sum$Site[sg_sum$Density %in% aggregate(Density ~ Site,sg_sum, 
-  #                                             FUN = tail, n = 1)$Density &
-  #                       sg_sum$Year %in% aggregate(Year ~ Site, sg_sum, max)$Year])))
-  facet_wrap(~NS, nrow = 2, scales = "free")
 
-```
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspecies.jpg", sep=""),
 
-
-All sites separate plots
-```{r}
-ggplot(sg_sum, aes(Year,Density,colour=Site))+
-  geom_point()+
-  geom_line()+
-  facet_wrap(~SiteSame, scales = "free")+
-  ylab("Density")+
+filter(sg_sum, !grepl("old", Site)) %>%
+  ggplot(  aes(Year,Density,colour=Site))+
+    geom_point(size=3)+
+    geom_line()+
   theme_bw()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    xlim(c(2008, 2024))+
+    ylab(expression("Density ( plants/m"^{2}~")")) +
+    theme_classic()+
+    scale_colour_manual(values = rainbow(14))+
+    # annotate("text", x = aggregate(Year ~ Site, sg_sum, max)$Year + 1.5,
+    #          y = aggregate(Density ~ Site, sg_sum, FUN = tail, n = 1)$Density,
+    #          label = paste(unique(sg_sum$Site[sg_sum$Density %in% aggregate(Density ~ Site,sg_sum, 
+    #                                             FUN = tail, n = 1)$Density &
+    #                       sg_sum$Year %in% aggregate(Year ~ Site, sg_sum, max)$Year])))
+    facet_wrap(~NS, nrow = 2, scales = "free"),
+
+
+width = 230, height = 150, units = 'mm', dpi=300)
+
 ```
 
-All the new ones
+Density changing from year to year and from the baseline?   
 ```{r}
-ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  facet_wrap(~Site)+
-  ylab("Total individuals")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  scale_x_continuous(breaks = seq(2008, currentYr, 2))
+baselineScGl <- 0.26
+baselineScDa <- 0.57
+
+sg_density <- sg_sum %>%
+  mutate(Change.Density = if_else(NS == "S. glaucus", (Density - baselineScGl )/baselineScGl, 
+                 (Density - baselineScDa )/baselineScDa))
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspeciesPercentBaseline.jpg", sep=""),
+
+    filter(sg_density, !grepl("old", Site)) %>%
+      ggplot(  aes(Year, Change.Density, color = Site))+
+        geom_point(size=2)+
+        geom_line()+
+  theme_bw()+
+        facet_wrap(~NS, nrow = 2, scales = "free")+
+        scale_colour_manual(values = rainbow(10))+
+      scale_y_continuous(labels = scales::percent)+
+      ylab("Density: percent of baseline")+
+      geom_hline(yintercept = -0.2, col = "red"),
+
+width = 230, height = 150, units = 'mm', dpi=300)
+
+  #   filter(sg_density, !grepl("old|Pond|Pyramid Rock", Site)) %>%
+  #     ggplot(  aes(Year, Change.Density, color = Site))+
+  #       geom_point(size=2)+
+  #       geom_line()+
+  # theme_bw()+
+  #       facet_wrap(~NS, nrow = 2, scales = "free")+
+  #       scale_colour_manual(values = rainbow(14))+
+  #     scale_y_continuous(labels = scales::percent)+
+  #     ylab("Density: percent of baseline")+
+  #     geom_hline(yintercept = -0.2, col = "red")
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspeciesPercentBaselineBysite.jpg", sep=""),      
+filter(sg_density, !grepl("old", Site)) %>%
+  ggplot(  aes(Year, Change.Density, color = NS))+
+    geom_point(size=2)+
+    geom_line()+
+    theme_bw()+
+    facet_wrap(~Site, nrow = 2, scales = "free")+
+    scale_colour_manual(values = c("cadetblue","gold"))+
+    scale_y_continuous(labels = scales::percent)+
+    ylab("Density: percent change from baseline")+
+    geom_hline(yintercept = -0.2, col = "red"),
+width = 330, height = 150, units = 'mm', dpi=300)
+
+sg_density %>%
+  group_by(NS) %>%
+  dplyr::summarise(MeanChange = mean(Change.Density[Year == currentYr]))
+
+## Change in density from previous to current year
+sg_density %>%
+  group_by(NS) %>%
+  dplyr::summarise(VarChange = sd(Change.Density[Year == currentYr]))
+
+
+sg_density %>%
+  group_by(NS) %>%
+  dplyr::summarise(Change = 
+                     mean((Density[Year == currentYr] - Density[Year == currentYr-1])/Density[Year == currentYr-1]))
+sg_density %>%
+  group_by(NS) %>%
+  dplyr::summarise(Change = 
+                     sd((Density[Year == currentYr] - Density[Year == currentYr-1])/Density[Year == currentYr-1]))
 ```
+
+
 
 
 ```{r}
@@ -398,30 +487,12 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], aes(Year,X,colour=Site, sha
 ```
 
 
-All the old ones
-```{r}
-ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  facet_grid(~Site)+
-  ylab("Total individuals")+
-  theme_bw()
-```
-
-```{r}
-ggplot(sg_sum[grep("old",sg_sum$Site),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  ylab("Total individuals")
-```
-
-
 old and new
 ```{r}
 oldnew <- c("Oil","Pond","T-","Atwell")
 
 ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
-                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+                   sg_sum$Site, value=TRUE)),], aes(Year,Density,colour=Site))+
   geom_point()+
   geom_line()+
   ylab("Total individuals")+
@@ -791,9 +862,9 @@ save(scgl.climate, file=paste(userpath, "Denver Botanic Gardens/Conservation - G
 load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
 
-scgl.climate$NS <- "North"
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-scgl.climate$NS[scgl.climate$Site %in% southsites] <- "South"
+scgl.climate$NS <- "S. dawsonii"
+southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
+scgl.climate$NS[scgl.climate$Site %in% southsites] <- "S. glaucus"
 
 scgl.climate.monthly <- scgl.climate %>%
   mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-10,nchar(date)-6)),
@@ -839,10 +910,10 @@ scgl.annual.temp <- scgl.climate.monthly %>%
 scgl.annual <- do.call(rbind, list(as.data.frame(scgl.annual.ppt),
                                    as.data.frame(scgl.annual.temp)))
 
-ggplot(scgl.annual, aes(Prev12, Value))+
-  geom_point()+
-  stat_smooth(se = FALSE)+
-  facet_grid(Variable ~ Site, scales = "free")
+ggplot(scgl.annual, aes(Prev12, Value, colour = Site))+
+  geom_point(position = position_dodge(width = 0.05))+
+  stat_smooth(se = FALSE, position = position_dodge(width = 0.05))+
+  facet_grid(Variable ~ NS, scales = "free") 
 
 ## a column for each variable instead of long
 scgl.annual.wide <- scgl.annual %>%
@@ -939,6 +1010,7 @@ write.table(Table3a[!duplicated(Table3a$Freq),], file=paste(userpath, "Denver Bo
 # Results: Reproduction
 ```{r}
 sg_season <- merge(sg, scgl.season.wide, by.x = c("Year","Site","NS"), by.y = c("Prev12","Site","NS"))
+sg_annual <- merge(sg, scgl.annual.wide, by.x = c("Year","Site","NS"), by.y = c("Prev12","Site","NS"))
 scgl_season <- merge(sg_sum, scgl.season.wide, 
                      by.x = c("Year","Site","NS"), by.y = c("Prev12","Site","NS"))
 
@@ -957,52 +1029,7 @@ ggplot(sg_season, aes(Width.cm., Fl, color = NS))+
     method.args = list(family = "binomial"), 
     se = FALSE)
 
-```
 
-# 2021 ESA SSA delisting recommendation. Density across south and north for BLM
-```{r}
-
-ggplot(sg_sum, aes(Density, SiteSame, fill = NS))+
-  geom_boxplot() 
-
-write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
-
-```
-
-
-
-####Figure 6: The plot design for four ScGl sites were changed in 2012...   
-```{r}
-# old and new
-oldnew <- c("Oil","Pond","T-","Atwell")
-
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
-
-ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
-                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  ylab("Total individuals") +
-  facet_wrap(~SiteSame)+
-  theme_bw()+
-  scale_x_continuous(breaks = seq(2009, currentYr, 2)),
-
- width=200, height=125, units="mm", dpi=300)
-
-
-```
-
-#Reproduction   
-
-Density dependence? 
-```{r}
-## t = y, t+1 = x
-sg_lagged <- subset(merge(sg_sum, sg_sum, by = c("Site")), Year.x == Year.y + 1)
-
-## Really want growth rate on Y as a function of density
-ggplot(sg_lagged, aes(X.y, X.x))+
-  geom_point()+
-  stat_smooth()
 
 ```
 
@@ -1010,9 +1037,8 @@ ggplot(sg_lagged, aes(X.y, X.x))+
 
 ```{r}
 
-
-ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),], 
-       aes(Year, Prepro, group = Site, colour = Site)) +
+ggplot(scgl_season[grep("old",scgl_season$Site,invert=TRUE),], 
+       aes(Year, PRep, group = Site, colour = Site)) +
   geom_point()+
   geom_line()+
   ylab("Percent reproductive") +
@@ -1020,42 +1046,74 @@ ggplot(sg_sum[grep("old",sg_sum$Site,invert=TRUE),],
   theme_bw()
 ```
 
-# AICc climate and width on Reproduction   
-Largest proportion of reproductive individuals over all years   
+# AICc climate and width on Reproduction Y/N
 ```{r}
-sg_sum[sg_sum$Site=="Pond",]
+head(sg_season)
+head(sg_annual)
 
-summarySEreproductive <- summarySE(sg_sum, measurevar = "Prepro", groupvars=c("Site"))
+sg_season_scaled <- sg_season %>%
+  dplyr::mutate(across(ppt_fall:tmin_winter, scale)) %>%
+  mutate(Br = as.factor(Br),
+         NS = as.factor(NS))
 
-summarySEreproductive[with(summarySEreproductive, order(Prepro)),]
+sg_annual_scaled <- sg_annual %>%
+  dplyr::mutate(across(ppt:tmin, scale)) %>%
+  mutate(Br = as.factor(Br),
+         NS = as.factor(NS))
 
+ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], aes(Width.cm., as.numeric(Fl), colour = Br))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)
 
-#Is percent reproductive explained by width, height, or both: volume?
-summary(lm(Prepro~(avgW+avgVol)^2, data=sg_sum))
+ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], aes(ppt_winter, Fl, colour = NS))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)
 
-# Which is the better predictor of percent reproductive
-summary(lm(Prepro~avgVol, data=sg_sum))
-summary(lm(Prepro~avgW, data=sg_sum))
-summary(lm(Prepro~avgH, data=sg_sum))
-```
+ggplot(sg_annual_scaled[!is.na(sg_annual_scaled$Fl),], aes(ppt, Fl, colour = NS))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)
 
+ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], aes(tmin_spring, Fl, colour = NS))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)
+
+ggplot(sg_annual_scaled[!is.na(sg_annual_scaled$Fl),], aes(tmin, Fl, colour = NS))+
+  geom_point()+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)
+```  
+  
 ```{r}
-head(sg_sum)
-sort(sg_sum$Prepro) ## Never zero, never 1
+## If used weights should be scaled such that sum(weights) corresponds to number of independent observations
 
-library(betareg)
-## Should be beta regression
-lm1 <- betareg(Prepro~avgVol, sg_sum) ## If used weights should be scaled such that sum(weights) corresponds to number of independent observations
-lm2 <- glm(Prepro~avgW, family = "binomial",sg_sum, weights = X)
-lm3 <- glm(Prepro~avgH, family = "binomial",sg_sum, weights = X) 
-lm4 <- glm(Prepro~avgVol*Site,family = "binomial", sg_sum, weights = X)
-lm5 <- glm(Prepro~avgW*Site, family = "binomial",sg_sum, weights = X)
-lm6 <- glm(Prepro~avgH*Site, family = "binomial",sg_sum, weights = X) 
-lm7 <- glm(Prepro~avgVol*NS,family = "binomial", sg_sum, weights = X)
-lm8 <- glm(Prepro~avgW*NS, family = "binomial",sg_sum, weights = X)
-lm9 <- glm(Prepro~avgH*NS, family = "binomial",sg_sum, weights = X) 
+lm1 <- glmer(Fl~ Width.cm. + Br + ppt_fall + ppt_spring + ppt_summer + ppt_winter +
+             tmin_fall + tmin_spring + tmin_summer + tmin_winter + (1|NS:Site), data = sg_season_scaled,
+             family = binomial) 
+lm2 <- glmer(Fl~ Width.cm. + Br + (1|NS:Site), data = sg_season_scaled,
+             family = binomial) 
+lm3 <- glmer(Fl~ Width.cm. + Br + tmin_spring + tmin_winter + (1|NS:Site), data = sg_season_scaled,
+             family = binomial) 
+lm4 <- glmer(Fl~ Width.cm. + Br + ppt_fall + ppt_spring + ppt_summer + ppt_winter +
+             (1|NS:Site), data = sg_season_scaled,
+             family = binomial) 
+lm5 <- glmer(Fl~ Width.cm. + Br + ppt_spring + ppt_summer + ppt_winter +
+             (1|NS:Site), data = sg_season_scaled,
+             family = binomial) 
+lm6 <- glmer(Fl~ Width.cm. + Br + ppt_spring + ppt_summer + (1|NS:Site), data = sg_season_scaled,
+             family = binomial)  
+lm7 <- glmer(Fl~ Width.cm. + Br + ppt_spring + (1|NS:Site), data = sg_season_scaled,
+             family = binomial)  
 
-lm.list <- list(lm1,lm2, lm3, lm4, lm5, lm6, lm7, lm8,lm9)
+lm.list <- list(lm1,lm2, lm3, lm4, lm5, lm6, lm7)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
 #evidence ratio 
@@ -1064,15 +1122,89 @@ for(i in 2:length(lm.list)){
 }
 
 # more percent reproductive with avg width
-summary(lm2)
-sjPlot::plot_model(lm8, type = "int", show.data = T) ## no interactions
+summary(lm1)
+sjPlot::plot_model(lm1, type = "est", show.data = T) 
 
-# library(sjPlot)
-effectsize::standardize(lm2) %>% summary()
-sjPlot::plot_model(lm2, type = "est", show.values = T)
-sjPlot::tab_model(lm2)
+effectsize::standardize(lm1) %>% summary()
+sjPlot::tab_model(lm1)
 ```
 
+Annual instead of seasonal
+```{r}
+## If used weights should be scaled such that sum(weights) corresponds to number of independent observations
+
+lm1 <- glmer(Fl~ Width.cm. * Br + ppt +tmin + tmax + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial) 
+lm2 <- glmer(Fl~ Width.cm. * Br + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial) 
+lm3 <- glmer(Fl~ (Width.cm. + Br + tmin)^2 + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial) 
+lm4 <- glmer(Fl~ Width.cm. + Br + ppt + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial) 
+lm5 <- glmer(Fl~ Width.cm. + Br + ppt + tmin + tmax +
+             (1|NS:Site), data = sg_annual_scaled,
+             family = binomial) 
+lm6 <- glmer(Fl~ Width.cm. + ppt + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial)  
+lm7 <- glmer(Fl~ Width.cm. + tmin + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial)  
+lm8 <- glmer(Fl~ (Width.cm. + Br + ppt)^2 + (1|NS:Site), data = sg_annual_scaled,
+             family = binomial)
+
+lm.list <- list(lm1,lm2, lm3, lm4, lm5, lm6, lm7, lm8)
+lm.names <- as.character(unlist(lapply(lm.list,formula)))
+(lm.results <- aictab(lm.list, modnames=lm.names))
+#evidence ratio 
+for(i in 2:length(lm.list)){
+  print(exp(0.5*lm.results$Delta_AICc[i]))
+}
+
+# more percent reproductive with avg width
+summary(lm3)
+sjPlot::plot_model(lm3, type = "est", show.data = T)
+
+sg_annual_scaled %>%
+  mutate(Br = as.numeric(Br)-1) %>%
+  filter(!is.na(Fl)) %>%
+ggplot( aes(Width.cm., Br, colour = as.factor(Fl)))+
+  geom_point()+ 
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)
+
+sg_annual_scaled %>%
+  filter(!is.na(Fl)) %>%
+ggplot(aes(Width.cm., Fl, colour = Br))+
+  geom_point() +
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE) +
+  facet_wrap(~ NS)
+
+
+sg_annual_scaled %>%
+  filter(!is.na(Fl)) %>%
+  dplyr::mutate(SizeClass = ifelse(Width.cm. < 3.04 & NS == "S. dawsonii", "veg", "rep"),
+                SizeClass = ifelse(Width.cm. < 2.28 & NS == "S. glaucus", "veg", "rep")) %>%
+ggplot(aes(tmin, Fl, colour = Br))+
+  geom_point() +
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)+
+  facet_wrap(SizeClass~NS, scales = "free")
+
+effectsize::standardize(lm1) %>% summary()
+sjPlot::tab_model(lm3)
+p1 <- sjPlot::plot_model(lm3, type = "int", mdrt.values = "meansd", colors = c("blue","orange","brickred"))
+p1[[1]]$labels$title <- ""
+p1[[1]]$labels$colour <- "Browsing"
+p1[[1]]$labels$x <- "Size (width cm)"
+p1[[1]]$labels$y <- "Probability of reproduction"
+p1[[2]]
+
+
+
+```
 
 # What describes reproduction
 ### Is percent reproductive explained by climate variables?   
@@ -1376,6 +1508,57 @@ Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
 ```
 
 
+######################################################################################
+
+# 2021 ESA SSA delisting recommendation. Density across south and north for BLM
+```{r}
+
+ggplot(sg_sum, aes(Density, SiteSame, fill = NS))+
+  geom_boxplot() 
+
+write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
+
+```
+
+
+
+####Figure 6: The plot design for four ScGl sites were changed in 2012...   
+```{r}
+# old and new
+oldnew <- c("Oil","Pond","T-","Atwell")
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
+
+ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
+                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
+  geom_point()+
+  geom_line()+
+  ylab("Total individuals") +
+  facet_wrap(~SiteSame)+
+  theme_bw()+
+  scale_x_continuous(breaks = seq(2009, currentYr, 2)),
+
+ width=200, height=125, units="mm", dpi=300)
+
+
+```
+
+#Reproduction   
+
+Density dependence? 
+```{r}
+## t = y, t+1 = x
+sg_lagged <- subset(merge(sg_sum, sg_sum, by = c("Site")), Year.x == Year.y + 1)
+
+## Really want growth rate on Y as a function of density
+ggplot(sg_lagged, aes(X.y, X.x))+
+  geom_point()+
+  stat_smooth()
+
+```
+
+
+
 ### Figure 3b
 ```{r}
 Fig3b <- ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
@@ -1541,9 +1724,9 @@ plot.currentYr <- melt(fit.currentYr,
 #Lambdas by site
 ```{r}
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-plot.currentYr$NS <- "North"
+plot.currentYr$NS <- "S. dawsonii"
 plot.currentYr$NS[plot.currentYr$Site %in% grep(paste(southsites,collapse="|"),
-                                                plot.currentYr$Site, value=TRUE)] <- "South"
+                                                plot.currentYr$Site, value=TRUE)] <- "S. glaucus"
 
 #Average growth rate and CI for all sites
 aggregate(value ~ variable, data = plot.currentYr, FUN= mean)
@@ -1630,9 +1813,9 @@ head(sg.xy)
 sg.xy[is.na(sg.xy$Tag),]
 
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg.xy$NS <- "North"
+sg.xy$NS <- "S. dawsonii"
 sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
-                                                sg.xy$Site, value=TRUE)] <- "South"
+                                                sg.xy$Site, value=TRUE)] <- "S. glaucus"
 ```
 
 ```{r}
