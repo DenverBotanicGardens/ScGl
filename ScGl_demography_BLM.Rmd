@@ -122,18 +122,6 @@ summarize 2008
 ```{r}
 scgl08 <- read.delim(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/All2008.txt", sep=""),sep=",")
 
-### plyr way
-# sg_summary08 <- ddply(scgl08,  
-#                     .(SiteName,Year), summarise,
-#                     X = sum(CountofHeight),
-#                     Rep = sum(SumFlowered),
-#                     Brs = sum(SumBrowsed),
-#                     avgH = NA,
-#                     sdH = NA,
-#                     avgW = NA,
-#                     sdW = NA,
-#                     avgVol = NA,
-#                     sdVol = NA)
 sg_summary08 <- scgl08 %>%
   dplyr::select(Year:SumOfMinis) %>% # exclude monthly climate data
   group_by(SiteName, Year) %>%
@@ -218,25 +206,12 @@ sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 #No Pond in 2015╣
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
+# Assign genetic regions; now new species, still have not seen the publication 2022
+sg$NS <- "S. dawsonii"
+southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
+sg$NS[sg$Site %in% southsites] <- "S. glaucus"
 
-# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
-atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
-# One copy of all Atwell Gulch for all years but transects not extended
-atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
-atwell.old$Site <- "Atwell Gulch (old)"
 
-ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
-  geom_point(position = position_dodge(width = 0.03), pch=21)+
-  facet_wrap(~ Transect, nrow = 2)+
-  theme_bw()
-
-#Add back Atwell duplicated for old and new
-sg <- do.call(rbind,list(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old))
-length(levels(sg$Site))
-sg$Site <- droplevels(sg$Site)
-levels(sg$Site)
-
-table(sg$Site,sg$Year)
 
 sg$SiteSame <- sg$Site
 sg$SiteSame[sg$Site %in% unique(grep(paste("Atwell",collapse="|"),
@@ -256,11 +231,6 @@ sg$SiteSame[sg$Site %in% unique(grep(paste("T-",collapse="|"),
                                         value=TRUE))] <- "T-Junction"
 
 
-# Assign genetic regions; now new species, still have not seen the publication 2022
-sg$NS <- "S. dawsonii"
-southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
-sg$NS[sg$Site %in% southsites] <- "S. glaucus"
-
 ## 2008 has Escalante Canyon, Picnic Site, Powerline, and Pyramid Rock
 sg_summary08$SiteSame <- sg_summary08$Site
 
@@ -269,16 +239,30 @@ sg_summary08$NS <- "S. dawsonii"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
 sg_summary08$NS[sg_summary08$Site %in% southsites] <- "S. glaucus"
 
+# One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
+atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
+# One copy of all Atwell Gulch for all years but transects not extended
+atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),] 
+atwell.old$Site <- "Atwell Gulch (old)"
+
+ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
+  geom_point(position = position_dodge(width = 0.03), pch=21)+
+  facet_wrap(~ Transect, nrow = 2)+
+  theme_bw()
+
+#Add back Atwell duplicated for old and new
+sg <- do.call(rbind,list(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old))
+length(levels(sg$Site))
+sg$Site <- droplevels(sg$Site)
+levels(sg$Site)
+
+
 # to match sg_summary later
 sg_summary08 <- sg_summary08[,c(1,12:13,2:11)]
 ```
 
 #Data checks
 ```{r}
-ggplot(sg[sg$Site == "Picnic Site",], aes(Transect,Height.cm.))+
-  geom_point()
-
-table(sg$Site[which(sg$Height.cm. > 10 )])
 
 sg[which(sg$Height.cm. > 7.5 & sg$Site == "Picnic Site"),]
 unique(sg$Comments[sg$Site == "Picnic Site" & is.na(sg$Height.cm.)]) ## Some are dead, some might be seedlings <0.5cm
@@ -360,6 +344,7 @@ Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western 
 
 # total area from table 2
 unique(sg_sum$Site)
+sg_sum$area <- NA
 sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
 sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
 sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
@@ -382,64 +367,49 @@ sg_sum$Density <- sg_sum$X/sg_sum$area
 All sites   
 Add baseline for each facet
 ```{r}
+baselineScGl <- 0.26
+baselineScDa <- 0.57
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspecies.jpg", sep=""),
+baselineDF <- data.frame(NS = c("S. dawsonii","S. glaucus"), 
+                         Y = c(baselineScDa,baselineScGl))
 
-filter(sg_sum, !grepl("old", Site)) %>%
+plot1 <- filter(sg_sum, !grepl("old", Site)) %>%
   ggplot(  aes(Year,Density,colour=Site))+
-    geom_point(size=3)+
+    geom_point(size=2)+
     geom_line()+
-  theme_bw()+
+    theme_bw()+
     xlim(c(2008, 2024))+
     ylab(expression("Density ( plants/m"^{2}~")")) +
     theme_classic()+
-    scale_colour_manual(values = rainbow(14))+
-    # annotate("text", x = aggregate(Year ~ Site, sg_sum, max)$Year + 1.5,
-    #          y = aggregate(Density ~ Site, sg_sum, FUN = tail, n = 1)$Density,
-    #          label = paste(unique(sg_sum$Site[sg_sum$Density %in% aggregate(Density ~ Site,sg_sum, 
-    #                                             FUN = tail, n = 1)$Density &
-    #                       sg_sum$Year %in% aggregate(Year ~ Site, sg_sum, max)$Year])))
-    facet_wrap(~NS, nrow = 2, scales = "free"),
+    scale_color_brewer(palette = "Set3")+
+    facet_wrap(~NS, nrow = 2, scales = "free")+
+    geom_hline(data = baselineDF, aes(yintercept = Y), linetype = "longdash")
 
-
-width = 230, height = 150, units = 'mm', dpi=300)
 
 ```
 
 Density changing from year to year and from the baseline?   
 ```{r}
-baselineScGl <- 0.26
-baselineScDa <- 0.57
 
 sg_density <- sg_sum %>%
   mutate(Change.Density = if_else(NS == "S. glaucus", (Density - baselineScGl )/baselineScGl, 
                  (Density - baselineScDa )/baselineScDa))
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspeciesPercentBaseline.jpg", sep=""),
+# ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspeciesPercentBaseline.jpg", sep=""),
 
-    filter(sg_density, !grepl("old", Site)) %>%
+plot2 <- filter(sg_density, !grepl("old", Site)) %>%
       ggplot(  aes(Year, Change.Density, color = Site))+
         geom_point(size=2)+
         geom_line()+
-  theme_bw()+
+        theme_bw()+
         facet_wrap(~NS, nrow = 2, scales = "free")+
         scale_colour_manual(values = rainbow(10))+
-      scale_y_continuous(labels = scales::percent)+
-      ylab("Density: percent of baseline")+
-      geom_hline(yintercept = -0.2, col = "red"),
+        scale_y_continuous(labels = scales::percent)+
+        ylab("Density: percent of baseline")+
+        geom_hline(yintercept = -0.2, col = "red")
 
-width = 230, height = 150, units = 'mm', dpi=300)
+# width = 230, height = 150, units = 'mm', dpi=300)
 
-  #   filter(sg_density, !grepl("old|Pond|Pyramid Rock", Site)) %>%
-  #     ggplot(  aes(Year, Change.Density, color = Site))+
-  #       geom_point(size=2)+
-  #       geom_line()+
-  # theme_bw()+
-  #       facet_wrap(~NS, nrow = 2, scales = "free")+
-  #       scale_colour_manual(values = rainbow(14))+
-  #     scale_y_continuous(labels = scales::percent)+
-  #     ylab("Density: percent of baseline")+
-  #     geom_hline(yintercept = -0.2, col = "red")
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspeciesPercentBaselineBysite.jpg", sep=""),      
 filter(sg_density, !grepl("old", Site)) %>%
@@ -474,6 +444,15 @@ sg_density %>%
                      sd((Density[Year == currentYr] - Density[Year == currentYr-1])/Density[Year == currentYr-1]))
 ```
 
+```{r}
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"densityXspecies.jpg", sep=""),
+
+  plot1/,
+
+
+width = 230, height = 150, units = 'mm', dpi=300)
+
+```
 
 
 
