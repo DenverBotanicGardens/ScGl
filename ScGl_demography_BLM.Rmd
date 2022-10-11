@@ -27,7 +27,6 @@ library(devtools)
 # library(reshape2)
 library(raster)
 library(prism)
-prism_set_dl_dir("Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
 library(RCurl)
 # library(Rmisc)
 require(AICcmodavg)
@@ -248,7 +247,7 @@ atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),]
 atwell.old$Site <- "Atwell Gulch (old)"
 
 ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
-  geom_point(position = position_dodge(width = 0.03), pch=21)+
+  geom_point(position = position_dodge(width = 0.05), pch="|",size = 2)+
   facet_wrap(~ Transect, nrow = 2)+
   theme_bw()
 
@@ -277,20 +276,36 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 
 Merge for size changes year to year by location
 ```{r}
+southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
+sg$NS <- "S. dawsonii"
+sg$NS[sg$SiteSame %in% grep(paste(southsites,collapse="|"),
+                                                sg$SiteSame, value=TRUE)] <- "S. glaucus"
+
+
 sg.new <- sg %>%
   dplyr::select(Site:Y.coord.m., Width.cm.:Minis, SiteSame, NS) %>%
   filter(!grepl("old",Site)) 
 
 sg.merged <- sg.new %>%
   group_by(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m.) %>%
-  left_join(sg.new, by = c("Site","Tag","Transect","X.coord.m.","Y.coord.m.")) %>%
+  left_join(sg.new, by = c("Site","SiteSame","NS","Tag","Transect",
+                           "X.coord.m.","Y.coord.m.")) %>%
   dplyr::select(Site:Y.coord.m., Width.cm..x:Minis.x, Year.y, Width.cm..y:Minis.y) %>%
-  filter(Year.x == Year.y-1)
+  filter(Year.x == Year.y-1) %>%
+  filter(Width.cm..x != 0) %>%
+  mutate(surv = ifelse(Width.cm..y ==0, 0,1))
+
+ggplot(sg.merged, aes(Width.cm..x, surv, color = as.factor(Br.x)))+
+    geom_point(pch="|")+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = TRUE)+
+  facet_grid(~NS)
 
 ggplot(sg.merged, aes(Width.cm..x, Width.cm..y, colour = as.factor(Transect)))+
   geom_point()+
-  stat_smooth()+
-  facet_wrap(~Site)+
+  stat_smooth(se=FALSE)+
+  facet_wrap(~NS)+
   scale_color_discrete(guide = "none")
 
 save(sg.merged,  file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_Projects/2022_DoakPortfolioEffectNSFProposal/",currentYr,"sgSizeMerged.Rdata", sep=""))
@@ -633,6 +648,7 @@ Climate directly from PRISM
 ```{r}
 #devtools::install_github("ropensci/prism")
 
+prism_set_dl_dir("Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
 # Set wd for prism
 # options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 # options(prism.path = "Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
@@ -881,19 +897,6 @@ cc.season.notcor <- scgl.season.wide[,-colexclude]
 
 ```
 
-#Table 3a)    
-```{r}
-
-Table3acor <-cor(scgl.season.wide[complete.cases(scgl.season.wide),-c(1:2)])
-Table3a <- as.data.frame(as.table(Table3acor))
-
-Table3a <- Table3a[abs(Table3a$Freq)>cor.level&Table3a$Freq<1,]
-
-# To get rid of duplicated correlations
-write.table(Table3a[!duplicated(Table3a$Freq),], file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Table3a.csv", sep=""), 
-            sep=",", row.names=FALSE, col.names = TRUE)
-```
-
 #### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
 
 # Results: Reproduction
@@ -986,8 +989,60 @@ ggplot(sg_annual_scaled[!is.na(sg_annual_scaled$Fl),], aes(tmin, Fl, colour = NS
 
 Survival - need merge year to year like what I made for Dan Doak but add a survived or not
 ```{r}
+sg_annual_scaled_merged <- sg_annual_scaled %>%
+  group_by(Site, SiteSame, NS, Transect, Tag, Year) %>%
+  left_join(sg.new, by = c("Site","SiteSame","NS","Tag","Transect")) %>%
+  dplyr::select(Year.x:Transect, Width.cm..x:Minis.x, FlNum:Year.y, Width.cm..y:Minis.y) %>%
+  filter(Year.x == Year.y-1) %>%
+  filter(Width.cm..x != 0) %>%
+  mutate(surv = ifelse(Width.cm..y ==0, 0,1))
+
+ggplot(sg_annual_scaled_merged, aes(Width.cm..x, surv, color = Br.x))+
+  geom_point(pch="|")+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = TRUE)+
+  facet_grid(~NS)+
+  theme_light()+
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))# "aquamarine3"))
 
 ```
+
+```{r}
+
+lm1 <- glmer(surv~ Width.cm..x * Br + ppt +tmin + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial) 
+lm2 <- glmer(surv~ Width.cm..x * Br + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial) 
+lm3 <- glmer(surv~ (Width.cm..x + Br + tmin)^2 + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial) 
+lm4 <- glmer(surv~ Width.cm..x + Br + ppt + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial) 
+lm5 <- glmer(surv~ Width.cm..x + Br + ppt + tmin +
+             (1|NS), data = sg_annual_scaled_merged,
+             family = binomial) 
+lm6 <- glmer(surv~ Width.cm..x + ppt + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial)  
+lm7 <- glmer(surv~ Width.cm..x + tmin + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial)  
+lm8 <- glmer(surv~ (Width.cm..x + Br + ppt)^2 + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial)
+lm9 <- glmer(surv ~ Width.cm..x + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial)
+lm10 <- glmer(surv ~ 1 + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial)
+
+lm.list <- list(lm1,lm2, #lm3, 
+                lm4, lm5, lm6, lm7, lm9) #, lm10)
+lm.names <- as.character(unlist(lapply(lm.list,formula)))
+(lm.results <- aictab(lm.list, modnames=lm.names))
+#evidence ratio 
+for(i in 2:length(lm.list)){
+  print(exp(0.5*lm.results$Delta_AICc[i]))
+}
+
+```
+
 
 
 Annual instead of seasonal
@@ -1575,11 +1630,11 @@ ggplot(sgminis, aes(TotMinis.y, X/area))+
   geom_point()+
   stat_smooth(method="lm")
 
-ggplot(sgminis, aes(TotMinis.y, Rep))+
+ggplot(sgminis, aes(Rep,TotMinis.y))+
   geom_point()+
-  stat_smooth(method="lm")
+  stat_smooth()
 
-ggplot(sgminis, aes(TotMinis.y/Rep, X/area))+
+ggplot(sgminis, aes( (X/area),(TotMinis.y/Rep)))+
   geom_point()+
   stat_smooth(method="lm")
 ```
@@ -1618,14 +1673,6 @@ lambdas <- do.call(rbind, lapply(all.count, '[[', 1))
 lambdas$Site <- sub("\\.[0-9]","",row.names(lambdas)) #get rid of numbers following .
 
 head(lambdas)
-head(cc.season.notcor)
-str(cc.season.notcor)
-## Remove typo from 2021
-cc.season.notcor$Site[cc.season.notcor$Site == "T-Junciton"] <- "T-Junction"
-
-# merge the growth rate of the climatic factors of year 2 (so the climate shaping the change from Year 1 to year 2, not before year 1)
-sg.pc.lambda <- merge(cc.season.notcor, lambdas, by.x = c("Site","Prev12"), by.y = c("Site","Year2"))
-
 ```
 
 #### Demography   
@@ -1642,15 +1689,15 @@ last.fit <- do.call(rbind,lapply(Fit.list, function(x){
 
 
 fit.currentYr <- data.frame(Site = rownames(last.fit), last.fit)
-plot.currentYr <- melt(fit.currentYr,
-                  id.vars = "Site",
-                  measure.vars = c("fit","upr","lwr","rsq"))
+plot.currentYr <- fit.currentYr %>%
+  pivot_longer(cols = c(2,5:7), names_to = "variable", values_to = "value")
 
 ```
 
 #Demography
 #Lambdas by site
 ```{r}
+
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
 plot.currentYr$NS <- "S. dawsonii"
 plot.currentYr$NS[plot.currentYr$Site %in% grep(paste(southsites,collapse="|"),
@@ -1684,20 +1731,22 @@ plot.noold <- plot.currentYr[!grepl("old", plot.currentYr$Site),]
 plot.noold <- rbind(plot.noold, plot.currentYr[plot.currentYr$Site == "Atwell Gulch (old)",])
 
 
-jpeg(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2.jpg", sep=""), width=250, height=200, units="mm", res=300)
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2.jpg", sep=""),
 
 ggplot(plot.noold[plot.noold$variable!="rsq",], 
        aes(Site,value, color= variable, group = variable, shape=variable))+
-  geom_point(aes(size = 1)) +
+  geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+  geom_point(size = 10) +
   theme_bw()+
-  scale_shape_manual(values=c(1,6,2))+
+  # scale_shape_manual(values=c(1,6,2))+
+  scale_shape_manual(values = c("*","-","-"))+
   scale_colour_manual(values=c("black","red", "red"))+
-  theme(axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0, size = 12))+
-  guides(colour= FALSE, shape= FALSE, size = FALSE)+
-  labs(y="Lambda")+
-  facet_grid(~NS, scales="free")
+  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0, size = 12))+
+  guides(colour= "none", shape= "none", size = "none")+
+  ylab(expression(lambda))+
+  facet_grid(~NS, scales="free"), 
 
-dev.off()
+width=180, height=150, units="mm", dpi=300)
 
 ```
 
@@ -1705,23 +1754,7 @@ Discussion, lambda patterns
 ```{r}
 
 fit.currentYr[fit.currentYr$lwr>1,]
-
-```
-
-### Reproduction
-```{r}
-
-sum15 <- sg_sum[sg_sum$Year == currentYr,]
-sum(sum15$Rep)/sum(sum15$X)
-
-aggregate(sg_sum$Rep, list(Year = sg_sum$Year, Site = sg_sum$SiteSame), sum)
-aggregate(sg_sum$X, list(Year = sg_sum$Year, Site = sg_sum$SiteSame), sum)
-
-mean(sg_sum$Prepro)
-sd(sg_sum$Prepro)
-data.frame(as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN =mean)),
-           as.table(tapply(sg_sum$Prepro, INDEX = sg_sum$Site, FUN = sd)))
-
+fit.currentYr[fit.currentYr$upr<1,]
 
 ```
 
