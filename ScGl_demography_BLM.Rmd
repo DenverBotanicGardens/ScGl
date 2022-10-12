@@ -951,6 +951,7 @@ sg_annual_scaled <- sg_annual %>%
   mutate(Br = as.factor(Br),
          NS = as.factor(NS))
 
+## If browsed, need to be larger to flower
 ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], 
        aes(Width.cm., as.numeric(Fl), colour = Br))+
   geom_point()+
@@ -960,7 +961,19 @@ ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),],
     se = FALSE)+
   ylab("Vegetative (0) or Reproductive (1)")+
   xlab("Size (width cm)")+
-  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))# "aquamarine3"))
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
+
+## if browsed then more likely to flower as more precipitation in previous winter
+ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], 
+       aes(ppt_winter, as.numeric(Fl), colour = Br))+
+  geom_point()+
+  facet_wrap(~NS)+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = FALSE)+
+  ylab("Vegetative (0) or Reproductive (1)")+
+  xlab("Size (width cm)")+
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
 
 ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], aes(ppt_winter, Fl, colour = NS))+
   geom_point()+
@@ -1004,36 +1017,71 @@ ggplot(sg_annual_scaled_merged, aes(Width.cm..x, surv, color = Br.x))+
     se = TRUE)+
   facet_grid(~NS)+
   theme_light()+
-  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))# "aquamarine3"))
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
+
+## too much precip decreases survival
+ggplot(sg_annual_scaled_merged, aes(ppt, surv, color = Br.x))+
+  geom_point(pch="|")+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = TRUE)+
+  facet_grid(~NS)+
+  theme_light()+
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
+
+
+
+ggplot(sg_annual_scaled_merged, aes(tmax, surv, color = Br.x))+
+  geom_point(pch="|")+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = TRUE)+
+  facet_grid(~NS)+
+  theme_light()+
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
+
+
+
+ggplot(sg_annual_scaled_merged, aes(tmin, surv, color = Br.x))+
+  geom_point(pch="|")+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = TRUE)+
+  facet_grid(~NS)+
+  theme_light()+
+  scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
 
 ```
 
+
 ```{r}
 
-lm1 <- glmer(surv~ Width.cm..x * Br + ppt +tmin + (1|NS), data = sg_annual_scaled_merged,
+## The effect of browsing is strongly correlated with width (-0,939) from the correlation of fixed effects. 
+lm1 <- glmer(surv~ Width.cm..x * Br.x + ppt +tmin + (1|NS), data = sg_annual_scaled_merged,
              family = binomial) 
-lm2 <- glmer(surv~ Width.cm..x * Br + (1|NS), data = sg_annual_scaled_merged,
+lm2 <- glmer(surv~ Width.cm..x * Br.x + (1|NS), data = sg_annual_scaled_merged,
              family = binomial) 
-lm3 <- glmer(surv~ (Width.cm..x + Br + tmin)^2 + (1|NS), data = sg_annual_scaled_merged,
+lm3 <- glmer(surv~ (Width.cm..x + Br.x + tmin)^2 + (1|NS), data = sg_annual_scaled_merged,
              family = binomial) 
-lm4 <- glmer(surv~ Width.cm..x + Br + ppt + (1|NS), data = sg_annual_scaled_merged,
+lm4 <- glmer(surv~ Width.cm..x + Br.x + ppt + (1|NS), data = sg_annual_scaled_merged,
              family = binomial) 
-lm5 <- glmer(surv~ Width.cm..x + Br + ppt + tmin +
+lm5 <- glmer(surv~ Width.cm..x + Br.x + ppt + tmin +
              (1|NS), data = sg_annual_scaled_merged,
              family = binomial) 
 lm6 <- glmer(surv~ Width.cm..x + ppt + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)  
 lm7 <- glmer(surv~ Width.cm..x + tmin + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)  
-lm8 <- glmer(surv~ (Width.cm..x + Br + ppt)^2 + (1|NS), data = sg_annual_scaled_merged,
-             family = binomial)
+lm8 <- glmer(surv~ Br.x + ppt + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial) 
 lm9 <- glmer(surv ~ Width.cm..x + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)
 lm10 <- glmer(surv ~ 1 + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)
 
 lm.list <- list(lm1,lm2, #lm3, 
-                lm4, lm5, lm6, lm7, lm9) #, lm10)
+                lm4, lm5, lm6, # lm7, 
+                lm9, lm10) #, lm10)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
 #evidence ratio 
@@ -1041,6 +1089,80 @@ for(i in 2:length(lm.list)){
   print(exp(0.5*lm.results$Delta_AICc[i]))
 }
 
+### color = Br, x = size, y = prob flower, facet for tmin and ppt ~ NS 
+p1a <- sg_annual_scaled_merged %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(tmin, 
+                              breaks = c(min(tmin)-0.1, mean(tmin), max(tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(pptbin = cut(ppt, 
+                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(Width.cm..x,surv, color = as.factor(Br.x)))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+    facet_grid(NS~tempbin+pptbin, 
+               labeller = labeller(tempbin = as_labeller(c("1" = "<= mean min temp",
+                                "2" = "> mean min temp")),
+                    pptbin = as_labeller(c("1" = "<= mean ppt", "2" = "> mean ppt")),
+                    NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
+                                       "S. dawsonii" = expression(italic(S.~dawsonii))))))+
+    theme_light()+
+    scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
+                         labels = c("Unbrowsed","Browsed"))+
+    ylab("Survival")+
+    xlab("Size (width cm)")+
+  ggtitle("a)")
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig_Survival.jpg", sep=""),p1a, width = 200, height = 110, units = 'mm', dpi=300)
+
+```
+
+```{r}
+p1 <- sg_annual_scaled_merged %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(tmin, 
+                              breaks = c(min(tmin)-0.1, mean(tmin), max(tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(pptbin = cut(ppt, 
+                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(ppt,surv, color = as.factor(tempbin)))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+  facet_wrap(~NS)+
+    theme_light()+
+    scale_color_manual("Temperature", values = c("deepskyblue","deeppink4"),  # Minimum\nTemperature
+                         labels = c("1" = "<= mean\nmin temp", "2" = "> mean\nmin temp"))+
+    ylab("Survival")+
+    xlab("Precipitation")+
+  ggtitle("b)")
+
+p2 <- sg_annual_scaled_merged %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(tmin, 
+                              breaks = c(min(tmin)-0.1, mean(tmin), max(tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(pptbin = cut(ppt, 
+                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(tmin,surv, color = as.factor(pptbin)))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+  facet_wrap(~NS)+
+    theme_light()+
+    scale_color_manual("Precipitation", values = c("deepskyblue","deeppink4"),
+                         labels = c("1" = "<= mean\nppt", "2" = "> mean\nppt"))+
+    ylab("Survival")+
+    xlab("Minimum Temperature")+
+  ggtitle("c)")
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4_SurvBrTminPPT.jpg", sep=""),
+       p1a  /(p1 + p2), width = 300, height = 200, units = 'mm', dpi=300) 
+     
 ```
 
 
@@ -1059,7 +1181,7 @@ lm4 <- glmer(Fl~ Width.cm. + Br + ppt + (1|NS), data = sg_annual_scaled,
              family = binomial) 
 lm5 <- glmer(Fl~ Width.cm. + Br + ppt + tmin +
              (1|NS), data = sg_annual_scaled,
-             family = binomial) 
+             family = binomial)
 lm6 <- glmer(Fl~ Width.cm. + ppt + (1|NS), data = sg_annual_scaled,
              family = binomial)  
 lm7 <- glmer(Fl~ Width.cm. + tmin + (1|NS), data = sg_annual_scaled,
@@ -1148,10 +1270,9 @@ sg_annual_scaled %>%
                          labels = c("< mean","> mean"))+
   ylab("Probability of Reproduction")+
   xlab("Size (width cm)")
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig_ProbofReproductive.jpg", sep=""),
-      
+
 ### color = Br, x = size, y = prob flower, facet for tmin and ppt ~ NS 
-sg_annual_scaled %>%
+flpl1 <- sg_annual_scaled %>%
   filter(!is.na(Fl)) %>% # not dead
   filter(!is.na(Width.cm.)) %>%
   filter(Width.cm. != 0) %>% # dead
@@ -1176,8 +1297,8 @@ sg_annual_scaled %>%
     scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
                          labels = c("Unbrowsed","Browsed"))+
     ylab("Probability of Reproduction")+
-    xlab("Size (width cm)"),
-width = 200, height = 110, units = 'mm', dpi=300)
+    xlab("Size (width cm)")
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig_ProbofReproductive.jpg", sep=""),flpl1, width = 200, height = 110, units = 'mm', dpi=300)
 
 sjPlot::plot_model(lm1, type = "est")
 sjplot1 <- sjPlot::plot_model(lm1, type = "pred",
