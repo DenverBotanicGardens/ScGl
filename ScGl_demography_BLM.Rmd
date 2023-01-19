@@ -363,16 +363,16 @@ Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western 
 unique(sg_sum$Site)
 sg_sum$area <- NA
 sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
-sg_sum$area[sg_sum$Site == "Bridgeport"] <- 400
-sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390
+sg_sum$area[sg_sum$Site == "Bridgeport"] <- 200 # 400 is wrong, is four 1 x 50m
+sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390 # correct, 2012 and beyond is 390
 sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
-sg_sum$area[sg_sum$Site == "Fram"] <- 1300
+sg_sum$area[sg_sum$Site == "Fram"] <- 2600 # 1300, not adjacent, treat them as if they're within 2600m2
 sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
-sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120
+sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120 # correct 2012 forward
 sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
 sg_sum$area[sg_sum$Site == "Pond"] <- 36
 sg_sum$area[sg_sum$Site == "Pond (old)"] <- 235.6
-sg_sum$area[sg_sum$Site == "Powerline"] <- 40
+sg_sum$area[sg_sum$Site == "Powerline"] <- 100 # 40 is wrong, is two 1 x 50
 sg_sum$area[sg_sum$Site == "Pyramid Rock"] <- 100
 sg_sum$area[sg_sum$Site == "Road T-West (old)"] <- 2212
 sg_sum$area[sg_sum$Site == "T-Junction"] <- 130
@@ -871,32 +871,6 @@ fall: September-November (9-11)
 winter: December-February (12, 1-2)
 spring: March-May (3-5)
 
-
-# forcing variables (climate drivers) of growth, survival, and reproduction 1987 through current year
-Ditch anything 50% or more correlated of the pair that explains less variation, get r^2 values
-```{r}
-
-#keep the one with bigger r2 from var1 and var2 when Freq is > 50% 
-cor.level <- .5 
-
-cor.table86.current<-cor(scgl.season.wide[complete.cases(scgl.season.wide),-c(1:3)])
-data86.current <- as.data.frame(as.table(cor.table86.current))
-data86.current[abs(data86.current$Freq) >= 0.5,]
-corrforcing <- data86.current[abs(data86.current$Freq) >= 0.5 & data86.current$Freq < 1,]
-
-## 
-corrforcing[order(corrforcing$Var1),]
-corrforcing[!duplicated(corrforcing$Freq),]
-
-toexclude <- corrforcing$Var1[!duplicated(corrforcing$Freq)]
-colexclude <- which(names(scgl.season.wide) %in% toexclude)
-
-# Climatic variables used in PCA 1986-current year
-names(scgl.season.wide[,-colexclude])
-cc.season.notcor <- scgl.season.wide[,-colexclude]
-
-```
-
 #### Figure 2: a) Number of Sclerocactus glaucus individuals per square meter in the northern genetic region (North) and the southern genetic region (South), and b) Average size of individuals per site. 
 
 # Results: Reproduction
@@ -925,16 +899,6 @@ ggplot(sg_season, aes(Width.cm., Fl, color = NS))+
 ```
 
 
-```{r}
-
-ggplot(scgl_season[grep("old",scgl_season$Site,invert=TRUE),], 
-       aes(Year, PRep, group = Site, color = Site)) +
-  geom_point()+
-  geom_line()+
-  ylab("Percent reproductive") +
-  facet_wrap(~NS,ncol = 5) +
-  theme_bw()
-```
 
 # AICc climate and width on Reproduction Y/N
 ```{r}
@@ -952,7 +916,7 @@ sg_annual_scaled <- sg_annual %>%
          NS = as.factor(NS))
 
 ## If browsed, need to be larger to flower
-ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], 
+brflowered <- ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], 
        aes(Width.cm., as.numeric(Fl), colour = Br))+
   geom_point()+
   facet_wrap(~NS)+
@@ -972,7 +936,7 @@ ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),],
     method.args = list(family = "binomial"), 
     se = FALSE)+
   ylab("Vegetative (0) or Reproductive (1)")+
-  xlab("Size (width cm)")+
+  xlab("Winter precipitation")+
   scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
 
 ggplot(sg_season_scaled[!is.na(sg_season_scaled$Fl),], aes(ppt_winter, Fl, colour = NS))+
@@ -1271,6 +1235,7 @@ sg_annual_scaled %>%
   ylab("Probability of Reproduction")+
   xlab("Size (width cm)")
 
+
 ### color = Br, x = size, y = prob flower, facet for tmin and ppt ~ NS 
 flpl1 <- sg_annual_scaled %>%
   filter(!is.na(Fl)) %>% # not dead
@@ -1297,8 +1262,54 @@ flpl1 <- sg_annual_scaled %>%
     scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
                          labels = c("Unbrowsed","Browsed"))+
     ylab("Probability of Reproduction")+
-    xlab("Size (width cm)")
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig_ProbofReproductive.jpg", sep=""),flpl1, width = 200, height = 110, units = 'mm', dpi=300)
+    xlab("Size (width cm)")+
+  ggtitle("a)")
+
+
+flp1 <- sg_annual_scaled %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(tmin, 
+                              breaks = c(min(tmin)-0.1, mean(tmin), max(tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(pptbin = cut(ppt, 
+                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(Width.cm.,Fl, color = as.factor(tempbin)))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+  facet_grid(NS~pptbin, labeller = labeller(pptbin = as_labeller(c("1"= "<= mean ppt",
+                                                                   "2" = "> mean ppt"))))+
+    theme_light()+
+    scale_color_manual("Temperature", values = c("deepskyblue","deeppink4"),
+                         labels = c("1" = "<= mean\nmin temp", "2" = "> mean\nmin temp"))+
+    ylab("Probability of Reproduction")+
+    xlab("Size (width cm)")+
+  ggtitle("b)")
+
+flp2 <- sg_annual_scaled %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(tmin, 
+                              breaks = c(min(tmin)-0.1, mean(tmin), max(tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(pptbin = cut(ppt, 
+                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(Width.cm.,Fl, color = as.factor(pptbin)))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+  facet_grid(NS~tempbin, labeller = labeller(tempbin = as_labeller(c("1"= "<= mean min temp",
+                                                                   "2" = "> mean min temp"))))+
+    theme_light()+
+    scale_color_manual("Precipitation", values = c("deepskyblue","deeppink4"),
+                         labels = c("1" = "<= mean\nppt", "2" = "> mean\nppt"))+
+    ylab("Probability of Reproduction")+
+    xlab("Minimum Temperature")+
+  ggtitle("c)")
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5_ProbofReproductive.jpg", sep=""),
+       flpl1 / (flp1 + flp2), width = 300, height = 200, units = 'mm', dpi=300)
 
 sjPlot::plot_model(lm1, type = "est")
 sjplot1 <- sjPlot::plot_model(lm1, type = "pred",
@@ -1934,22 +1945,38 @@ ggheight/ggwidth,
 # Plant Size
 ```{r}
 
-summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy))
-summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy))
+summary(lm(Height.cm..x ~ Height.cm..y*NS, data=sg.xy[sg.xy$Height.cm..x != 0 & 
+                                                        sg.xy$Height.cm..y != 0,]))
+0.930089 + 0.004730
+summary(lm(Width.cm..x ~ Width.cm..y*NS, data=sg.xy[sg.xy$Width.cm..x != 0 & 
+                                                        sg.xy$Width.cm..y != 0,]))
+0.956704 + -0.069552 
 
-# Too many errors, use linear model to get change in size
-sg.xy$ChangeH <- sg.xy$Height.cm..x-sg.xy$Height.cm..y
-sg.xy$ChangeW <- sg.xy$Width.cm..x-sg.xy$Width.cm..y
 
-mean(sg.xy$ChangeH[abs(sg.xy$ChangeH) < 3], na.rm=TRUE) #No way something lost 11cm or 21cm! that's an error
-sd(sg.xy$Height.cm..x-sg.xy$Height.cm..y, na.rm=TRUE)
-
-mean(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
-sd(sg.xy$Width.cm..x-sg.xy$Width.cm..y, na.rm=TRUE)
-
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Figure6HeigthWidthScGlScDa.jpg", sep=""),
+sg.xy %>%
+  filter(Height.cm..x != 0 & Height.cm..y != 0) %>%
+ggplot(  aes(Height.cm..y, Height.cm..x, color = NS))+
+  geom_point(alpha = 0.5, pch = 16)+
+  stat_smooth(method = "lm")+
+  ylab(expression("Height cm year"[t+1])) +
+	xlab(expression("Height cm year"[t]))+
+  theme_bw()+
+  ggtitle("a)")
++
+sg.xy %>%
+  filter(Width.cm..x != 0 & Width.cm..y != 0) %>%
+ggplot(  aes(Width.cm..y, Width.cm..x, color = NS))+
+  geom_point(alpha = 0.5, pch = 16)+
+  stat_smooth(method = "lm")+
+  ylab(expression("Width cm year"[t+1])) +
+	xlab(expression("Width cm year"[t]))+
+  theme_bw()+
+  ggtitle("b)")
+,
+width = 200, height = 80, units = 'mm', dpi=300)
 
 summary(lm(Prepro~(avgH+avgW)^2, data=sg_sum))
-
 ```
 
 

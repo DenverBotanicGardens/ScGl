@@ -9,19 +9,110 @@ library(binr)
 library(matrixStats)
 require(AICcmodavg)
 library(prism)
+library(raster)
+library(lme4)
+require(DiagrammeR)
+
+
+load("C:/Users/DePrengm/OneDrive - Denver Botanic Gardens/P drive/My Documents/UCDenver_phd/Dissertation/Chapter ScGl/dredge_IPM4ScGl.RData")
+```
+```{r}
+save.image(file="C:/Users/DePrengm/OneDrive - Denver Botanic Gardens/P drive/My Documents/UCDenver_phd/Dissertation/Chapter ScGl/dredge_IPM4ScGl.RData") # default is ".Rhistory"
+
 
 ```
 
+Directed acyclic graph
+```{r}
+
+grViz("digraph flowchart {
+      
+      graph [compound = TRUE, rankdir = BT, fontsize = 14, style = filled,
+      label = 'Integral Projection Model by 
+      s: site, c: climate, y: year, sz: size class']
+      
+      node [fontname = Helvetica, shape = square]
+      a [fillcolor = green label = <<I>f</I><SUB>s,c,y,sz</SUB>>]
+      b [fillcolor = green label = <G<SUB>s,c,y,sz</SUB>>]
+      c [fillcolor = green label = <S<SUB>s,c,y,sz</SUB>>]
+      d [fillcolor = green label = <&lambda;<SUB>s,c,y,sz</SUB>>]
+      
+      e [fillcolor = green label = <<I>f</I><SUB>s,c,y,sz</SUB>>]
+      f [fillcolor = green label = <G<SUB>s,c,y,sz</SUB>>]
+      g [fillcolor = green label = <S<SUB>s,c,y,sz</SUB>>]
+      
+      h [fillcolor = green label = <<I>f</I><SUB>c,y,sz</SUB>>]
+      i [fillcolor = green label = <G<SUB>c,y,sz</SUB>>]
+      j [fillcolor = green label = <S<SUB>c,y,sz</SUB>>]
+      
+      k [fillcolor = green label = <<I>f</I><SUB>s,c,y,sz</SUB>>]
+      l [fillcolor = green label = <G<SUB>s,c,y,sz</SUB>>]
+      m [fillcolor = green label = <S<SUB>s,c,y,sz</SUB>>]
+      
+      n [fillcolor = green label = <<I>f</I><SUB>s,c,y,sz</SUB>>]
+      o [fillcolor = green label = <G<SUB>s,c,y,sz</SUB>>]
+      p [fillcolor = green label = <S<SUB>s,c,y,sz</SUB>>]
+      
+      subgraph cluster1 {
+      graph [color = cornflowerblue]
+      a -> d
+      b -> d
+      c -> d
+      }
+      
+      # Orange for both, Yellow for South
+      subgraph cluster2 {
+      graph [color = orange]
+      e -> a
+      f -> b
+      g -> c
+      label = 'Escalante Canyon, Powerline, Picnic and Pyramid Rock  
+      2009 - 2019';
+      }
+      
+      subgraph cluster3 {
+      graph [color = red]
+      h -> a
+      i -> b
+      j -> c
+      label = 'Pond  
+      2010 - 2014, 2012 - 2014 some individuals overlap, 
+      2016 - 2019 ';
+      }
+
+      # Red for North
+      subgraph cluster4 {
+      graph [color = red]
+      k -> a
+      l -> b
+      m -> c
+      label = 'T-Junction and Oil Pad  
+      2010 - 2015 and 2012 - 2019 some individuals overlap';
+      }
+            
+      subgraph cluster5 {
+      graph [color = yellow]
+      n -> a
+      o -> b
+      p -> c
+      label = 'Bridgeport 
+      2011 - 2019';
+      }
+
+
+      }
+  ")
+
+```
+
+
+
+
 "OK, here is what we'll do: I am going to send you some data source files and the attached R code. This code does a lot of stuff, but it is easiest to send it to you as a whole and tell you what lines to look at, I think." - Dan Doak
 
-
-
-
 You will see between lines 1-38 some important summarizing of the sizes and survival rates for the recruits (these are 'bulblings', which are similar to seedlings for this spp). 
-```{r}
-sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_2019.csv",
-                   sep=""))  
-
+# Bistort example
+# ```{r}
 setwd("C:/Users/DePrengm/OneDrive - Denver Botanic Gardens/P drive/My Documents/UCDenver_phd/Dissertation/Chapter3")
 # setwd("C:/Users/Dan Doak/Desktop/CurrentProjects/IPMmodels/Bistorts")
 
@@ -32,10 +123,6 @@ setwd("C:/Users/DePrengm/OneDrive - Denver Botanic Gardens/P drive/My Documents/
 allsdszs= as.numeric(read.csv('bulblingsizes.csv', header=FALSE)[,1])
 mnsldgsz=mean(allsdszs)
 sdsldgsz = sqrt(var(allsdszs))
-
-allsdszs_scgl <- sg$Width.cm.[which(sg$Width.cm. < 0.6 & sg$Width.cm. > 0.01 & !is.na(sg$Width.cm.))]
-mnsldgsz_scgl <- mean(allsdszs_scgl)
-sdsldgsz_scgl <- sqrt(var(allsdszs_scgl))
 
 alldata=as.matrix(read.csv('BNdataforIPMsimple.csv', header=TRUE))
 #alldata has columns of: szs0, szs1, bulbils produced in yr 0
@@ -50,27 +137,46 @@ alldata=alldata[which(alldata$szs0 !=0),]
 bulblings_per_bulbil = 0.00676 # this is mean for allyrs and the 4 niwot pops, from 
 #data assembled for Sam analyses
 
-seed_per_flower <- 100 # estimate from few times collected seed from flowers
-
 # define size of a bulbling as =sqrt(4.388*2*2) = 2
 bulblingsz=sqrt(4.388*4)
-minisz <- 0.5
 # say that survival of bulblings is survial for plants of <= 2,2,size:
 alltinys=alldata[alldata$szs0<=bulblingsz,]
 surv_bulbings=sum(alltinys$survival)/length(alltinys$survival)
+# ```
+
+```{r}
+sg <- read.csv(paste("Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/R_code_ScGl/R_tables/RawData_scgl_2019.csv",
+                   sep=""))  
+# all seedling sizes
+allsdszs_scgl <- sg$Width.cm.[which(sg$Width.cm. < 0.6 & sg$Width.cm. > 0.01 & !is.na(sg$Width.cm.))]
+mnsldgsz_scgl <- mean(allsdszs_scgl)
+sdsldgsz_scgl <- sqrt(var(allsdszs_scgl))
+
+# seed_per_flower <- 100 # estimate from few times collected seed from flowers ** should be some small number? viable seedlings per output, which is of the flowers and seeds per flower, what is the rate of seedlings by output; see Disturbance_2014_germination.R
+#           Site    PercGerm
+# 1         Fram 0.034959376
+# 2       Picnic 0.050158103
+# 3         Pond 0.009359903
+# 4 Pyramid Rock 0.022931214
+seedlings_per_seed <- 0.03 # from germination study across Fram  # the rate that a seed germinates; sd = 0.02 
+germination <- data.frame(Site = c("Fram","Picnic","Pond","Pyramid Rock"),
+                          Germ = c(0.034959376,0.050158103,0.009359903,0.022931214))
+rnorm(1,germination$Germ[germination$Site == "Fram"], sd(germination$Germ))
+mean(germination$Germ)
 
 # for scgl, we started in 2012 or so just counting minis, not recording size but did before (and occasionally after)
 # allminis <- sg[sg$Width.cm. <= minisz,] # need to do this after I've got year to year transitions
-# surv_mini_1 <- sum() # Survival should just be averaged with the estmiate of after we started just counting and my estimate of how many grew (so survived) and how many died and how many survived or how many new ones there might be
-
-```
-
-# mimic with ScGl
-```{r}
 
 sg <- sg[which(complete.cases(sg[,c("Tag")])),]
-# sg[which(sg$Width.cm. < 2.5 & sg$Fl == "y"),]
 
+# Look at differences among sites (need to remove individuals that are measured in new and old); in 2015, Pond only partially completed and Fram was skipped (couldn't access); I could either follow the individuals 
+table(sg$Site, sg$Year)
+sg <- sg[grep("T-East", sg$Site, invert = TRUE),]
+sg$Site <- as.character(sg$Site)
+sg$Site <- as.factor(sg$Site)
+
+# sg[which(sg$Width.cm. < 2.5 & sg$Fl == "y"),]
+# ones where height and width swapped or typos
 sg$Width.cm.[sg$Year == 2017 & sg$Tag==363.00] <- 4.4
 sg$Height.cm.[sg$Year == 2017 & sg$Tag==363.00] <- 1
 sg$Width.cm.[which(sg$Year == 2013 & sg$Tag==1242)] <- 11.8 
@@ -91,7 +197,8 @@ sg_ipm$survival <- 1
 sg_ipm$survival[which(sg_ipm$szs1==0)] <- 0 
 # table(sg_ipm$survival)
 
-
+# but sometimes we see individuals that are larger the first time we see it
+minisz <- 0.5
 allminis <- sg_ipm[sg_ipm$szs0 <= minisz,]
 surv_minis1 <- sum(allminis$survival)/length(allminis$survival) # estimate survival of minis from when we didn't just count
 
@@ -150,7 +257,7 @@ surv_minis2 <- mean(minis0to1$survived)
 ```
 
 
-
+Montero-Serra et al 2018
 ####################################################
 ```{r}
 lifespan <- function(nx){
@@ -181,7 +288,7 @@ sg_ipm$szs1[sg_ipm$szs1==0] <- NA
 sg_ipm <- sg_ipm[!is.na(sg_ipm$szs0),]
 minsize_scgl <- min(c(sg_ipm$szs0,sg_ipm$szs1), na.rm = TRUE) - 0.09
 maxsize_scgl <- max(c(sg_ipm$szs0,sg_ipm$szs1), na.rm = TRUE) + 0.01
-size_scgl <- sg_ipm[,c("Site","Transect","szs0","szs1","minis0","survival","Fl.x", "Year.x", "Year.y")]
+size_scgl <- sg_ipm[,c("Site","Transect","szs0","szs1","minis0", "minis1", "survival","Fl.x", "Year.x", "Year.y")]
 
 table(size_scgl$Fl.x)
 size_scgl$Fl.x <- as.character(size_scgl$Fl.x)
@@ -189,7 +296,7 @@ size_scgl$Fl.x[size_scgl$Fl.x == "n"] <- "0"
 size_scgl$Fl.x[size_scgl$Fl.x == "y"] <- "1"
 size_scgl$Fl.x <- as.numeric(size_scgl$Fl.x)
 
-colnames(size_scgl) <- c("Site", "Transect", "t0","t1","minis0","survival","reproyesno","year0","year1")
+colnames(size_scgl) <- c("Site", "Transect", "t0","t1","minis0","minis1","survival","reproyesno","year0","year1")
 table(size_scgl$reproyesno)
 ```
 ScGl doesn't have bulbs, it has flowers that grow into minis, and there is a relationship between the number of flowers and the size of the plant.
@@ -216,16 +323,52 @@ sg2019$PhotoNumber <- as.numeric(sg2019$PhotoNumber)
 # If flowering, then here's how width relates to number of flowers
 ggplot(sg2019[sg2019$Fl=="y",], aes(Width.cm., PhotoNumber))+
   geom_point()+
-  geom_smooth(method = "lm")+
-  theme_bw()#+
+  geom_smooth(method = "glm", formula = y ~ x, colour = "blue")+
+  geom_smooth(method = "gam", colour = "red")+
+  theme_bw()+
+  ylab("Number of flowers")#+
   # facet_wrap(~Site, nrow=3)
+
+fl.1 <- glm(PhotoNumber~Width.cm.+Width.cm.^2, data=sg2019[sg2019$Fl=="y",])
+fl.2 <- glm(PhotoNumber~Width.cm., data=sg2019[sg2019$Fl=="y",])
+fl.3 <- glm(PhotoNumber~Width.cm. + Site, data=sg2019[sg2019$Fl=="y",])
+fl.4 <- glm(PhotoNumber~Height.cm.+I(Height.cm.^2), data=sg2019[sg2019$Fl=="y",])
+fl.5 <- glm(PhotoNumber~Height.cm., data=sg2019[sg2019$Fl=="y",])
+fl.6 <- glm(PhotoNumber~Height.cm. + (Height.cm.*Site), data=sg2019[sg2019$Fl=="y",])
+fl.7 <- glm(PhotoNumber~Width.cm. + (Width.cm.*Site), data=sg2019[sg2019$Fl=="y",])
+
+lm.list <- list(fl.1, fl.2, fl.3,fl.4, fl.5, fl.6,fl.7)
+lm.names <- as.character(unlist(lapply(lm.list, formula)))
+(lm.results <- aictab(lm.list, modnames = lm.names))
+summary(fl.7)
+
+summary(glm(PhotoNumber ~ (Width.cm.*Site), family = quasipoisson(), data = sg2019[sg2019$Fl=="y",])) # for quastipoisson "log"
+summary(lm(PhotoNumber ~ Width.cm., data = sg2019[sg2019$Fl=="y",])) # y = 1.3x - 3.9
+
+# but some have so few, should I just do the most simple? 
+ggplot(sg2019[sg2019$Fl=="y",], aes(Width.cm., PhotoNumber, colour = Site))+
+  geom_point()+
+  stat_smooth(method = MASS::glm.nb, se = FALSE)+
+  theme_bw()+
+  ylab("Number of flowers")
 
 summary(lm(PhotoNumber~Width.cm.+I(Width.cm.^2), data=sg2019[sg2019$Fl=="y",]))
 
-summary(lm(PhotoNumber~Width.cm., data=sg2019[sg2019$Fl=="y",])) # y = 1.26x+ -3.86 +StErr 0.06
+summary(glm(PhotoNumber~Width.cm., data=sg2019[sg2019$Fl=="y",],
+            family = negative.binomial(2))) # y = 1.26x+ -3.86 +StErr 0.06
 ```
 
+Rate of growth, rate of fecundity, rate of survival
+
 ```{r}
+
+
+```
+
+
+
+
+# ```{r}
 size=alldata
 colnames(size)=c('t0','t1','bulbs0','survival')
 # table(size$bulbs0)
@@ -235,6 +378,17 @@ size$reproyesno[size$reproyesno >0]=1 # so, turn into yes no variable
 sizeforrepro=size
 sizeforrepro=sizeforrepro[sizeforrepro$reproyesno==1,]
 
+#####new size density estimation for median size estimation
+pdfsz=density(size$t0, n=1024, cut=0)
+pdfsz2=cbind(pdfsz$x,pdfsz$y)
+#so, this is a set of smoothed values that can then be used with weightedMedian in the matrixStats package to get a 'good' median for each class.
+######---------------
+
+plot(pdfsz2, type="l")
+
+# ```
+
+```{r}
 #################### ScGl #################### 
 sizeforrepro_scgl <- size_scgl[size_scgl$reproyesno==1,]
 sizeforrepro_scgl$flowers0 <- sapply(sizeforrepro_scgl$t0, function(x){ 
@@ -243,28 +397,18 @@ sizeforrepro_scgl$flowers0 <- sapply(sizeforrepro_scgl$t0, function(x){
   })
 # size_scgl; sizeforrepro_scgl
 size_scgl <- merge(size_scgl, sizeforrepro_scgl, 
-                   by = c("Site","Transect","t0","t1","minis0","survival","reproyesno","year0","year1"))
+                   by = c("Site","Transect","t0","t1","minis0","minis1","survival","reproyesno","year0","year1"))
 #################### #################### 
-
-
-#####new size density estimation for median size estimation
-pdfsz=density(size$t0, n=1024, cut=0)
-pdfsz2=cbind(pdfsz$x,pdfsz$y)
-#so, this is a set of smoothed values that can then be used with weightedMedian in the matrixStats package to get a 'good' median for each class.
-######---------------
 
 #ScGl
 pdfsz_scgl <- density(size_scgl$t0, n=1024, cut=0, na.rm = TRUE)
 pdfsz2_scgl <- cbind(pdfsz_scgl$x,pdfsz_scgl$y)
-
-
-plot(pdfsz2, type="l")
 plot(pdfsz2_scgl, type="l")
 ```
 
 # Bistort example
 ### Specify what range of classes/bins to evaluate -----------------------
-```{r}
+# ```{r}
 bin.num <- c(3,4,5,6, 8, 10,seq(from = 15, to = 100, by = 10))
 #bin.num=20
 
@@ -344,101 +488,123 @@ for(i in 1:length(bin.num)){
     lifespan_matrix[i] = NA
   }
 }
+# ```
+
+```{r}
+save()
+
 ```
+
 
 # ScGl
 ### Specify what range of classes/bins to evaluate -----------------------
-```{r}
-bin.num <- c(4,5,6)
+```{r ScGl matrix}
+seed_per_flower <- seedlings_per_seed
+
+bin.num <- c(4,5,6,10,20)
 # ScGl
 
-lambdas_matrix <- rep(NA, length(bin.num))
-dampratio_matrix = rep(NA, length(bin.num))
-lifespan_matrix=rep(NA, length(bin.num))
-mincounts=NULL
+# -------- testing --------------
+site <- unique(size_scgl$Site)[1]
+Yr <- unique(size_scgl$year0[size_scgl$Site == site])[1]
+siteYr <- size_scgl[size_scgl$Site == site & size_scgl$year0 == Yr,]
+i <- 2
+rm(site);rm(Yr);rm(siteYr);rm(i)
 
 
-### Keep only data that follows the whole way through <-- do this for sie_scgl
-sg_entire <- sg[grep("Road", sg$Site, invert = TRUE),]
-sg_entire <-sg_entire[sg_entire$Year > 2011, ]
-sg_entire <- sg_entire[grep("Pond", sg_entire$Site, invert = TRUE),]
-sg_entire <- sg_entire[grep("Fram", sg_entire$Site, invert = TRUE),]
-sg_entire <- sg_entire[grep("(old)", sg_entire$Site, invert = TRUE),]
-table(sg_entire$Site, sg_entire$Year)
-
-
-
-for(i in 1:length(bin.num)){
-  ss=as.numeric(size_scgl$t0)
-  # vec.bin = c(minsize_scgl, minsize_scgl+1:bin.num[i]*(maxsize_scgl-minsize_scgl)*(1/bin.num[i]))  # really should split at < 0.6 and then < 2.5 as the non-reproductive sizes, then split above
-  breaks2add <- 2.5+1:(bin.num[i]-1)*(maxsize_scgl-2.1)*(1/(bin.num[i]-1))
-  vec.bin <- c(minsize_scgl, 2.5, breaks2add[1:(bin.num[i]-1)])
-  nums=hist(ss,breaks=vec.bin, plot=FALSE)$counts 
-  mincounts=c(mincounts,min(nums))
-  
-  if (min(nums)>2) {  
-    ## Initialize storage
-    n.bin <- length(vec.bin)-1                  # this is a workaround
-    n <- rep(NA, n.bin)                         # count of indvs per bin
-    medians <- rep(NA, n.bin)                    # median size per bin for F
-    surv <- rep(NA, n.bin)                      # survivorship for each class
-    grow <- matrix(NA, n.bin, n.bin)            # store growth probabilites for each class
-    reproduction <- rep(NA, n.bin)
+scgl_vitalrates <- lapply(unique(size_scgl$Site), function(site){
+  yearout <- lapply(unique(size_scgl$year0[size_scgl$Site == site]), function(Yr){
     
-    totnums = 0 # this is just monitoring for errors
-    # bin, survival, growth  test j<-4
-     for(j in 1:(length(vec.bin)-1)){
-      # set limits for size subset according to bin breaks
-      bounds <- c(vec.bin[j], vec.bin[j+1])
-      # subset data according to bounds
-      subset <- size_scgl[size_scgl$t0 > bounds[1] & size_scgl$t0 <= bounds[2],]
-      # store number of inviduals in this bin for future reference
-      n[j] <- length(subset$t0)
-      medians[j] <- median(subset$t0)
-      # calculate survivorship for this class
-      surv[j] <- sum(subset$survival) / length(subset$t0) # of those alive in year 1, how many survived by bin/size class
-      # store histo as object, to access counts per bin
-      histo <- hist(subset$t1, breaks = vec.bin, plot = FALSE)
-      # $counts returns the number of individuals of a certain size class
-      grow[,j] <- histo$counts/length(subset$t0[subset$survival==1]) 
-      reproduction[j] <- mean(subset$flowers0, na.rm = TRUE) # bulbils produced per plant in start yr - not the same for ScGl, minis aren't produced, not the same as fruit count, which we didn't take or seed count - so estimate how many flower there would likely have been; but there aren't going to be any flowers until >2.5 width
+    siteYr <- size_scgl[size_scgl$Site == site & size_scgl$year0 == Yr,]
+    
+    minsize_scgl <- min(c(siteYr$t0,siteYr$t1), na.rm = TRUE) - 0.09
+    maxsize_scgl <- max(c(siteYr$t0,siteYr$t1), na.rm = TRUE) + 0.01
+    
+    lambdas_matrix <- rep(NA, length(bin.num))
+    dampratio_matrix = rep(NA, length(bin.num))
+    lifespan_matrix=rep(NA, length(bin.num))
+    mincounts=NULL
+    
+    for(i in 1:length(bin.num)){
+      ss=as.numeric(siteYr$t0)
+      # breaks2add <- 2.5+1:(bin.num[i]-1)*(maxsize_scgl-2.1)*(1/(bin.num[i]-1))
+      vec.bin <- c(minsize_scgl,
+                   minsize_scgl+1:bin.num[i]*(maxsize_scgl-minsize_scgl)*(1/bin.num[i])) 
+      nums=hist(ss,breaks=vec.bin, plot=FALSE)$counts 
+      mincounts=c(mincounts,min(nums))
       
-      totnums = totnums + sum(histo$counts)
-    }
-    
-    # make a vector of the prob of seedling sizes: 
-    sdlggrow <- hist(allsdszs_scgl, breaks = vec.bin, plot = FALSE)$counts/length(allsdszs_scgl)
-    reproduction[is.nan(reproduction)] <- 0
-    
-    M1 <- matrix(NA, n.bin, n.bin)   # initiate projection matrix
-    M <- matrix(0, (n.bin+1), (n.bin+1))
-    # populate projection matrix
-  
-    for(j in 1:length(surv)){
-      M1[,j] <- surv[j] * grow[,j]
-      M1[,j] <- (surv[j] * grow[,j])
-    }
+      if (min(nums)>2) {  
+        ## Initialize storage
+        n.bin <- length(vec.bin)-1                  # this is a workaround
+        n <- rep(NA, n.bin)                         # count of indvs per bin
+        medians <- rep(NA, n.bin)                    # median size per bin for F
+        surv <- rep(NA, n.bin)                      # survivorship for each class
+        grow <- matrix(NA, n.bin, n.bin)            # store growth probabilites for each class
+        reproduction <- rep(NA, n.bin)
+        
+        totnums = 0 # this is just monitoring for errors
+        # bin, survival, growth  test j<-4
+        # TO DO!!! add a discrete stage that adds up all the minis with a rate of staying a mini 
+         for(j in 1:(length(vec.bin)-1)){
+          # set limits for size subset according to bin breaks
+          bounds <- c(vec.bin[j], vec.bin[j+1])
+          # subset data according to bounds
+          subset <- siteYr[siteYr$t0 > bounds[1] & siteYr$t0 <= bounds[2],]
+          # store number of individuals in this bin for future reference
+          n[j] <- length(subset$t0)
+          medians[j] <- median(subset$t0)
+          # calculate survivorship for this class
+          surv[j] <- sum(subset$survival) / length(subset$t0) # of those alive in year 1, how many survived by bin/size class
+          # store histo as object, to access counts per bin
+          histo <- hist(subset$t1, breaks = vec.bin, plot = FALSE)
+          # $counts returns the number of individuals of a certain size class
+          grow[,j] <- histo$counts/length(subset$t0[subset$survival==1]) 
+          reproduction[j] <- mean(subset$flowers0, na.rm = TRUE) 
+          totnums = totnums + sum(histo$counts)
+        }
+        
+        # make a vector of the prob of seedling sizes: 
+        sdlggrow <- hist(allsdszs_scgl, breaks = vec.bin, plot = FALSE)$counts/length(allsdszs_scgl)
+        reproduction[is.nan(reproduction)] <- 0
+        
+        M1 <- matrix(NA, n.bin, n.bin)   # initiate projection matrix
+        M <- matrix(0, (n.bin+1), (n.bin+1))
+        # populate projection matrix
       
-      # add lines for the creation of bulblings and thier transition to first size class
-      M[2:(n.bin+1), 2:(n.bin+1)] = M1
-      M[2:(n.bin+1),1] = surv_minis*sdlggrow 
-      M[1,2:(n.bin+1)] = reproduction*seed_per_flower  
-    
-    
-    lambdas_matrix[i] <- lambda(M) # calls popbio f'n 'lambda'
-    dampratio_matrix[i]=damping.ratio(M)
-    lifespan_matrix[i] =lifespan(M)
-    
-    print(c(i,totnums)) 
-  } else {
-    lambdas_matrix[i]=NA
-    dampratio_matrix[i] = NA
-    lifespan_matrix[i] = NA
-  }
-}
+        for(j in 1:length(surv)){
+          M1[,j] <- surv[j] * grow[,j]
+          M1[,j] <- (surv[j] * grow[,j])
+        }
+          
+          # add lines for the creation of bulblings and thier transition to first size class
+          M[2:(n.bin+1), 2:(n.bin+1)] = M1
+          M[2:(n.bin+1),1] = surv_minis*sdlggrow 
+          M[1,2:(n.bin+1)] = reproduction*seed_per_flower  
+        
+        
+        lambdas_matrix[i] <- lambda(M) # calls popbio f'n 'lambda'
+        dampratio_matrix[i]=damping.ratio(M)
+        lifespan_matrix[i] =lifespan(M)
+        
+        print(c(i,totnums)) 
+      } else {
+        lambdas_matrix[i]=NA
+        dampratio_matrix[i] = NA
+        lifespan_matrix[i] = NA
+      }
+    }
+    list(lambdas_matrix,dampratio_matrix,lifespan_matrix)
+    }) # end year
+  yearout
+  }) # end site
+
+scgl_vitalrates[[1]]
 ```
 
 Climate and ScGl
+
+survival and growth, climate by t+1
+reproduction is in time t0, so prior to t0
 ```{r}
 options(prism.path = "Q:/Research/All_Projects_by_Species/Sclerocactus SPECIES/Sclerocactus_glaucus/ScGl_climate")
 
@@ -451,11 +617,25 @@ get_prism_monthlys(type="tmin", mon = 1:12, keepZip = FALSE, years = 2019:2020)
 
 ## How to deal with plants that are double counted, could start and stop each site in 2012, could eliminate the new, eliminate just the duplicate by tag and transect, Pond (old) 2010 through 2013 and Pond 2015 to 2019. Where is my 2019 data? 
 ```{r}
-table(size_scgl$Site)
-table(size_scgl$Site, size_scgl$year0)
 
-size_scgl$Site <- as.character(size_scgl$Site)
-size_scgl$Site[grep("Atwell", size_scgl$Site)] <- "Atwell Gulch"
+### Keep only data that follows the whole way through <-- do this for size_scgl
+sg_entire <- sg[grep("Road", sg$Site, invert = TRUE),]
+sg_entire <-sg_entire[sg_entire$Year > 2011, ]
+sg_entire <- sg_entire[grep("Pond", sg_entire$Site, invert = TRUE),]
+sg_entire <- sg_entire[grep("Fram", sg_entire$Site, invert = TRUE),]
+sg_entire <- sg_entire[grep("(old)", sg_entire$Site, invert = TRUE),]
+table(sg_entire$Site, sg_entire$Year)
+
+# get size_scgl to non-repeated in old/new and remove ones with missing years
+size_scgl1 <- size_scgl[grep("(old)", size_scgl$Site, invert = TRUE),]
+# I'm missing a year for Fram and from part of Pond in the same year
+# size_scgl1 <- size_scgl1[grep("Fram", size_scgl1$Site, invert = TRUE),]
+# size_scgl1 <- size_scgl1[grep("Pond", size_scgl1$Site, invert = TRUE),]
+
+size_scgl1$Site <- as.character(size_scgl1$Site)
+size_scgl1$Site[grep("Atwell", size_scgl1$Site)] <- "Atwell Gulch"
+size_scgl1$Site <- as.factor(size_scgl1$Site) # back and forth to remove the unused levels
+table(size_scgl1$Site)
 
 latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
 #                            c(39.1969, -108.1298, "Atwell Gulch (old)"),
@@ -475,7 +655,100 @@ latlong <- data.frame(rbind(c(39.1969, -108.1298, "Atwell Gulch"),
 names(latlong) <- c("Lat","Long","Site")
 latlong[,1:2] <- sapply(latlong[,1:2], function(x) as.numeric(as.character(x)))
 
+table(size_scgl1$year1)
+```
 
+```{r}
+ppt <- grep("ppt", ls_prism_data(absPath = TRUE)[,2])
+#ppt2 <- grep(paste("ppt_stable",paste("ppt_provisional_4kmM3_",currentYr,sep=""),collapse="|"),ls_prism_data(absPath = TRUE)[,2])
+m.ppt <- lapply(ppt, function(x){
+  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
+             date = ls_prism_data()[x,], Site = latlong$Site)
+})
+tmax <- grep("tmax", ls_prism_data(absPath = TRUE)[,2])
+m.tmax <- lapply(tmax, function(x){
+  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
+             date = ls_prism_data()[x,], Site = latlong$Site)
+})
+tmin <- grep("tmin", ls_prism_data(absPath = TRUE)[,2])
+m.tmin <- lapply(tmin, function(x){
+  rastertemps <- raster(ls_prism_data(absPath = TRUE)[x,2])
+  data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]), 
+             date = ls_prism_data()[x,], Site = latlong$Site)
+})
+
+scgl.climate <- rbind(do.call(rbind, m.tmin), 
+                    do.call(rbind, m.tmax),
+                    do.call(rbind, m.ppt))
+#turn factors into characters
+scgl.climate$date <- sapply(scgl.climate$date, as.character)
+scgl.climate$Year <- sapply(scgl.climate$date, function(x){
+  substr(x, (nchar(x)+1)-10,nchar(x)-6)
+})
+scgl.climate$Month <- sapply(scgl.climate$date, function(x){
+  substr(x, (nchar(x)+1)-6,nchar(x)-4)
+}) 
+scgl.climate[,4:5] <- sapply(scgl.climate[,4:5], as.numeric)
+scgl.climate$Prev12 <- scgl.climate$Year 
+scgl.climate$Prev12[scgl.climate$Month > 5] <- scgl.climate$Year[scgl.climate$Month>5]+1
+#extract the climate variable name from the prism long name
+scgl.climate$date <- as.character(scgl.climate$date)
+scgl.climate$Variable <- sapply(scgl.climate$date, function(x) {
+  unlist(strsplit(x, split="_", fixed=TRUE))[[2]]
+  })
+#long to wide
+melt.scgl <- melt(scgl.climate[,-2], id = c("Site","Prev12","Month","Year","Variable"))
+head(melt.scgl)
+table(melt.scgl$Variable) # variable is just 'data'
+sp.melt.scgl <- split(melt.scgl, melt.scgl$Variable)
+head(sp.melt.scgl[[2]])
+scgl.c.1 <- merge(sp.melt.scgl[[1]],sp.melt.scgl[[2]], by = c("Site","Prev12","Month","Year"))
+scgl.c.1 <- scgl.c.1[,c("Site","Prev12","Month","Year","value.x","value.y")]
+names(scgl.c.1) <- c("Site","Prev12","Month","Year","ppt","tmax")
+scgl.c.2 <- merge(scgl.c.1,sp.melt.scgl[[3]], by = c("Site","Prev12","Month","Year"))
+head(scgl.c.2)
+scgl.c <- scgl.c.2[,c("Site","Prev12","Month","Year","ppt","tmax","value")]
+names(scgl.c) <- c("Site","Prev12","Month","Year","ppt","tmax","tmin")
+scgl.c$season <- "winter"
+scgl.c[scgl.c$Month>5 & scgl.c$Month<9, "season"] <- "summer"
+scgl.c[scgl.c$Month>8 & scgl.c$Month<12, "season"] <- "fall"
+scgl.c[scgl.c$Month>2 & scgl.c$Month<6, "season"] <- "spring"
+table(scgl.c$Year)
+scgl.c[scgl.c$Year>2016,]
+table(scgl.c$Year,scgl.c$Month)
+scgl.c.summary <- aggregate(scgl.c[,c("ppt","tmax","tmin")],
+                            scgl.c[,c("Site","Prev12","season")],
+                            FUN = function(x) mean(x, na.rm = TRUE))
+scgl.c.summary.ppt <- aggregate(scgl.c[,"ppt"],
+                            scgl.c[,c("Site","Prev12","season")],
+                            FUN = function(x) sum(x, na.rm = TRUE))
+scgl.c.summary <- merge(scgl.c.summary, scgl.c.summary.ppt, by = c("Site","Prev12","season"))
+names(scgl.c.summary) <- c(names(scgl.c.summary)[-length(scgl.c.summary)],"sum.ppt")
+season <- reshape(scgl.c.summary[scgl.c.summary$Prev12<2019+1,],
+                  idvar = c("Site","Prev12"),
+                  timevar = "season",
+                  direction = "wide")
+
+names(season)
+names(size_scgl1)
+
+library(corrplot)
+corrplot(cor(season[season$Prev12 <2020 & season$Prev12 > 2000,c(3:18)]), method="circle")
+str(season)
+
+
+ggplot(season, aes(Prev12, ppt.fall, colour = Site))+
+  geom_line()
+```
+
+```{r}
+size_scgl1 <- merge(season, size_scgl1, by.x = c("Site", "Prev12"), by.y = c("Site","year0"))
+
+# Add columns for ScGl squaring the size terms, why for?? - oh! to give some curve to the 
+size_scgl1$t0sq <- size_scgl1$t0^2
+sizeforrepro_scgl$t0sq <- sizeforrepro_scgl$t0^2
 ```
 
 
@@ -484,14 +757,11 @@ Lines 170-215: this is doing what you could also do with dredge, but that simple
 #######################################
 ######################################
 ### IPM with mean sizes-----------------------------------------------------
-```{r}
+# ```{r}
 # adding in columns
 size$t0sq <- size$t0^2           
 sizeforrepro$t0sq = sizeforrepro$t0^2
 
-# Add columns for ScGl squaring the size terms, why for?? - oh! to give some curve to the 
-size_scgl$t0sq <- size_scgl$t0^2
-sizeforrepro_scgl$t0sq <- sizeforrepro_scgl$t0^2
 
 # fitting functions for different vital rates (survival, growth, reproduction)
 # prob (survival): linear function of size, quadratic function of size
@@ -502,13 +772,72 @@ min_AIC <- min(MuMIn::AICc(sur_models[[1]], sur_models[[2]])$AICc)
 # gives you the info for the best-fit model
 bestsur <- sur_models[[which(min_AIC == MuMIn::AICc(sur_models[[1]], sur_models[[2]])$AICc)]] 
 
+
+Dredge
+```{r}
+globaldredge.survival <- glm(survival ~ t0+Site+(t0*Site)+ ppt.fall+tmax.fall+tmin.fall+ 
+                              ppt.spring+tmax.spring+ppt.summer+tmax.summer+
+                              tmin.summer+ppt.winter+tmax.winter+tmin.winter+sum.ppt.spring+tmin.spring+sum.ppt.winter+
+                               sum.ppt.fall+sum.ppt.summer, data = size_scgl1, family = "binomial", na.action = 'na.fail')
+
+dredgemodtemp1 <- dredge(globaldredge.survival, fixed = c("t0"), subset = !(ppt.spring && sum.ppt.spring) &&
+                                                                          !(tmax.spring && ppt.spring) &&
+                                                                          !(tmax.spring && tmin.spring) &&
+                                                                          !(tmax.spring && ppt.winter) &&
+                                                                          !(tmax.spring && tmax.winter) &&
+                                                                          !(tmax.spring && sum.ppt.winter) &&
+                                                                          !(tmax.spring && tmax.fall) &&
+                                                                          !(tmax.spring && tmax.summer) &&
+                                                                          !(tmin.spring && ppt.winter) &&
+                                                                          !(tmin.spring && tmax.winter) &&
+                                                                          !(tmin.spring && ppt.winter) &&
+                                                                          !(tmin.spring && tmin.winter) &&
+                                                                          !(tmin.spring && sum.ppt.winter) &&
+                                                                          !(tmin.spring && tmin.fall) &&
+                                                                          !(tmin.spring && ppt.summer) &&
+                                                                          !(tmin.spring && tmax.summer) &&
+                                                                          !(tmin.spring && tmin.summer) &&
+                                                                          !(ppt.winter && tmax.winter) &&
+                                                                          !(ppt.winter && sum.ppt.winter) &&
+                                                                          !(tmax.winter && tmin.winter) &&
+                                                                          !(tmax.winter && sum.ppt.winter) &&
+                                                                          !(tmin.winter && tmin.fall) &&
+                                                                          !(ppt.fall && tmax.fall) &&
+                                                                          !(ppt.fall && sum.ppt.fall) &&
+                                                                          !(tmax.fall && sum.ppt.fall) &&
+                                                                          !(tmin.fall && tmin.summer) &&
+                                                                          !(ppt.summer && tmax.summer) &&
+                                                                          !(ppt.summer && sum.ppt.summer), beta = 'none', trace=2)
+
+subset(dredgemodtemp1, delta <=2, recalc.weights=FALSE)
+# this is a the way to display the best model (you can also look at the table of all the models to see what is displayed)
+(besttempmod1=get.models(dredgemodtemp1, subset = 1)[[1]])
+summary(besttempmod1)
+AICc(besttempmod1)
+
+ctemppredictions = predict(besttempmod1)
+plot(ctemppredictions~size_scgl1$survival)
+abline(a=0,b=1)
+```
+
+modtempglobal=lmer(ctemp~monthlytemp*site*(month + I(month^2))+monthlytemp*site*realtrt+(1+monthlytemp|plotid),data=tdats,REML = FALSE,na.action='na.fail')
+
+```{r seedling per seed}
+size_scgl1
+# globaldredge.seedlings <- lmer(minis0 ~ )
+
+```
+
+
+
+```{r}
 ######### ScGl survival #########################
 # do it my way 
 
-glm1 <- glm(survival ~ t0, family = "binomial", data = size_scgl)
-glm2 <- glm(survival ~ t0 + t0sq, family = "binomial", data = size_scgl)
-glm3 <- glm(survival ~ t0 + Site + t0*Site, family = "binomial", data = size_scgl) # The slope and the intecept could differ
-glm4 <- glm(survival ~ t0*Site, family = "binomial", data = size_scgl)
+glm1 <- glm(survival ~ t0, family = "binomial", data = size_scgl1)
+glm2 <- glm(survival ~ t0 + t0sq, family = "binomial", data = size_scgl1)
+glm3 <- glm(survival ~ t0 + Site + t0*Site, family = "binomial", data = size_scgl1) # The slope and the intecept could differ
+glm4 <- glm(survival ~ t0*Site, family = "binomial", data = size_scgl1)
 
 lm.list <- list(glm1, glm2, glm3, glm4)
 lm.names <- as.character(unlist(lapply(lm.list, formula)))
@@ -517,20 +846,27 @@ lm.names <- as.character(unlist(lapply(lm.list, formula)))
 for(i in 2:length(lm.list)){
   print(exp(0.5*lm.results$Delta_AICc[i]))
 }
+
+library(lattice)
+xyplot(survival ~ t0|Site, size_scgl1,
+       type = c("g","p","r"),
+       index = function(x,y) coef(lm(y ~ x))[1],
+       xlab = "Size at t0",
+       ylab = "Survival", aspect = "xy")
 ################################################
  
-ggplot(size_scgl, aes(t0, survival, colour = Site))+
+ggplot(size_scgl1, aes(t0, survival, colour = Site))+
   geom_point()+
   stat_smooth(se = FALSE)+
   theme_bw()
 
-ggplot(size_scgl, aes(t0, survival))+
+ggplot(size_scgl1, aes(t0sq, survival))+
   geom_point()+
   stat_smooth(se = FALSE)+
   theme_bw()
 ```
 
-```{r}
+# ```{r}
 # growth: linear function of size, quadratic function of size, power function (A+B*(size^C))
 growth_models <- list(nls(t1~ a+ b*t0, data = size, start=list(a= 1, b=1)),
                       nls(t1~ a+ b*t0 + c*t0sq, data = size, start=list(a= 1, b=1,c=1)),
@@ -552,12 +888,14 @@ size$growth_residuals[which(!is.na(size$t1) & !is.na(size$t0))] <- summary(bestg
 # lines(s, predict(nls(t1 ~ a + b*(t0^c), data= size, start=list(a= 1, b=1,c=1)), list(x=s)), col="yellow")
 # plot(t1~t0, data=size_scgl)
 # abline(lm(t1~t0, data=size_scgl), col="red")
+```
 
+```{r}
 ########### ScGl growth #################
 # nls {stats} is for curve fitting. 
-nlm1 <- nls(t1 ~ a + b*t0, data = size_scgl, start = list(a=1, b=1))
-nlm2 <- nls(t1 ~ a + b*t0 + c*t0sq, data=size_scgl, start = (list(a=1, b=1, c=1)))
-nlm3 <- nls(t1 ~ a + b*(t0^c), data=size_scgl, start=list(a=1, b=1, c=1))
+nlm1 <- nls(t1 ~ a + b*t0, data = size_scgl1, start = list(a=1, b=1))
+nlm2 <- nls(t1 ~ a + b*t0 + c*t0sq, data=size_scgl1, start = (list(a=1, b=1, c=1)))
+nlm3 <- nls(t1 ~ a + b*(t0^c), data=size_scgl1, start=list(a=1, b=1, c=1))
 
 nlm.list <- list(nlm1, nlm2, nlm3)
 nlm.names <- as.character(unlist(lapply(nlm.list, formula)))
@@ -566,18 +904,17 @@ for(i in 2:length(nlm.list)){
   print(exp(0.5*nlm.results$Delta_AICc[i]))
 }
 
-size_scgl$growth_residuals <- NA
-size_scgl$growth_residuals[which(!is.na(size_scgl$t1) & !is.na(size_scgl$t0))] <- summary(nlm1)$residuals^2 # so the variance squared
+size_scgl1$growth_residuals <- NA
+size_scgl1$growth_residuals[which(!is.na(size_scgl1$t1) & !is.na(size_scgl1$t0))] <- summary(nlm1)$residuals^2 # so the variance squared
 #########################################
 
-plot(growth_residuals~t0, data=size_scgl, pch=16)
-plot(t1~t0, data=size_scgl, pch=16)
+plot(growth_residuals~t0, data=size_scgl1, pch=16)
+plot(t1~t0, data=size_scgl1, pch=16)
 
 ```
 
 
-```{r}
-
+# ```{r}
 reproyesno_models <- list(glm(reproyesno~ t0, family= "binomial",data = size),
                    glm(reproyesno~ t0 + t0sq , family= "binomial",data =size))
 # gives the value of the lowest AICc
@@ -592,9 +929,10 @@ rep_models <- list(lm(bulbs0~ t0, data = sizeforrepro),
 min_AIC <- min(MuMIn::AICc(rep_models[[1]], rep_models[[2]])$AICc)# gives the value of the lowest AICc
 (bestrep <- rep_models[[which(min_AIC == MuMIn::AICc(rep_models[[1]], rep_models[[2]])$AICc)]]) # gives you the info for the best-fit model
 
+```{r}
 ###################### ScGl when reproductive ##########################
-glm.rp1 <- glm(reproyesno ~ t0, family = "binomial", data = size_scgl, maxit = 100) # 
-glm.rp2 <- glm(reproyesno ~ t0 + t0sq, family = "binomial", data = size_scgl)
+glm.rp1 <- glm(reproyesno ~ t0, family = "binomial", data = size_scgl1, maxit = 100) # 
+glm.rp2 <- glm(reproyesno ~ t0 + t0sq, family = "binomial", data = size_scgl1)
 
 glm.rp.list <- list(glm.rp1, glm.rp2)
 glm.rp.names <- as.character(unlist(lapply(glm.rp.list, formula)))
@@ -613,16 +951,16 @@ summary(rep1)
 ```
 
 
-```{r}
+# ```{r}
 # variance in growth: uses best-fit model for growth: linear function of size, quadratic function of size, no intercept
 var_models <- list(glm(growth_residuals~ t0-1, data= size), glm(growth_residuals~ t0 + t0sq-1, data= size))
 min_AIC <- min(MuMIn::AICc(var_models[[1]], var_models[[2]])$AICc) # gives the value of the lowest AICc
 bestvar <- var_models[[which(min_AIC == MuMIn::AICc(var_models[[1]], var_models[[2]])$AICc)]] # gives you the info for the best-fit model
 
-
+```{r}
 ################## ScGl ##################
-var1 <- glm(growth_residuals ~ t0-1, data = size_scgl)
-var2 <- glm(growth_residuals ~ t0 + t0sq-1, data = size_scgl)
+var1 <- glm(growth_residuals ~ t0-1, data = size_scgl1)
+var2 <- glm(growth_residuals ~ t0 + t0sq-1, data = size_scgl1)
 
 var.list <-  list(var1, var2)
 var.names <- as.character(unlist(lapply(var.list, formula)))
@@ -638,7 +976,7 @@ for(i in 2:length(var.list)){
 
 Line 225: everything below in this section is in a loop that varies how many bins (size classes) are used to make the model: this is what this code is for, but that is not something that you need to do, so don't worry about this, except to know that you do need to define how many bins you will use. 
 
-```{r}
+# ```{r}
 # vary bin sizes
 
 lambdas_ipm_mean <- vector("numeric", length= length(bin.num))
