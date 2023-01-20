@@ -319,18 +319,20 @@ save(sg.merged,  file=paste(userpath, "Denver Botanic Gardens/Conservation - Gen
 
 ## remove atwell and add in later
 sg_summary <- sg %>%
-  filter(Year > 2008) %>%
-  filter(!(Site %in% c("Atwell Gulch","Atwell Gulch (old)"))) %>%
+  filter(Year > 2008,
+         !(Site %in% c("Atwell Gulch","Atwell Gulch (old)"))) %>%
   group_by(Site,SiteSame,NS,Year) %>%
   dplyr::summarise(.groups = "keep",
                    ## the number of individuals should include minis
                    X = length(Tag[Height.cm. >0]) + sum(Minis, na.rm = TRUE),
                    Rep = sum(Fl, na.rm = TRUE),
                    Brs = sum(Br, na.rm = TRUE),
-                   avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
-                   sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
-                   avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
-                   sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                   medianH = median(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+                   Height95HDIlwr = hdi(Height.cm.[Height.cm. > 0], credMass = 0.95)[1],
+                   Height95HDIupr = hdi(Height.cm.[Height.cm. > 0], credMass = 0.95)[2],
+                   medianW = median(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                   Width95HDIlwr = hdi(Width.cm.[Width.cm. > 0], credMass = 0.95)[1],
+                   Width95HDIupr = hdi(Width.cm.[Width.cm. > 0], credMass = 0.95)[2],
                    avgVol = mean(Vol, na.rm = TRUE),
                    sdVol = sd(Vol, na.rm = TRUE))
 
@@ -339,12 +341,14 @@ atwell_summary <- bind_rows(atwell.old, atwell.new) %>%
   group_by(Site,SiteSame,NS,Year) %>%
   dplyr::summarise(.groups = "keep",
                    X = length(Tag[Height.cm. >0] + sum(Minis, na.rm = TRUE)),
-                Rep = sum(Fl, na.rm = TRUE),
-                    Brs = sum(Br, na.rm = TRUE),
-                    avgH = mean(Height.cm.[Height.cm. > 0], na.rm = TRUE),
-                    sdH = sd(Height.cm.[Height.cm. > 0], na.rm = TRUE),
-                    avgW = mean(Width.cm.[Width.cm. > 0], na.rm = TRUE),
-                    sdW = sd(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                   Rep = sum(Fl, na.rm = TRUE),
+                   Brs = sum(Br, na.rm = TRUE),
+                   medianH = median(Height.cm.[Height.cm. > 0], na.rm = TRUE),
+                   Height95HDIlwr = hdi(Height.cm.[Height.cm. > 0], credMass = 0.95)[1],
+                   Height95HDIupr = hdi(Height.cm.[Height.cm. > 0], credMass = 0.95)[2],
+                   medianW = median(Width.cm.[Width.cm. > 0], na.rm = TRUE),
+                   Width95HDIlwr = hdi(Width.cm.[Width.cm. > 0], credMass = 0.95)[1],
+                   Width95HDIupr = hdi(Width.cm.[Width.cm. > 0], credMass = 0.95)[2],
                     avgVol = mean(Vol, na.rm = TRUE),
                     sdVol = sd(Vol, na.rm = TRUE))
 
@@ -354,6 +358,14 @@ atwell_summary <- bind_rows(atwell.old, atwell.new) %>%
 #Data summary
 Combine 2008 (with no height or width data) and remaining years 
 ```{r}
+
+## Now sg_summary has a lower and upper HDI where sg_summary08 only has SD for height and width. 
+sg_summary08 <- sg_summary08 %>%
+  dplyr::mutate(# dplyr::rename(Height95HDIlwr = sdH),
+                # dplyr::rename(Width95HDIlwr = sdW),
+                Height95HDIupr = NA, Width95HDIupr = NA) %>%
+  # select(Site:Height95HDIlwr,Height95HDIupr,avgW:Width95HDIlwr, Width95HDIupr, avgVol:sdVol )
+  dplyr::select(Site:sdH, Height95HDIupr, avgW:sdW, Width95HDIupr, avgVol:sdVol)
 names(sg_summary08) <- names(sg_summary)
 sg_sum <- do.call(rbind, list(sg_summary08,sg_summary, atwell_summary))
 ```
@@ -478,37 +490,36 @@ tableout <- sg_sum %>%
   dplyr::select(Year, Site, X:area) %>%
   group_by(Year,Site) %>%
   mutate(TotInd = X, IndSqM = round(X/area,2), PercRepro = paste0(round(100*Rep/X, 1), "%"),
-         AvgHeight = paste(round(avgH,2), " (", round(sdH,2), ")", sep=""),
-         AvgWidth = paste(round(avgW,2), " (", round(sdW,2), ")", sep = ""),
+         MedianHeight = paste(round(medianH,2), " (", round(Height95HDIlwr,2), "-", round(Height95HDIupr,2),"cm)", sep=""),
+         MedianWidth = paste(round(medianH,2), " (", round(Width95HDIlwr,2), "-",round(Width95HDIupr,2), "cm)", sep = ""),
          PercBr = paste0(round(100*Brs/X, 2), "%")) %>%
-  dplyr::select(Site:Year, area, TotInd, IndSqM, Rep, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
+  dplyr::select(Site:Year, area, TotInd, IndSqM, Rep, PercRepro, MedianHeight, MedianWidth, Brs, PercBr)
 
 new <- c("Atwell Gulch","Oil Pad","Pond","T-Junction")
 
 tablesummaryout <- sg_sum %>%
   dplyr::mutate(Group = case_when(Site %in% new ~ "post",
                            !(Site %in% new) ~ "pre")) %>%
-  dplyr::select(Year, Site, X:area, Group) %>%
+  # dplyr::select(Year, Site, X:area, Group) %>%
   group_by(Group, Year) %>%
   dplyr::summarise(area = sum(area), TotInd = sum(X), IndSqM = round(sum(X)/area,2), 
                    PercRepro = paste0(round(100*sum(Rep)/sum(X), 1), "%"),
-         AvgHeight = paste(round(mean(avgH),2), " (", round(mean(sdH),2), ")", sep=""),
-         AvgWidth = paste(round(mean(avgW),2), " (", round(mean(sdW),2), ")", sep = ""),
-         Brs = sum(Brs), PercBr = paste0(round(100*sum(Brs)/sum(X), 2), "%")) %>%
-  dplyr::select(Group, Year, area, TotInd, IndSqM, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
+         # MedianHeight = paste(round(medianH,2), " (", round(Height95HDIlwr,2), "-", round(Height95HDIupr,2),"cm)", sep=""),
+         # MedianWidth = paste(round(medianH,2), " (", round(Width95HDIlwr,2), "-",round(Width95HDIupr,2), "cm)", sep = ""),
+         Brs = sum(Brs), PercBr = paste0(round(100*sum(Brs)/sum(X), 2), "%")) 
+
 
 
 ### summary of average size and SD of size across all sites within the pre and post set up
 sizesummary <- bind_rows(atwell.old, atwell.new, sg) %>%
   dplyr::mutate(Group = case_when(Site %in% new ~ "post",
                            !(Site %in% new) ~ "pre")) %>%
-  dplyr::select(Year, Site, Group, Height.cm.:Width.cm., Group) %>%
+  # dplyr::select(Year, Site, Group, Height.cm.:Width.cm., Group) %>%
   group_by(Group, Year) %>%
-  dplyr::summarise(AvgHeight = paste(round(mean(Height.cm., na.rm=TRUE),2), 
-                                     " (", round(sd(Height.cm., na.rm=TRUE),2), ")", sep=""),
-                   AvgWidth = paste(round(mean(Width.cm., na.rm=TRUE),2), 
-                                    " (", round(sd(Width.cm., na.rm=TRUE),2), ")", sep = "")) %>%
-  dplyr::select(Group, Year, AvgHeight, AvgWidth)
+  dplyr::summarise(
+         MedianHeight = paste(round(Height.cm.,2), " (", round(Height95HDIlwr,2), "-", round(Height95HDIupr,2),"cm)", sep=""),
+         MedianWidth = paste(round(medianH,2), " (", round(Width95HDIlwr,2), "-",round(Width95HDIupr,2), "cm)", sep = ""))
+  # dplyr::select(Group, Year, AvgHeight, AvgWidth)
 
 ```
 
