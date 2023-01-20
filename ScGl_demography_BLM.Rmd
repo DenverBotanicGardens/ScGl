@@ -360,13 +360,14 @@ Table 2: Summary data of Sclerocactus glaucus demographic monitoring in western 
 ```{r}
 
 # total area from table 2
+## Should be total meter2 surveyed (not the entire size of the macroplot)
 unique(sg_sum$Site)
 sg_sum$area <- NA
 sg_sum$area[sg_sum$Site == "Escalante Canyon"] <- 180
 sg_sum$area[sg_sum$Site == "Bridgeport"] <- 200 # 400 is wrong, is four 1 x 50m
-sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390 # correct, 2012 and beyond is 390
+sg_sum$area[sg_sum$Site == "Atwell Gulch"] <- 390 # correct, 2012 and beyond is 390, but the macroplot area == 1270
 sg_sum$area[sg_sum$Site == "Atwell Gulch (old)"] <- 300
-sg_sum$area[sg_sum$Site == "Fram"] <- 2600 # 1300, not adjacent, treat them as if they're within 2600m2
+sg_sum$area[sg_sum$Site == "Fram"] <- 1300 # 1300, not adjacent, treat them as if they're within 2600m2
 sg_sum$area[sg_sum$Site == "Oil Pad (old)"] <- 672
 sg_sum$area[sg_sum$Site == "Oil Pad"] <- 120 # correct 2012 forward
 sg_sum$area[sg_sum$Site == "Picnic Site"] <- 160
@@ -457,16 +458,17 @@ sg_density %>%
 ```
 
 ```{r}
+# ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"density_corrected.jpg", sep=""),
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"density.jpg", sep=""),
 
-  plot1 + plot3 + plot_layout(widths = c(1,3)),
+  plot1 + plot3 + plot_layout(widths = c(2,5)),
 
 
-width = 275, height = 200, units = 'mm', dpi=300)
+width = 305, height = 200, units = 'mm', dpi=300)
 
 ```
 
-Summary tables
+Summary tables pre and post
 ```{r}
 
 tableout <- sg_sum %>%
@@ -478,14 +480,91 @@ tableout <- sg_sum %>%
          PercBr = paste0(round(100*Brs/X, 2), "%")) %>%
   dplyr::select(Site:Year, area, TotInd, IndSqM, Rep, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
 
+new <- c("Atwell Gulch","Oil Pad","Pond","T-Junction")
+
+tablesummaryout <- sg_sum %>%
+  dplyr::mutate(Group = case_when(Site %in% new ~ "post",
+                           !(Site %in% new) ~ "pre")) %>%
+  dplyr::select(Year, Site, X:area, Group) %>%
+  group_by(Group, Year) %>%
+  dplyr::summarise(area = sum(area), TotInd = sum(X), IndSqM = round(sum(X)/area,2), 
+                   PercRepro = paste0(round(100*sum(Rep)/sum(X), 1), "%"),
+         AvgHeight = paste(round(mean(avgH),2), " (", round(mean(sdH),2), ")", sep=""),
+         AvgWidth = paste(round(mean(avgW),2), " (", round(mean(sdW),2), ")", sep = ""),
+         Brs = sum(Brs), PercBr = paste0(round(100*sum(Brs)/sum(X), 2), "%")) %>%
+  dplyr::select(Group, Year, area, TotInd, IndSqM, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
+
+
+### summary of average size and SD of size across all sites within the pre and post set up
+sizesummary <- bind_rows(atwell.old, atwell.new, sg) %>%
+  dplyr::mutate(Group = case_when(Site %in% new ~ "post",
+                           !(Site %in% new) ~ "pre")) %>%
+  dplyr::select(Year, Site, Group, Height.cm.:Width.cm., Group) %>%
+  group_by(Group, Year) %>%
+  dplyr::summarise(AvgHeight = paste(round(mean(Height.cm., na.rm=TRUE),2), 
+                                     " (", round(sd(Height.cm., na.rm=TRUE),2), ")", sep=""),
+                   AvgWidth = paste(round(mean(Width.cm., na.rm=TRUE),2), 
+                                    " (", round(sd(Width.cm., na.rm=TRUE),2), ")", sep = "")) %>%
+  dplyr::select(Group, Year, AvgHeight, AvgWidth)
+
+```
+
+
+### 2016 on only Atwell Gulch repeats, should drop Atwell Gulch pre since all of these are included in post   
+Should report the means and differences among ScGl and ScDa plots in 2016 onward. 
+Summary tables pre and post
+```{r}
+
+tableoutNS <- sg_sum %>%
+  filter(Year > 2015, !grepl("old",Site) ) %>%
+  dplyr::select(Year, Site, NS, X:area) %>%
+  group_by(Year,NS,Site) %>%
+  mutate(TotInd = X, IndSqM = round(X/area,2), PercRepro = paste0(round(100*Rep/X, 1), "%"),
+         AvgHeight = paste(round(avgH,2), " (", round(sdH,2), ")", sep=""),
+         AvgWidth = paste(round(avgW,2), " (", round(sdW,2), ")", sep = "")
+         PercBr = paste0(round(100*Brs/X, 2), "%")) %>%
+  dplyr::select(Year,NS,Site, area, TotInd, IndSqM, Rep, PercRepro, AvgHeight, AvgWidth, Brs, PercBr) %>%
+  arrange(Year,NS,Site)
+
+
+tablesummaryoutNS <- sg_sum %>%
+  dplyr::select(Year, Site, X:area, NS) %>%
+  filter(Year > 2015, !grepl("old",Site) ) %>%
+  group_by(NS, Year) %>%
+  dplyr::summarise(area = sum(area), TotInd = sum(X), IndSqM = round(sum(X)/area,2), 
+                   Rep = sum(Rep),
+                   PercRepro = paste0(round(100*sum(Rep)/sum(X), 1), "%"),
+         AvgHeight = paste(round(mean(avgH),2), " (", round(mean(sdH),2), ")", sep=""),
+         AvgWidth = paste(round(mean(avgW),2), " (", round(mean(sdW),2), ")", sep = ""),
+         Brs = sum(Brs), PercBr = paste0(round(100*sum(Brs)/sum(X), 2), "%")) %>%
+  dplyr::select(NS, Year, area, TotInd, IndSqM, Rep, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
+
+
+library(HDInterval)
+### summary of average size and SD of size across all sites within the pre and post set up
+sizesummaryNS <- bind_rows(atwell.new, sg) %>%
+  filter(Year > 2015, !grepl("old",Site), Height.cm. > 0 ) %>%
+  dplyr::select(Year, Site, NS, Height.cm.:Width.cm.) %>%
+  group_by(NS, Year) %>%
+  dplyr::summarise(# AvgHeight = paste(round(mean(Height.cm., na.rm=TRUE),2), 
+                                     # " (", round(sd(Height.cm., na.rm=TRUE),2), ")", sep=""),
+                   # AvgWidth = paste(round(mean(Width.cm., na.rm=TRUE),2), 
+                                    # " (", round(sd(Width.cm., na.rm=TRUE),2), ")", sep = ""),
+                   MedianWidth = paste(round( exp(mean(log(Width.cm.))),2), " (",
+                                        round( exp(mean(log(Width.cm.))+ sd(log(Width.cm.))),2),  ")", sep = ""),
+                   HDI95_width = paste("(",round(hdi(Width.cm., credMass = 0.95)[1],2),
+                               "-",round(hdi(Width.cm., credMass = 0.95)[2],2), "cm)", sep = ""),
+                   MedianHeight = paste(round( exp(mean(log(Height.cm.))),2), " (",
+                                        round( exp(mean(log(Height.cm.))+ sd(log(Height.cm.))),2),  ")", sep = ""),
+                   HDI95_height = paste("(",round(hdi(Height.cm., credMass = 0.95)[1],2),
+                               "-",round(hdi(Height.cm., credMass = 0.95)[2],2), "cm)", sep = ""))
+
 ```
 
 
 
 ```{r}
-new <- c("Atwell Gulch","Oil Pad","Pond","T-Junction")
-# poststand <- tableout[tableout$Year == currentYr & tableout$Site %in% new,]
-# prestand <- tableout[tableout$Year == currentYr & !(tableout$Site %in% new),]
+
 
 ## All years with minis added to count
 poststand <- tableout %>%
@@ -496,12 +575,43 @@ prestand <- tableout %>%
   filter(!Site %in% new) %>%
   arrange(Year,Site)
 
+
+
+# write.table(poststand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_poststand_correction.csv", sep=""), sep=",", row.names=FALSE, col.names = TRUE)
+# 
+# 
+# write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_prestand_correction.csv", sep=""),
+#             sep=",", row.names=FALSE, col.names = TRUE)
+
+
 write.table(poststand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_poststand.csv", sep=""), sep=",", row.names=FALSE, col.names = TRUE)
 
 
 write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_prestand.csv", sep=""),
             sep=",", row.names=FALSE, col.names = TRUE)
 
+write.table(tableoutNS, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_ScGl_ScDa.csv", sep=""),
+            sep=",", row.names=FALSE, col.names = TRUE)
+
+
+### For 2008-2015 to compare the old and new designs
+## Summary for each year and pre or post; average of the mean size and average of the SDs
+write.table(tablesummaryout, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_yearlysummary.csv", sep=""),
+            sep=",", row.names=FALSE, col.names = TRUE)
+
+## Size summary of average size and SD across all individuals in a group
+write.table(sizesummary, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_yearlySIZEsummary.csv", sep=""),
+            sep=",", row.names=FALSE, col.names = TRUE)
+
+
+### For 2016-currentYr to compare ScGl and ScDa
+## Summary for each year and species; average of the mean size and average of the SDs but the rest are good summaries
+write.table(tablesummaryoutNS, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_yearlysummary_ScGl_ScDa.csv", sep=""),
+            sep=",", row.names=FALSE, col.names = TRUE)
+
+## Size summary of average size and SD across all individuals in a species
+write.table(sizesummaryNS, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_yearlySIZEsummary_ScDa.csv", sep=""),
+            sep=",", row.names=FALSE, col.names = TRUE)
 ```
 
 # Results: Reproduction
@@ -1610,7 +1720,8 @@ Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
   ggtitle("a)")+
-  facet_wrap(~NS + SiteSame, ncol = 5) +
+  facet_wrap(~NS + SiteSame, ncol = 5, scales = "free_y") +
+  # ggh4x::facet_grid2(NS ~ SiteSame, scales = "free_y", independent = "y")+ ## not quite, don't need ggh4x
   ylab("Individuals per square meter") +
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
   theme_bw()+
@@ -1631,8 +1742,9 @@ Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
 ggplot(sg_sum, aes(Density, SiteSame, fill = NS))+
   geom_boxplot() 
 
-write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
+# write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density_correction.csv", sep=""))
 
+write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
 ```
 
 
