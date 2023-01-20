@@ -36,6 +36,9 @@ require(AICcmodavg)
 library(magrittr)
 library(scales)
 library(lme4)
+
+## Highest density interval
+library(HDInterval)
 ```
 
 
@@ -540,8 +543,8 @@ tablesummaryoutNS <- sg_sum %>%
   dplyr::select(NS, Year, area, TotInd, IndSqM, Rep, PercRepro, AvgHeight, AvgWidth, Brs, PercBr)
 
 
-library(HDInterval)
-### summary of average size and SD of size across all sites within the pre and post set up
+### summary of average size and SD of size across all sites within the pre and post set up  
+## report the median and the highest density interval of 95%
 sizesummaryNS <- bind_rows(atwell.new, sg) %>%
   filter(Year > 2015, !grepl("old",Site), Height.cm. > 0 ) %>%
   dplyr::select(Year, Site, NS, Height.cm.:Width.cm.) %>%
@@ -551,13 +554,11 @@ sizesummaryNS <- bind_rows(atwell.new, sg) %>%
                    # AvgWidth = paste(round(mean(Width.cm., na.rm=TRUE),2), 
                                     # " (", round(sd(Width.cm., na.rm=TRUE),2), ")", sep = ""),
                    MedianWidth = paste(round( exp(mean(log(Width.cm.))),2), " (",
-                                        round( exp(mean(log(Width.cm.))+ sd(log(Width.cm.))),2),  ")", sep = ""),
-                   HDI95_width = paste("(",round(hdi(Width.cm., credMass = 0.95)[1],2),
-                               "-",round(hdi(Width.cm., credMass = 0.95)[2],2), "cm)", sep = ""),
+                                       round(hdi(Width.cm., credMass = 0.95)[1],2),
+                                       "-",round(hdi(Width.cm., credMass = 0.95)[2],2), "cm)", sep = ""),
                    MedianHeight = paste(round( exp(mean(log(Height.cm.))),2), " (",
-                                        round( exp(mean(log(Height.cm.))+ sd(log(Height.cm.))),2),  ")", sep = ""),
-                   HDI95_height = paste("(",round(hdi(Height.cm., credMass = 0.95)[1],2),
-                               "-",round(hdi(Height.cm., credMass = 0.95)[2],2), "cm)", sep = ""))
+                                        round(hdi(Height.cm., credMass = 0.95)[1],2),
+                                        "-",round(hdi(Height.cm., credMass = 0.95)[2],2), "cm)", sep = ""))
 
 ```
 
