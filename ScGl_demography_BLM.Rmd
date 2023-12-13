@@ -474,6 +474,7 @@ plot3 <- filter(sg_density, !grepl("old", Site)) %>%
     ylab("Density: percent change from baseline")+
     geom_hline(yintercept = -0.2, linetype = "longdash")
 
+## Average change in density from baseline
 sg_density %>%
   group_by(NS) %>%
   dplyr::summarise(MeanChange = mean(Change.Density[Year == currentYr]))
@@ -876,6 +877,15 @@ write.table(prestand, file = paste(userpath, "Denver Botanic Gardens/Conservatio
 write.table(tableoutNS, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_ScGl_ScDa.csv", sep=""),
             sep=",", row.names=FALSE, col.names = TRUE)
 
+## Demography: reproduction
+tableoutNS %>%
+  mutate(PercRepro = gsub("%","",PercRepro)) %>%
+  mutate(PercRepro = as.numeric(PercRepro)) %>%
+  mutate(PercRepro = PercRepro/100) %>%
+  filter(Year == currentYr) %>%
+  group_by(NS) %>%
+  dplyr::summarise(mean = mean(PercRepro),
+                   sd = sd(PercRepro))
 
 ### For 2008-2015 to compare the old and new designs
 ## Summary for each year and pre or post; average of the mean size and average of the SDs
@@ -980,6 +990,7 @@ rep_site %>%
   summarise(Mean = mean(MeanRep), SD = sd(SDRep))
 
 
+
 # the ones that changed 
 rep_site.post <- sg_sum %>%
   filter(Year >= 2012) %>%
@@ -1005,18 +1016,6 @@ ggplot(compareall, aes(Year, MeanRep, color = Group))+
 ### Are larger non-reproductive individuals dying?
 table(sg$Comments[which(sg$Width.cm. > 6.5 & sg$Fl == 0)])
 
-
-# Atwell gulch: reproduction detected in new vs. old design
-# Atwell.oldPR <- sg_sum %>%
-#   filter(SiteSame == "Atwell Gulch") %>%
-#   group_by(Year, Site) %>%
-#   dplyr::summarise(PR = Rep/X, .groups = "keep") %>%
-#   group_by(Year) %>%
-#   dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR), 
-#                    SE = sd(PR)/sqrt(length(PR))) %>% 
-#                     # CI = sd(PR)/sqrt(length(PR)) * (qt(0.95/2 + 0.5, length(PR)-1))) %>%
-#   mutate(Group = "atwell")
-
 # Average reproduction of each site
 sg_sum %>%
   group_by(Year, Site) %>%
@@ -1026,7 +1025,6 @@ sg_sum %>%
                    SE = sd(PR)/sqrt(length(PR)),
                     CI = sd(PR)/sqrt(length(PR)) * (qt(0.95/2 + 0.5, length(PR)-1))) %>%
   mutate(Group = "all") %>%
-  arrange(desc(MeanRep))
 
 sg_sum <- sg_sum %>%
   mutate(PRep = Rep/X)
@@ -2056,8 +2054,6 @@ Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
 ggplot(sg_sum, aes(Density, SiteSame, fill = NS))+
   geom_boxplot() 
 
-# write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density_correction.csv", sep=""))
-
 write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
 ```
 
@@ -2388,10 +2384,11 @@ ggheight/ggwidth,
 summary(lm(Height.cm..x ~ Height.cm..y*NS, data=sg.xy[sg.xy$Height.cm..x != 0 & 
                                                         sg.xy$Height.cm..y != 0,]))
 0.930089 + 0.004730
+0.927771 + 0.004654
 summary(lm(Width.cm..x ~ Width.cm..y*NS, data=sg.xy[sg.xy$Width.cm..x != 0 & 
                                                         sg.xy$Width.cm..y != 0,]))
 0.956704 + -0.069552 
-
+0.955013 + -0.063365
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Figure6HeigthWidthScGlScDa.jpg", sep=""),
 sg.xy %>%
