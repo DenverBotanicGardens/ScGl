@@ -523,8 +523,10 @@ table(sg.newold$SiteSame)
 sg.JS <- sg.newold %>%
   mutate(SiteSame = droplevels(SiteSame)) %>%
   mutate(NS = gsub(" ", "", NS)) %>%
+  mutate(NS = gsub("\\.","",NS)) %>%
   mutate(Site = gsub(" ", "", SiteSame)) %>%
   mutate(Site = gsub("-", "", Site)) %>%
+  mutate(NS = as.factor(NS)) %>%
   mutate(capture = if_else(Width.cm. > 0, "1", "0")) %>%
   tidyr::complete(nesting(Site,Transect,Tag, Year, NS), fill = list(capture = "0")) %>%
   arrange(Year, .by_group = TRUE) %>%
@@ -534,13 +536,19 @@ sg.JS <- sg.newold %>%
   filter(grepl("1",ch))
 
 dmPlot <- model.matrix(~ -1 + Site, sg.JS)
-dmSpecies <- model.matrix(~ -1 + Site + NS, sg.JS)
+# dmSpecies <- model.matrix(~ -1 + Site + NS, sg.JS)
+# ## Add S.dawsonii column
+# dmSpecies <- dmSpecies %>%
+#   as.data.frame(.) %>%
+#   mutate(NSSdawsonii = if_else(NSSglaucus == 0, 1, 0))
 
 sg.JSPlot <- sg.JS %>%
   # dplyr::select(ch, NS) %>%
-  dplyr::select(ch) %>%
+  dplyr::select(ch, NS) %>%
+  # bind_cols(dmSpecies) %>%
   bind_cols(dmPlot) %>%
   mutate(SiteTJunction = paste(SiteTJunction, ";", sep = ""))
+  # mutate(NSSdawsonii =  paste(NSSdawsonii, ";", sep = ""))
 
 sg.JSPlot %>%
   write.table(file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"CJS_scgl.inp", sep=""), 
@@ -556,14 +564,17 @@ sg.JSPlot %>%
 plotdf <- sg.JS %>%
   distinct(Site) %>%
   mutate(Site = as.factor(Site))
+speciesdf <- sg.JS %>%
+  distinct(Site,NS) %>%
+  mutate(NS = as.factor(NS)) 
 
 scgl.inp <- convert.inp(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"CJS_scgl.inp", sep=""),
-                        group.df = plotdf, 
-                        # covariates = "NS",
-                        covariates = NULL,
+                        # group.df = speciesdf,
+                        group.df = plotdf,
+                        covariates = "NS",
                         use.comments = FALSE)
 
-scglproc <- process.data(scgl.inp, model = "Pradrec", groups = "Site", begin.time = 2008)
+scglproc <- process.data(scgl.inp, model = "Pradrec", groups = c("Site","NS"), begin.time = 2008)
 scglddl <- make.design.data(scglproc)
 
 ## Fix p to zero when no survey
@@ -641,6 +652,60 @@ run.scgl <- function(){
 scgl.models <- run.scgl()
 save(scgl.models, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"PradelScGl.Rdata", sep=""))
 
+
+## Estimate constant population growth rate across each study site but setting apparent survival constant.  Constant survival
+
+scgl.constant <- mark(data = scglproc, ddl = scglddl, model = "Pradrec",
+                      model.parameters = list(p = list(formula = ~ Site, fixed = list(index = p.indices, value = p.values)),
+                                              Phi = list(formula = ~ Site),
+                                              f = list(formula = ~ time + Site)),
+                      begin.time = 2008,
+                      groups = "Site")
+
+summary(scgl.constant)
+
+estimates <- scgl.constant$results$real %>%
+  mutate(params = row.names(.)) %>%
+  separate(params, into = c("Parameter","group","age","time"))
+  
+scgl.constant$results$derived$`Lambda Population Change`
+
+## lambda = f + survival, estimate with all values within the range of uncertainty for f and Phi
+# skip the first year, estimates are crazy for per capita recruitment
+x <- unique(estimates$group)[1]
+sitelambdas <- do.call(rbind, lapply(unique(estimates$group), function(x){
+  group <- estimates[estimates$group == x,]
+  Phirange <- seq(from = group$lcl[group$Parameter == "Phi"],
+                  to = group$ucl[group$Parameter == "Phi"], length.out = 10)
+  frange <- c()
+  for(yr in 2:14){
+    frange <- cbind(frange, fvalues = seq(from = group$lcl[group$Parameter == "f"][yr],
+                                          to = group$ucl[group$Parameter == "f"][yr], length.out = 10))
+  }
+  frange <- data.frame(frange)
+  colnames(frange) <- paste("Year",2009:2021, sep="")
+  # For each year, need all combinations of 
+  combos <- do.call(rbind,lapply(1:nrow(frange), function(yr) {
+    out <- data.frame(group = x, Year = yr)
+    params <- expand.grid(Phirange, frange[,yr])
+    colnames(params) <- c("Phi","f")
+    params$lambda <- params$Phi + params$f
+    data.frame(out,params)
+  }))
+  }))
+
+sitelambdas %>%
+  group_by(group) %>%
+  mutate(group = gsub("g","",group)) %>%
+  left_join()
+  dplyr::summarise(hdilwl = HDInterval::hdi(lambda)[1],
+                   hdiupl = HDInterval::hdi(lambda)[2],
+                   median = median(lambda)) %>%
+  ggplot(  aes(group, median))+
+    geom_point()+
+    geom_errorbar(aes(ymin = hdilwl, ymax = hdiupl), width = 0.5)+
+    theme_bw() +
+    
 ```
 
 ```{r}
