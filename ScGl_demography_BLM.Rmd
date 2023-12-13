@@ -667,7 +667,12 @@ summary(scgl.constant)
 estimates <- scgl.constant$results$real %>%
   mutate(params = row.names(.)) %>%
   separate(params, into = c("Parameter","group","age","time"))
+
+estimates %>%
+  filter(Parameter == "p")
+
   
+
 scgl.constant$results$derived$`Lambda Population Change`
 
 ## lambda = f + survival, estimate with all values within the range of uncertainty for f and Phi
@@ -694,10 +699,15 @@ sitelambdas <- do.call(rbind, lapply(unique(estimates$group), function(x){
   }))
   }))
 
-sitelambdas %>%
-  group_by(group) %>%
-  mutate(group = gsub("g","",group)) %>%
-  left_join()
+SiteSpecies <- sg %>%
+  distinct(Site, NS) %>%
+  mutate(Site = gsub(" ", "", Site)) %>%
+  mutate(Site = gsub("-", "", Site)) 
+
+Fig2b <- sitelambdas %>%
+  mutate(group = sub("g","",group)) %>%
+  left_join(SiteSpecies, by = c("group" = "Site")) %>%
+  group_by(group, NS) %>%
   dplyr::summarise(hdilwl = HDInterval::hdi(lambda)[1],
                    hdiupl = HDInterval::hdi(lambda)[2],
                    median = median(lambda)) %>%
@@ -705,6 +715,15 @@ sitelambdas %>%
     geom_point()+
     geom_errorbar(aes(ymin = hdilwl, ymax = hdiupl), width = 0.5)+
     theme_bw() +
+    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+    theme(strip.text = element_text(face = "italic")) +
+    facet_wrap(~NS, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    ylab(expression(lambda))+
+    xlab("")+
+    ggtitle("b)")
+
+## See far below for Fig2a, count based growth rate
     
 ```
 
@@ -2272,21 +2291,24 @@ plot.noold <- rbind(plot.noold, plot.currentYr[plot.currentYr$Site == "Atwell Gu
 plot.countlambda <- plot.noold %>%
   pivot_wider(names_from = variable, values_from = value)
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2.jpg", sep=""),
-
-ggplot(plot.countlambda, aes(Site, fit))+
+Fig2a <- ggplot(plot.countlambda, aes(Site, fit))+
   geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
   geom_point() +
   theme_bw()+
   # scale_shape_manual(values = c("*","-","-"))+
   # scale_colour_manual(values=c("black","red", "red"))+
   geom_errorbar(aes(ymin = lwr, ymax = upr), width = .5) +
-  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust = 0, size = 12))+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
   guides(colour= "none", shape= "none", size = "none")+
   ylab(expression(lambda))+
-  facet_grid(~NS, scales="free"), 
+  facet_grid(~NS, scales="free")+
+  theme(strip.text = element_text(face = "italic"))+
+  ggtitle("a)")
 
-width=180, height=150, units="mm", dpi=300)
+
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2ab.jpg", sep=""),
+       Fig2a/Fig2b,
+width=200, height=250, units="mm", dpi=300)
 
 ```
 
