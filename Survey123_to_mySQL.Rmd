@@ -1,0 +1,88 @@
+---
+title: "Survey123_to_mySQL"
+author: "Michelle DePrenger-Levin"
+date: "2024-06-12"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(stringr)
+```
+
+
+
+2024 was the first year we collected data using a Survey123 form. The data needs to be reformatted to ingest by the PHP mySQL database.   
+```{r}
+
+## Transect and Site, 
+demo2024 <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/Sclerocactus_glaucus_DemographicMonitoring_0.csv")
+
+plants2024 <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/plantData_1.csv")
+
+```
+
+To upload to MySQL through the PHP   
+```{r}
+# Step 1
+##  download current year csv from database
+# Step 2
+## push to git
+
+
+## Add year to each data column 
+currentyr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
+
+## Needs to skip 3 non-blank rows to get to headers
+headers <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"), 
+                    skip = 3,
+                    header = FALSE, nrows = 1, as.is = TRUE)
+# Only skip 4, it will ignore the top 3 blank rows
+df2enter <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"),, skip = 4, header = FALSE)
+
+# Match gives first time it matches
+headers[,match("Height (cm)", headers)] <- paste0("Height (cm)", currentyr - 2)
+headers[,match("Width (cm)", headers)] <- paste0("Width (cm)", currentyr - 2)
+
+headers[,match("Height (cm)", headers)] <- paste0("Height (cm)", currentyr - 1)
+headers[,match("Width (cm)", headers)] <- paste0("Width (cm)", currentyr - 1)
+
+headers[,"Comments" == headers][2] <- paste0("Comments", currentyr)
+
+## remove all white space and special characters
+headersNowhite <- sapply(headers, function(x) gsub(" ", "", x))
+headersNospch <- sapply(headersNowhite, function(x) str_replace_all(x, "[^[:alnum:]]", ""))
+
+colnames(df2enter) <- headersNospch
+
+
+## Use NA to advantage to remove rows without Transect info
+df2enter <- df2enter %>%
+  select(TagIdignoreforupload:Comments) %>%
+  mutate(Transect = as.numeric(as.character(Transect))) %>%
+  filter(!is.na(Transect) & Transect > 0) 
+
+
+```
+
+
+Merge current year data
+```{r}
+
+demo2024 %>%
+  select(c(GlobalID:transect, EditDate)) %>%
+  left_join(plants2024, by = c("GlobalID" = "ParentGlobalID")) %>%
+  select(c(Tag, transect, Height:Comments))   
+
+## Need to move any tag information from "Comments" to the "Individual Plant Location" 
+df2enter %>%
+  unite(IndividPlLoc_comments, c("IndividualPlantLocation", "Comments"))
+  # mutate(IndividualPlantLocation = case_when(grepl("tag", Comments) ~ 
+  #                                                  paste(IndividualPlantLocation , Comments, sep = " New: "),
+                                                 TRUE ~ IndividualPlantLocation ))
+
+
+```
+
