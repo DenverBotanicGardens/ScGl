@@ -1,0 +1,14 @@
+ScGl_site_id,ScGl_PRISM_id,SiteName,YearCreated,SiteComments,OriginLocation,PlotArea,imagefile,active,2012PlotArea,2012SiteName,old_site_id
+1,6,Powerline,2007,runs east to west,east end,50,powerline.gif,y,100,Powerline,1
+2,3,Escalante Canyon,2008,"9 transects at 0.17, 4.75, 5.75, 11.1, 12.1, 17.79, 18.79, 22.26, 23.26",Bottom left,20,Escalante_2013.jpg,y,180,Escalante Canyon,2
+3,5,Picnic Site,2008,"5 transects, tags towards road",bottom left when facing cliff,20,Picnic_2013.jpg,y,100,Picnic Site,3
+4,7,Pyramid Rock,2008,"2 transects, 1 towards hill, 2 towards road",South end of 50m line,50,PyramidRock_2013.jpg,y,100,Pyramid Rock,4
+5,1,Atwell Gulch_108,2009,5 transects,NE corner,30,atwellgulch.gif,y,270,Atwell Gulch,5
+6,1,Atwell Gulch_165,2009,5 transects,SW corner,30,atwellgulch.gif,y,150,Atwell Gulch,6
+7,8,S. Shale Ridge Pond,2010,,,78,Pond_2013.jpg,y,36,Pond,38
+8,9,Road T-East,2010,"X read from road side of lane.
+Tags north of cacti.",,10,roadteast.gif,n,0,T-junction,48
+9,9,Road T-West,2010,,,64,T-junction 2012.jpg,y,0,T-junction,50
+10,2,Bridgeport,2011,"50 meters long, read 2 meters each side, origin nearest road",nearest road,100,bridgeport.gif,y,0,Bridgeport,51
+11,4,Oil Pad,2010,Oil well leaking methane 2015 & 2016,,32,Oil-Pad-2012.gif,y,0,Oil Pad,54
+12,10,Fram,2013,"South side of road, on City of Grand Junction land; cheatgrass 2016","Northeast corners, runs north to south",100,Fram_2013_draft.jpg,y,0,,0
