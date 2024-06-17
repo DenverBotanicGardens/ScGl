@@ -10,6 +10,13 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(stringr)
+
+library(tidyverse)
+library(sf)
+library(mapview)
+library(leaflet)
+
+remotes::install_github("r-spatial/mapview@429-update-to-webshot2")
 ```
 
 
@@ -20,20 +27,156 @@ library(stringr)
 ## Transect and Site, 
 demo2024 <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/Sclerocactus_glaucus_DemographicMonitoring_0.csv")
 
-plants2024 <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/plantData_1.csv")
+plants2024 <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/plantData_1.csv") 
+
+sitesTransID <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/SitesTransectsDate.csv")
+
+## Column names for annual data direct entry into dbg-research-db  
+scgl_data_columns <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/_scgl_data.csv")
+scgl_tags_columns <- read.csv("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/_scgl_tags.csv")
 
 ```
 
-To upload to MySQL through the PHP   
+
+# Option 1 - direct upload into the PHP MySQL database       
+
+Remaining questions:    
+      1. how to deal with the ScGl_data_id?     
+      2. Note that "PhotoNumber" is now used to record the number of flowers or fruits     
+      3. How to update (instead of add on) any changes to X, Y, or location, or tag number?   
+      4. What happens to the old_tag_id... through duplicate_tag_id_2?
+          Can update column by column so only need affected ones
+      5. Save an update file with old location, the proposed new location, and the comments. Do quality control on the proposed new location, then upload to update. 
+      6. Need a way to check that the update does what we think it's doing. Check that it matches. 
 ```{r}
-# Step 1
-##  download current year csv from database
-# Step 2
-## push to git
 
-
-## Add year to each data column 
 currentyr <- as.numeric(format(as.Date(Sys.Date(),format="%Y-%m-%d"), "%Y"))
+
+data2QAQC <- plants2024 %>%
+  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
+  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
+  select(c(ObjectID.x, Site, Tag, x, y, Height:ScGl_tag_id, site:transect))
+
+## Quality control, some errors in data entry  
+## I assume if there was no ScGl_tag_id that the Tag is new
+plants2024 %>%
+  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
+  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
+  select(c(Tag:ScGl_tag_id, site:transect, Site)) %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/annualdata2qualitycheck_", currentyr, ".csv", sep=""))
+
+
+plants2024 %>%
+  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
+  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
+  select(c(Tag:ScGl_tag_id, site:transect, Site)) %>%
+  filter(Tag == "" & !is.na(Height))
+
+```
+
+
+## Needed edits  
+ScGl_tag_id  Site    transect    Site
+528          5	     19	         Atwell Gulch - 108      should be 377 as Tag and the rest zero, add the tag_id
+
+```{r}
+plants2024$ScGl_tag_id[plants2024$Height == 377 & !is.na(plants2024$Height)] <- "528"
+plants2024$Tag[plants2024$Height == 377 & !is.na(plants2024$Height)] <- "377"
+plants2024$Height[plants2024$Tag == 377 & !is.na(plants2024$Height)] <- 0
+
+plants2024 %>%
+  filter(ScGl_tag_id == 528)
+```
+
+
+# 62 are Either NEW or errors
+With data2QAQC I have a few duplicates!    
+There are 254 without duplicates    
+There are 198 without duplicates and only having tag information   
+There are 187 that have height info but no ID (new??)   
+
+Some with X and Y coordinates must be new tags. 
+```{r}
+data2QAQC %>%
+  filter(is.na(ScGl_tag_id)) %>%
+  # filter(Tag != "" & !is.na(Tag)) %>%
+  filter(Height > 0) %>%
+  distinct(ObjectID.x, .keep_all = TRUE) 
+# %>%
+#   summarize(n= n())
+
+## 15 new ones? Or 15 needing x and y
+data2QAQC %>%
+  filter(is.na(ScGl_tag_id)) %>%
+  filter(Height > 0) %>%
+  distinct(ObjectID.x, .keep_all = TRUE) %>%
+  # filter(grepl("Y ", Comments))
+  filter(grepl(paste(c("Y ", "y ", "X ", "x "), collapse = "|"),
+              Comments))
+
+
+## Need to pull these out to replace the X and Y data
+
+
+```
+
+
+Notes:
+ObjectID.x == 312; tag 762 is at Pond (id = 7); says X 23, Y 4.63. X is wrong. Should it be 0.23? 
+    1171 X 0.44, Y 5.19. 
+```{r}
+data2QAQC %>%
+  filter(Tag >= 1171 & Tag < 1172)
+```
+
+
+
+
+## Match formatting for the annual data  
+## Setting to NULL acts to delete the column 
+```{r}
+toupload <- plants2024 %>%
+  mutate(year = currentyr) %>%
+  mutate(old_tag_id = NA) %>% 
+  mutate(old_tag_id_2 = NA,
+         old_pond_tag_id = NA,
+         old_pond_transect_id = NA,
+         duplicate_tag_id = NA,
+         duplicate_tag_id_2 = NA) %>%
+  select(c(ScGl_tag_id, year, Height, Width, Flowering, Browsing, X..Minis, Photo.Number, Comments, 
+           old_tag_id:duplicate_tag_id_2))
+
+## Make all NAs NULL - that's not so easy to do!
+toupload %>%
+  left_join()
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/annualdata2upload_", currentyr, ".csv", sep=""))
+
+## Need to remove any tag information out of comments and move to location in tags
+
+```
+
+
+Quality control for the Individual plant location information task in the spreadsheet and the X and Y. I'm going to make a data frame with the old location information, the as is comments, and the proposed location information. I will attempt to automate the extraction of tag information from the comments and X and Y updates from the comments. 
+
+```{r}
+
+
+
+```
+
+
+
+# Option 2 - format to the paper upload   
+Work site by site, then can have NEW 
+
+To upload to MySQL through the PHP through the web format       
+
+Step 1   
+   download current year csv from database     
+Step 2   
+   push to git
+```{r}
+## Add year to each data column 
 
 ## Needs to skip 3 non-blank rows to get to headers
 headers <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"), 
@@ -64,8 +207,25 @@ df2enter <- df2enter %>%
   mutate(Transect = as.numeric(as.character(Transect))) %>%
   filter(!is.na(Transect) & Transect > 0) 
 
-
+head(df2enter)
 ```
+
+## make edits to columns (same as above) to cut and paste into upload csv
+
+
+
+
+
+```{r}
+
+m <- demo2024 %>%
+  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
+  mapview(  xcol = 'x', ycol = 'y', crs = 4269, grid = FALSE,
+            zcol = 'Site')
+
+mapshot(m, file = "C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/DemographicSitesMap.png")
+```
+
 
 
 Merge current year data
