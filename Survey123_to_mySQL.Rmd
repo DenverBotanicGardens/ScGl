@@ -248,42 +248,34 @@ data2QAQC %>%
   filter(grepl(paste(c("Y ", "y ", "X ", "x "), collapse = "|"),
               Comments.x))
 
-## Added distinct to the creation of data2QAQC
-## Some duplicates?! why? There are 197 when duplicates removed, there are 696 with duplicates; maybe some duplicates in the database
+## plants2024$ScGl_tag_id  missing from some, don't know why; 21 like this
 data2QAQC %>%
-  filter(is.na(ScGl_tag_id)) %>%
-  distinct(Tag, Height, Width, Flowering, .keep_all = TRUE) %>%
-  summarise(n = n())  ## to check the number, much more than the 15 where we recorded X and Y, but if new plant off existing tag, then no XY
-  
-str(data2QAQC)
-  
+  filter(is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload))
+
+```
+454 was big, saw dead spines, 445 not in transect 21 at Atwell Gulch, IS in transect 20
+3829 need to update X and Y
+3903 is in transect 21 in Survey123 but 20 in database
+3905 ""
+442 ""
+3639 ""
+
+## New plants?     
+```{r}
+# 19 plants that have a ScGl_tag_id from plants2024 in the Survey123 but no similar record in the phpMyAdmin database
+
 data2QAQC %>%
-  filter(is.na(ScGl_tag_id)) %>%
-  distinct(Tag, Height, Width, Flowering, .keep_all = TRUE)
+  filter(is.na(TagIdignoreforupload) & !is.na(ScGl_tag_id))
+```
 
-## Find the duplicates and check if needed changes in database; 705 tags duplicated! What?!?!
-dups2024 <- data2QAQC %>%
-  group_by(Tag, Height, Width) %>%
-  filter(n() > 1) 
-dups2024 %>%
-  distinct(Tag, .keep_all = TRUE)
-head(as.data.frame(dups2024))
-
-# TagID 189 died in 2019, still dead, why duplicated? 
-
-## I guess just get rid of duplicates for entering data
-
-
-  
-
-
-## Where is ScGl_tag_id coming from? plants2024 it is a chr; 
 
 
 ## Make a new to enter data frame with new X and Y if needed and updates to Individual Plant Location from comments  
 
+```{r}
 
 ```
+
 
 New:
 368.12 - 368.13 (should be 368.11 and 368.12) transect 18
@@ -294,7 +286,7 @@ New:
 
 
 Duplicates:
-ScGl_tag_id 2254 and 2476 for 628.01; 2476 no more data with it
+ScGl_tag_id 2254 and 2476 for 628.01; 2476 no more data with it ** Deleted from MySQL database **
 
             
 
