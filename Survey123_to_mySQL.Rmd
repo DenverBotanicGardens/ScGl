@@ -253,12 +253,29 @@ data2QAQC %>%
   filter(is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload))
 
 ```
-454 was big, saw dead spines, 445 not in transect 21 at Atwell Gulch, IS in transect 20
-3829 need to update X and Y
-3903 is in transect 21 in Survey123 but 20 in database
-3905 ""
-442 ""
-3639 ""
+
+# Will update myPHPAdmin to match data collected in the field from Survey123
+454 was big, saw dead spines, 445 not in transect 21 at Atwell Gulch, IS in transect 20   
+3829 need to update X and Y   
+3903 is in transect 21 in Survey123 but 20 in database   
+3905 ""   
+442 ""    
+3639 ""   
+473 ""   
+443 ""   
+472, 493, 474, 444, 2583, 2961. 3266 ""   
+3925 is in 76 in the Survey123 but in 77 in the database.   
+3926, 3927, 3930    
+3927 is repeated for tag 263.03 and 263.02; is with 263.02 in database. maybe 263.03 is NEW? No, was just under 77
+3930 is associated with tag number 263.05 in the database     
+    3925: 263   
+    3926: 263.01   
+    3927: 263.02   
+    3928: 263.03   
+    3929: 263.04    
+    3930: 263.05   
+
+
 
 ## New plants?     
 ```{r}
