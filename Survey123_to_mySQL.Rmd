@@ -60,6 +60,20 @@ plants2024 %>%
 
 
 plants2024$Tag[plants2024$ObjectID == 3] <- 185.07
+
+## A second measurement of the same plant
+plants2024 <- plants2024 %>%
+  filter(ObjectID != 1183)
+
+## All NAs
+plants2024 <- plants2024 %>%
+  filter(ObjectID != 147)
+
+## Plant 280.2 assigned to the wrong tag, should be new, not existing 
+plants2024 <- plants2024 %>%
+  mutate(Tag = case_when(ObjectID == 69 ~ "280.02",
+                         TRUE ~ Tag)) 
+
 ```
 
 
@@ -183,7 +197,7 @@ Work site by site, then can have NEW
 To upload to MySQL through the PHP through the web format       
 
 Step 1   
-   download current year csv from database     
+   download current year csv from database, save as ToEnter_2024     
 Step 2   
    push to git
 ```{r}
@@ -248,13 +262,73 @@ data2QAQC %>%
   filter(grepl(paste(c("Y ", "y ", "X ", "x "), collapse = "|"),
               Comments.x))
 
-## plants2024$ScGl_tag_id  missing from some, don't know why; 21 like this
+## plants2024$ScGl_tag_id  missing from some, don't know why; 21 like this; 20 after deleting ObjectID 1183, a duplicate measurement
+# A tagID in the database but that didn't connect in the Survey123   
+## These all look good
 data2QAQC %>%
-  filter(is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload))
+  filter(is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload)) %>%
+  arrange(TagIdignoreforupload)
 
 ```
 
+Tags that have a tagID in the database but no matching Scgl_tag_id in Survey123  
+3723 is in twice with different Height and widths, maybe accidentally measured it twice: keep first ObjectID 1164 and delete 1183    
+
+
+Assign ScGl_tag_id when it occurs in TagIdignoreforupload      
+```{r}
+
+dataWQAQC <- data2QAQC %>%
+  mutate(ScGl_tag_id = case_when( (is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload)) ~ TagIdignoreforupload,
+                                  TRUE ~ ScGl_tag_id))
+
+## New seedlings or new to us measurements
+dataWQAQC %>%
+  filter(is.na(ScGl_tag_id))
+
+dataWQAQC_v2 <- dataWQAQC %>%
+  filter(ObjectID.x != 158) %>%
+  mutate(TagIdignoreforupload = as.character(TagIdignoreforupload)) %>%
+  mutate(TagIdignoreforupload = case_when(is.na(ScGl_tag_id) ~ "NEW",
+                                          TRUE ~ TagIdignoreforupload))
+
+```
+objectID 147 needs to be deleted
+ObjectID 75 is the same plant recorded elsewhere    
+   
+   180 = X 0.81, Y 12.5      
+   
+     180: tag 12 cm SW (TagID 437) Years: 2009:2016   
+     180.01: tag 5cm W (TagID 3641) Years: 2021-2022   
+     180.02: tag 9 cm SW (TagID 3642) Years: 2021-2022    
+     ObjectID 69 should be assigned to tag 180.03 NEW
+     
+   280 = X 0.9, Y 12.86 (ObjectID 75)    
+   
+     280.02: tag 30cm S (TagID 467) Years: 2011:2023     
+
+
+```{r}
+dataWQAQC %>%
+  filter(ObjectID.x == 75)
+
+dataWQAQC %>%
+  filter(TagIdignoreforupload == 437)
+
+plants2024 %>%
+  filter(ObjectID == 69)
+
+
+```
+
+## Check that all additional off a tag have same X and Y    
+
+
+
 # Will update myPHPAdmin to match data collected in the field from Survey123
+#### 19 plants that have a ScGl_tag_id from plants2024 in the Survey123 but no similar record in the phpMyAdmin database   
+
+
 454 was big, saw dead spines, 445 not in transect 21 at Atwell Gulch, IS in transect 20   
 3829 need to update X and Y   
 3903 is in transect 21 in Survey123 but 20 in database   
@@ -279,7 +353,7 @@ data2QAQC %>%
 
 ## New plants?     
 ```{r}
-# 19 plants that have a ScGl_tag_id from plants2024 in the Survey123 but no similar record in the phpMyAdmin database
+
 
 data2QAQC %>%
   filter(is.na(TagIdignoreforupload) & !is.na(ScGl_tag_id))
