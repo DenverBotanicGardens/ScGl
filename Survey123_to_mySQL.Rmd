@@ -308,20 +308,47 @@ ObjectID 75 is the same plant recorded elsewhere
      280.02: tag 30cm S (TagID 467) Years: 2011:2023     
 
 
+## Check that all additional off a tag have same X and Y    
 ```{r}
-dataWQAQC %>%
-  filter(ObjectID.x == 75)
 
-dataWQAQC %>%
-  filter(TagIdignoreforupload == 437)
+data4csv <- dataWQAQC_v2 %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  distinct(BaseTag, transect, site, Xcoordm, Ycoordm, .keep_all = TRUE) %>%
+  group_by(BaseTag, transect, site) %>%
+  filter(n() > 1)
 
-plants2024 %>%
-  filter(ObjectID == 69)
+## Use VLOOKUP to replace all NEW with the correct X and Y  
+dataFIXxy <- data4csv %>%
+  group_by(BaseTag, site, transect) %>%
+  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
+  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE))
 
+dataFIXxy %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/NEWdecimalXY_", currentyr, ".csv", sep=""))
+
+## Need to pull X and Y from comments for NEW tags
+data4csv %>%
+  # filter(is.na(Xcoordm) & TagIdignoreforupload != "NEW") %>%
+  group_by(BaseTag, site, transect) %>%
+  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
+  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE)) %>%
+  
+  mutate(CommentsXY = sub('.+ X (.+)', '\\1', Comments.x))
+
+## Are there any that are not new but don't match? 
+dataXYerrors <- dataWQAQC_v2 %>%
+  filter(TagIdignoreforupload != "NEW") %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  distinct(BaseTag, transect, site, Xcoordm, Ycoordm, .keep_all = TRUE) %>%
+  group_by(BaseTag, transect, site) %>%
+  filter(n() > 1)
+
+dataFIXxy_errors <- dataXYerrors %>%
+  group_by(BaseTag) %>%
+  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
+  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE))
 
 ```
-
-## Check that all additional off a tag have same X and Y    
 
 
 
