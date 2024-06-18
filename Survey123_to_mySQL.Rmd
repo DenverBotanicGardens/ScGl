@@ -200,6 +200,12 @@ Step 1
    download current year csv from database, save as ToEnter_2024     
 Step 2   
    push to git
+Step 3
+   Use VLOOKUP in excel to put data2pasteincsv_2024.csv into the correct lines
+   Save the "NEW" lines by hand
+   Update the fixXYbyhand_2024.csv and NEWdecimalXY_2024.csv by hand
+   Hopefully VLOOKUP can change only where matches for IndivPlantLocation2Update_2024.csv
+   
 ```{r}
 ## Add year to each data column 
 
@@ -292,6 +298,7 @@ dataWQAQC_v2 <- dataWQAQC %>%
   mutate(TagIdignoreforupload = case_when(is.na(ScGl_tag_id) ~ "NEW",
                                           TRUE ~ TagIdignoreforupload))
 
+
 ```
 objectID 147 needs to be deleted
 ObjectID 75 is the same plant recorded elsewhere    
@@ -325,6 +332,24 @@ dataFIXxy <- data4csv %>%
 
 dataFIXxy %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/NEWdecimalXY_", currentyr, ".csv", sep=""))
+
+## 6 errors, two have living plants, ObjectID 983 says on trans 3, should be 2; objectID 89 is dead spines; 
+# ObjectIDs: 85, 89, 91, 93, 94, 983  
+# Only BaseTag 263  and 238 have XY; some of 238 is in transect 21, recorded in 26 Survey123; 263 has in trans 77, new plants recorded in trans 76  ** NEED TO FIX IN DATABASE **
+dataWQAQC_v2 %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  distinct(BaseTag, transect, site, Xcoordm, Ycoordm, .keep_all = TRUE) %>%
+  group_by(BaseTag, transect, site) %>%
+  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
+  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE)) %>%
+  ungroup() %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/data2pasteincsv_", currentyr, ".csv", sep=""))
+
+
+## Check errors
+dataWQAQC_v2 %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  filter(BaseTag %in% c(266,241,238,279,443,263))
 
 ## Need to pull X and Y from comments for NEW tags
 ## Fix by hand
@@ -376,20 +401,13 @@ dataFIXxy_errors <- dataXYerrors %>%
     3930: 263.05   
 
 
-
-## New plants?     
+## Individual plant location to update
 ```{r}
+dataWQAQC_v2 %>%
+  filter(grepl(paste(c("tag ", "Tag "), collapse = "|"),
+              Comments.x)) %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/IndivPlantLocation2Update_", currentyr, ".csv", sep=""))
 
-
-data2QAQC %>%
-  filter(is.na(TagIdignoreforupload) & !is.na(ScGl_tag_id))
-```
-
-
-
-## Make a new to enter data frame with new X and Y if needed and updates to Individual Plant Location from comments  
-
-```{r}
 
 ```
 
