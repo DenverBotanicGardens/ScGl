@@ -233,7 +233,8 @@ data2QAQC <- plants2024 %>%
                              "transect" = "MySQLTransectID")) %>%
   mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
   select(c(ObjectID.x,  Site, TagIdignoreforupload, Tag, transect, 
-           transect,  Xcoordm, Ycoordm, Height:ScGl_tag_id, site:transect)) 
+           transect,  Xcoordm, Ycoordm, Height:ScGl_tag_id, site:transect)) %>%
+  distinct(Tag, Height, Width, Flowering, .keep_all = TRUE)
 
 ## Did I run the 'Needed edits' ca. lines 83 on?  Should be 377 for Tag
 plants2024 %>%
@@ -247,6 +248,7 @@ data2QAQC %>%
   filter(grepl(paste(c("Y ", "y ", "X ", "x "), collapse = "|"),
               Comments.x))
 
+## Added distinct to the creation of data2QAQC
 ## Some duplicates?! why? There are 197 when duplicates removed, there are 696 with duplicates; maybe some duplicates in the database
 data2QAQC %>%
   filter(is.na(ScGl_tag_id)) %>%
@@ -259,7 +261,20 @@ data2QAQC %>%
   filter(is.na(ScGl_tag_id)) %>%
   distinct(Tag, Height, Width, Flowering, .keep_all = TRUE)
 
-## Find the duplicates and check if needed changes in database
+## Find the duplicates and check if needed changes in database; 705 tags duplicated! What?!?!
+dups2024 <- data2QAQC %>%
+  group_by(Tag, Height, Width) %>%
+  filter(n() > 1) 
+dups2024 %>%
+  distinct(Tag, .keep_all = TRUE)
+head(as.data.frame(dups2024))
+
+# TagID 189 died in 2019, still dead, why duplicated? 
+
+## I guess just get rid of duplicates for entering data
+
+
+  
 
 
 ## Where is ScGl_tag_id coming from? plants2024 it is a chr; 
