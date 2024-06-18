@@ -327,13 +327,12 @@ dataFIXxy %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/NEWdecimalXY_", currentyr, ".csv", sep=""))
 
 ## Need to pull X and Y from comments for NEW tags
-data4csv %>%
-  # filter(is.na(Xcoordm) & TagIdignoreforupload != "NEW") %>%
-  group_by(BaseTag, site, transect) %>%
-  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
-  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE)) %>%
+## Fix by hand
+dataWQAQC_v2 %>%
+  filter(grepl(paste(c("X "," X", "x ", " x"), collapse = "|"),
+              Comments.x)) %>%
+  write.csv( file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/fixXYbyhand_", currentyr, ".csv", sep=""))
   
-  mutate(CommentsXY = sub('.+ X (.+)', '\\1', Comments.x))
 
 ## Are there any that are not new but don't match? 
 dataXYerrors <- dataWQAQC_v2 %>%
