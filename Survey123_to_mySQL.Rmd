@@ -466,10 +466,11 @@ dataFIXxy_errors <- dataXYerrors %>%
 
 ## Individual plant location to update
 ```{r}
-dataWQAQC_v2 %>%
-  filter(grepl(paste(c("tag ", "Tag "), collapse = "|"),
-              Comments.x)) %>%
-  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/IndivPlantLocation2Update_", currentyr, ".csv", sep=""))
+
+# dataWQAQC_v2 %>%
+#   filter(grepl(paste(c("tag ", "Tag "), collapse = "|"),
+#               Comments.x)) %>%
+#   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/IndivPlantLocation2Update_", currentyr, ".csv", sep=""))
 
 
 # ?? Pull out X and Y from location info and just general info? No way to do it systematically because we didn't collect the info in a consistent way
@@ -478,11 +479,8 @@ dataWQAQC_v2 %>%
 dataWQAQC_v2 %>%
   filter(grepl(paste(c("tag ", "Tag "), collapse = "|"),
               Comments.x)) %>% 
-  # mutate(Comments = toupper(Comments.x)) %>%
-  ## This isn't helpful
-  # mutate(NewX = regmatches(Comments, gregexpr("(?<=X).*", Comments, perl = TRUE))) %>% 
-  # mutate(NewY = regmatches(Comments, gregexpr("(?<=Y).*", Comments, perl = TRUE)))
-  unite(NewIndivdLocation, c("IndividualPlantLocation", "Comments.x"), sep = "; ", remove = FALSE)
+  unite(NewIndivdLocation, c("IndividualPlantLocation", "Comments.x"), sep = "; ", remove = FALSE) %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/IndivPlantLocation2Update_", currentyr, ".csv", sep=""))
   
 ```
 
@@ -490,7 +488,7 @@ dataWQAQC_v2 %>%
 # NEW plants to cut and paste into input sheet  
 ```{r}
 
-dataWQAQC_v2 %>%
+dataWQAQC_v2 %>% 
   
 
 ```
