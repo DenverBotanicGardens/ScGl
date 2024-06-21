@@ -48,8 +48,9 @@ scgl_tags_columns <- read.csv("https://raw.githubusercontent.com/DenverBotanicGa
 
 ## Needed edits 
 ScGl_tag_id  Site    transect    Site
-528          5	     19	         Atwell Gulch - 108      should be 377 as Tag and the rest zero, add the tag_id
-
+528          5	     19	         Atwell Gulch - 108      should be 377 as Tag and the rest zero, add the tag_id     
+   
+More edits below once connect with known X and Y coords   
 ```{r}
 plants2024$ScGl_tag_id[plants2024$Height == 377 & !is.na(plants2024$Height)] <- "528"
 plants2024$Tag[plants2024$Height == 377 & !is.na(plants2024$Height)] <- "377"
@@ -73,6 +74,8 @@ plants2024 <- plants2024 %>%
 plants2024 <- plants2024 %>%
   mutate(Tag = case_when(ObjectID == 69 ~ "280.02",
                          TRUE ~ Tag)) 
+
+
 
 ```
 
@@ -234,6 +237,7 @@ df2enter <- df2enter %>%
   mutate(across(TagIdignoreforupload:Minis, as.numeric))
 
 str(df2enter)
+head(df2enter)
 ```
 
 
@@ -259,6 +263,9 @@ data2QAQC <- plants2024 %>%
 plants2024 %>%
   filter(ScGl_tag_id == 528)
 
+data2QAQC %>%
+  filter(is.na(Tag))
+
 ## 15 needed new x and y from data2QAQC  
 data2QAQC %>%
   filter(is.na(ScGl_tag_id)) %>%
@@ -282,7 +289,23 @@ Tags that have a tagID in the database but no matching Scgl_tag_id in Survey123
 
 Assign ScGl_tag_id when it occurs in TagIdignoreforupload      
 ```{r}
+## Tag number not recorded for one plant in transect 77 at Bridgeport 
+data2QAQC <- data2QAQC %>%
+  mutate(Ycoordm = case_when(ObjectID.x == 844 ~ ((30.37 + 42.20)/2),
+                             TRUE ~ Ycoordm))
+data2QAQC <- data2QAQC %>%
+  mutate(Xcoordm = case_when(ObjectID.x == 844 ~ 0.5,
+                             TRUE ~ Xcoordm))
 
+data2QAQC <- data2QAQC %>%
+  mutate(Comments.x = case_when(ObjectID.x == 844 ~ "Tag and XY not recorded, between 30.37 and 42.20, Cactus on West side of rock.",
+                             TRUE ~ Comments.x))
+
+## No data recorded for ObjectID 158
+data2QAQC <- data2QAQC %>%
+  filter(ObjectID.x != 158)
+
+## Assign ScGl_tag_id 
 dataWQAQC <- data2QAQC %>%
   mutate(ScGl_tag_id = case_when( (is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload)) ~ TagIdignoreforupload,
                                   TRUE ~ ScGl_tag_id))
@@ -296,6 +319,7 @@ dataWQAQC_v2 <- dataWQAQC %>%
   mutate(TagIdignoreforupload = as.character(TagIdignoreforupload)) %>%
   mutate(TagIdignoreforupload = case_when(is.na(ScGl_tag_id) ~ "NEW",
                                           TRUE ~ TagIdignoreforupload))
+
 
 
 ```
@@ -350,10 +374,15 @@ dataWQAQC_v2 %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/data2pasteincsv_", currentyr, ".csv", sep=""))
 
 ## Error in  group 545: BaseTag = NA, transect = 77, site = 10. Tag 545 is in transect 142, site 
-## One at Bridegport (transect 77, is a small one with no tag number recorded, no X or Y)
+## One at Bridegport (transect 77, is a small one with no tag number recorded, no X or Y)   
 dataWQAQC %>%
   mutate(BaseTag = trunc(Tag, prec = 0)) %>%
   filter(is.na(BaseTag) & !is.na(Height))
+
+## Must be within range of surrounding records
+# NA is Y between 30.37 and 42.20, 
+dataWQAQC %>%
+  filter(ObjectID.x > 800 & ObjectID.x < 900)
 
 ### Oh, to get X and Y, need to pull all tags from download, not just the ones with data this year. 
 ## Just NEW to paste in bottom. Otherwise only takes the first value and puts in every NEW slot. Need to cut and paste
@@ -453,7 +482,7 @@ dataWQAQC_v2 %>%
   ## This isn't helpful
   # mutate(NewX = regmatches(Comments, gregexpr("(?<=X).*", Comments, perl = TRUE))) %>% 
   # mutate(NewY = regmatches(Comments, gregexpr("(?<=Y).*", Comments, perl = TRUE)))
-  mutate(NewIndivdLocation)
+  unite(NewIndivdLocation, c("IndividualPlantLocation", "Comments.x"), sep = "; ", remove = FALSE)
   
 ```
 
