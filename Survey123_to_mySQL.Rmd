@@ -149,12 +149,6 @@ data2QAQC %>%
 Notes:
 ObjectID.x == 312; tag 762 is at Pond (id = 7); says X 23, Y 4.63. X is wrong. Should it be 0.23? 
     1171 X 0.44, Y 5.19. 
-```{r}
-data2QAQC %>%
-  filter(Tag >= 1171 & Tag < 1172)
-```
-
-
 
 
 ## Match formatting for the annual data  
@@ -242,17 +236,22 @@ df2enter <- df2enter %>%
 str(df2enter)
 ```
 
+
 ## make edits to columns (same as above) to cut and paste into upload csv
+
 ```{r}
 
 data2QAQC <- plants2024 %>%
   mutate(Tag = as.numeric(Tag)) %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  left_join(df2enter, by = c("Tag" = "Tag", 
+  # left_join(df2enter, by = c("Tag" = "Tag",
+  #                            "transect" = "MySQLTransectID")) %>%
+# Keep all rows from df2enter so we have all tag info with X and Y
+  right_join(df2enter, by = c("Tag" = "Tag",
                              "transect" = "MySQLTransectID")) %>%
   mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
-  select(c(ObjectID.x,  Site, TagIdignoreforupload, Tag, transect, 
+  select(c(ObjectID.x,  Site, TagIdignoreforupload, Tag, IndividualPlantLocation, 
            transect,  Xcoordm, Ycoordm, Height:ScGl_tag_id, site:transect)) %>%
   distinct(Tag, Height, Width, Flowering, .keep_all = TRUE)
 
@@ -327,10 +326,15 @@ data4csv <- dataWQAQC_v2 %>%
 ## Use VLOOKUP to replace all NEW with the correct X and Y  
 dataFIXxy <- data4csv %>%
   group_by(BaseTag, site, transect) %>%
-  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
-  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE))
+  mutate(XcoordmNEW = max(Xcoordm, na.rm = TRUE)) %>%
+  mutate(YcoordmNEW = max(Ycoordm, na.rm = TRUE))
 
 dataFIXxy %>%
+  filter(Xcoordm != XcoordmNEW) %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/ErrorsXY_", currentyr, ".csv", sep=""))
+
+dataFIXxy %>%
+  filter(TagIdignoreforupload == "NEW") %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/NEWdecimalXY_", currentyr, ".csv", sep=""))
 
 ## 6 errors, two have living plants, ObjectID 983 says on trans 3, should be 2; objectID 89 is dead spines; 
@@ -344,6 +348,36 @@ dataWQAQC_v2 %>%
   mutate(Ycoordm = max(Ycoordm, na.rm = TRUE)) %>%
   ungroup() %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/data2pasteincsv_", currentyr, ".csv", sep=""))
+
+## Error in  group 545: BaseTag = NA, transect = 77, site = 10. Tag 545 is in transect 142, site 
+## One at Bridegport (transect 77, is a small one with no tag number recorded, no X or Y)
+dataWQAQC %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  filter(is.na(BaseTag) & !is.na(Height))
+
+### Oh, to get X and Y, need to pull all tags from download, not just the ones with data this year. 
+## Just NEW to paste in bottom. Otherwise only takes the first value and puts in every NEW slot. Need to cut and paste
+dataWQAQC_v2 %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  distinct(BaseTag, transect, site, Xcoordm, Ycoordm, .keep_all = TRUE) %>%
+  group_by(BaseTag, transect, site) %>%
+  mutate(Xcoordm = max(Xcoordm, na.rm = TRUE)) %>%
+  mutate(Ycoordm = max(Ycoordm, na.rm = TRUE)) %>%
+  filter(TagIdignoreforupload == "NEW") %>%
+  ungroup() %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/NEW2pasteincsv_", currentyr, ".csv", sep=""))
+
+## Didn't pull X Y for these:
+# Missing 137, no X and Y. Only 137.01 is in the export above. Where is 137.02???
+dataWQAQC_v2 %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  filter(BaseTag == 137)
+
+## Only the NEW 166.03 and 166.04
+dataWQAQC_v2 %>%
+  mutate(BaseTag = trunc(Tag, prec = 0)) %>%
+  filter(BaseTag == 166 &
+           transect == 23)
 
 
 ## Check errors
@@ -409,7 +443,29 @@ dataWQAQC_v2 %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/IndivPlantLocation2Update_", currentyr, ".csv", sep=""))
 
 
+# ?? Pull out X and Y from location info and just general info? No way to do it systematically because we didn't collect the info in a consistent way
+
+## Just tack on the comments if there is 'tag', assume we typed it in because it needed updating
+dataWQAQC_v2 %>%
+  filter(grepl(paste(c("tag ", "Tag "), collapse = "|"),
+              Comments.x)) %>% 
+  # mutate(Comments = toupper(Comments.x)) %>%
+  ## This isn't helpful
+  # mutate(NewX = regmatches(Comments, gregexpr("(?<=X).*", Comments, perl = TRUE))) %>% 
+  # mutate(NewY = regmatches(Comments, gregexpr("(?<=Y).*", Comments, perl = TRUE)))
+  mutate(NewIndivdLocation)
+  
 ```
+
+
+# NEW plants to cut and paste into input sheet  
+```{r}
+
+dataWQAQC_v2 %>%
+  
+
+```
+
 
 
 New:
