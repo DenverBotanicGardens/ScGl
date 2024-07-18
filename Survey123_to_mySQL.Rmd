@@ -190,24 +190,48 @@ colnames(df2enter) <- headersNospch
 
 # Data frame to enter current year data into
 ## Use NA to advantage to remove rows without Transect info
+# Need to keep IndividualPlantLocation to update the existing location information with appropriate parts from current comments
 df2enter <- df2enter %>%
-  select(TagIdignoreforupload:Comments) %>%
+  select(c(TagIdignoreforupload:Ycoordm, IndividualPlantLocation)) %>%
   mutate(Transect = as.numeric(as.character(Transect))) %>%
   filter(!is.na(Transect) & Transect > 0) %>%
-  mutate(across(TagIdignoreforupload:Minis, as.numeric)) %>%
-  select(c(Site:Tag,))
+  # mutate(across(TagIdignoreforupload:Ycoordm, as.numeric)) %>%
+  ## need to remove the NEW rows
+  filter(!is.na(TagIdignoreforupload))
 
 str(df2enter)
 head(df2enter)
 ```
 
 
-```{r}
+Keep all rows from df2enter to pull the X Y even when the base tag doesn't have data this year. 
+Check that all columns Height:Comments are filled out for the current year.
+Export only rows that have data from this year (either a Height or a number of Minis)
 
+```{r}
+## x and y are for the site, not the plant
 data2QAQC <- plants2024 %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
   select(c(ObjectID.x, Site, Tag, x, y, Height:ScGl_tag_id, site:transect))
+
+## There must be 251 new plants or these are in error
+table(plants2024$ScGl_tag_id[is.na(plants2024$ScGl_tag_id)], useNA = "always")
+
+####################################################################################### TO DO!!!!!!
+## What was going on with 142/442. It is recorded as tag number 142, should be changed to 442
+# Need to do in the upload csv 
+plants2024 %>%
+  filter(Tag == "142/442")
+
+plants2024 %>%
+  filter(is.na(ScGl_tag_id) & is.na(Height)|is.na(ScGl_tag_id) & is.na(X..Minis)) 
+
+## Probably 189 new plants
+plants2024 %>%
+  filter(is.na(ScGl_tag_id) & !is.na(Height)|is.na(ScGl_tag_id) & !is.na(X..Minis))%>%
+  summarise(NumNew = n())
+
 
 # Quality control, some errors in data entry
 ## I assume if there was no ScGl_tag_id that the Tag is new  
@@ -215,10 +239,24 @@ data2QAQC <- plants2024 %>%
 plants2024 %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  full_join(df2enter) %>%
-  # select(c(Tag:ScGl_tag_id, site:transect, Site)) %>%
-  arrange(Site,transect,Tag) %>%
+  # mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
+  full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload")) %>%
+  select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
+  arrange(Site,transect,Tag.x) %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/annualdata2qualitycheck_", currentyr, ".csv", sep=""))
+
+
+## See ".\Denver Botanic Gardens\Conservation - General\AllProjectsBySpecies\Sclerocactus-glaucus\Sclerocactus-glaucus_DataEntry\2024_Sclerocactus-glaucus_Dataentry_Survey123-to-php\2024_ScGl_vlookup_Survey123-MySQL_TESTINGVLOOKUP.csv" for details of how to do the vlookup
+
+### Data to vlookup enter into the uploadable csv
+## Make fixes to this! Then save and add to the document
+data2vlookup <- plants2024 %>%
+  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
+  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
+  # mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
+  full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload")) %>%
+  select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
+  arrange(Site,transect,Tag.x)
 
 
 ## Should be no rows with no Tag but a height
