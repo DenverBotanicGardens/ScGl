@@ -46,6 +46,9 @@ scgl_tags_columns <- read.csv("https://raw.githubusercontent.com/DenverBotanicGa
 
 
 
+
+
+
 ## Needed edits 
 ScGl_tag_id  Site    transect    Site
 528          5	     19	         Atwell Gulch - 108      should be 377 as Tag and the rest zero, add the tag_id     
@@ -79,8 +82,49 @@ plants2024 <- plants2024 %>%
 
 ```
 
+# More edits found after merging
+objectID 147 needs to be deleted  - it is gone (2024-07-17)
+ObjectID 75 is the same plant recorded elsewhere  --> should be recorded under 180   
+   
+   180 = X 0.81, Y 12.5      
+   
+     180: tag 12 cm SW (TagID 437) Years: 2009:2016   
+     180.01: tag 5cm W (TagID 3641) Years: 2021-2022   
+     180.02: tag 9 cm SW (TagID 3642) Years: 2021-2022    
+     ObjectID 69 should be assigned to tag 180.03 NEW
+     
+   280 = X 0.9, Y 12.86 (ObjectID 75)    
+   
+     280.02: tag 30cm S (TagID 467) Years: 2011:2023     
+     
+```{r}
+plants2024 %>%
+  filter(ObjectID %in% c(147,75,69))
+
+## If plant 280.2 should be same as 180, figure out which 180 and remove this tag from the database
+plants2024 %>%
+  full_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
+  full_join(sitesTransID, by = c("transect" = "TransectID")) %>%
+  distinct() %>%
+  filter(ObjectID.x %in% c(69,75))
 
 
+
+### Tag 280.2 must mean 280.02 with Tag 30cm S is the same as 180
+plants2024 <- plants2024 %>%
+  filter(ObjectID != 75)
+
+## However, ObjectID 69: 280.02 tag 10cm SW is too small to be old 280.02, Could be a new one, remove ScGl_tag_id, make it 280.09
+plants2024 <- plants2024 %>%
+  mutate(ScGl_tag_id = case_when(ObjectID == 69 ~ "NA",
+                                 TRUE ~ ScGl_tag_id)) %>%
+  mutate(Tag = case_when(ObjectID == 69 ~ "280.09",
+                                 TRUE ~ Tag))
+  
+```
+#########################################################
+
+# Select Option 2 until the upload can be altered to match the output from Survey123
 # Option 1 - direct upload into the PHP MySQL database       
 
 Remaining questions:    
@@ -91,6 +135,73 @@ Remaining questions:
           Can update column by column so only need affected ones
       5. Save an update file with old location, the proposed new location, and the comments. Do quality control on the proposed new location, then upload to update. 
       6. Need a way to check that the update does what we think it's doing. Check that it matches. 
+      
+      
+      
+
+______________________________________________________________________________________________________________
+# Option 2 - format to the paper2csv DBGDatabse upload   
+Work site by site, then can have NEW 
+
+To upload to MySQL through the PHP through the web format       
+
+Step 1   
+   download current year csv from database, save as ToEnter_2024     
+Step 2   
+   push to git
+Step 3
+   Use VLOOKUP in excel to put data2pasteincsv_2024.csv into the correct lines
+   Save the "NEW" lines by hand
+   Update the fixXYbyhand_2024.csv and NEWdecimalXY_2024.csv by hand
+   Hopefully VLOOKUP can change only where matches for IndivPlantLocation2Update_2024.csv
+   
+Step 3a
+     "IndivPlantLocation2Update_2024_v2.xlsx" has X and Y corrected and NewIndivdLocation with appropriate information from concatenated IndivdualPlantLocation and Comments.     
+     
+     ".\Denver Botanic Gardens\Conservation - General\AllProjectsBySpecies\Sclerocactus-glaucus\Sclerocactus-glaucus_DataEntry\2024_Sclerocactus-glaucus_Dataentry_Survey123-to-php\IndivPlantLocation2Update_2024_v3_vlookup.xlsx" is a copy with correct X and Y and will be used to VLOOKUP into the final document to upload to MySQL database.      
+      1. Bridgeport TagID 3925 row has been deleted because it should not appear in transect 3, is correctly in transect 2  
+
+
+   
+```{r}
+## Add year to each data column 
+
+## Needs to skip 3 non-blank rows to get to headers
+headers <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"), 
+                    skip = 3,
+                    header = FALSE, nrows = 1, as.is = TRUE)
+# Only skip 4, it will ignore the top 3 blank rows
+df2enter <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"),, skip = 4, header = FALSE)
+
+# Match gives first time it matches
+headers[,match("Height (cm)", headers)] <- paste0("Height (cm)", currentyr - 2)
+headers[,match("Width (cm)", headers)] <- paste0("Width (cm)", currentyr - 2)
+
+headers[,match("Height (cm)", headers)] <- paste0("Height (cm)", currentyr - 1)
+headers[,match("Width (cm)", headers)] <- paste0("Width (cm)", currentyr - 1)
+
+headers[,"Comments" == headers][2] <- paste0("Comments", currentyr)
+
+## remove all white space and special characters
+headersNowhite <- sapply(headers, function(x) gsub(" ", "", x))
+headersNospch <- sapply(headersNowhite, function(x) str_replace_all(x, "[^[:alnum:]]", ""))
+
+colnames(df2enter) <- headersNospch
+
+# Data frame to enter current year data into
+## Use NA to advantage to remove rows without Transect info
+df2enter <- df2enter %>%
+  select(TagIdignoreforupload:Comments) %>%
+  mutate(Transect = as.numeric(as.character(Transect))) %>%
+  filter(!is.na(Transect) & Transect > 0) %>%
+  mutate(across(TagIdignoreforupload:Minis, as.numeric)) %>%
+  select(c(Site:Tag,))
+
+str(df2enter)
+head(df2enter)
+```
+
+
 ```{r}
 
 data2QAQC <- plants2024 %>%
@@ -98,15 +209,19 @@ data2QAQC <- plants2024 %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
   select(c(ObjectID.x, Site, Tag, x, y, Height:ScGl_tag_id, site:transect))
 
-## Quality control, some errors in data entry  
-## I assume if there was no ScGl_tag_id that the Tag is new
+# Quality control, some errors in data entry
+## I assume if there was no ScGl_tag_id that the Tag is new  
+## These don't have X and Y of the tags. Need the data upload csv from the DBG Database for those
 plants2024 %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  select(c(Tag:ScGl_tag_id, site:transect, Site)) %>%
+  full_join(df2enter) %>%
+  # select(c(Tag:ScGl_tag_id, site:transect, Site)) %>%
+  arrange(Site,transect,Tag) %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/annualdata2qualitycheck_", currentyr, ".csv", sep=""))
 
 
+## Should be no rows with no Tag but a height
 plants2024 %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
@@ -186,59 +301,7 @@ Quality control for the Individual plant location information task in the spread
 
 ```
 
-
-______________________________________________________________________________________________________________
-# Option 2 - format to the paper upload   
-Work site by site, then can have NEW 
-
-To upload to MySQL through the PHP through the web format       
-
-Step 1   
-   download current year csv from database, save as ToEnter_2024     
-Step 2   
-   push to git
-Step 3
-   Use VLOOKUP in excel to put data2pasteincsv_2024.csv into the correct lines
-   Save the "NEW" lines by hand
-   Update the fixXYbyhand_2024.csv and NEWdecimalXY_2024.csv by hand
-   Hopefully VLOOKUP can change only where matches for IndivPlantLocation2Update_2024.csv
-   
-```{r}
-## Add year to each data column 
-
-## Needs to skip 3 non-blank rows to get to headers
-headers <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"), 
-                    skip = 3,
-                    header = FALSE, nrows = 1, as.is = TRUE)
-# Only skip 4, it will ignore the top 3 blank rows
-df2enter <- read.csv(paste0("https://raw.githubusercontent.com/DenverBotanicGardens/ScGl/master/datasets/ToEnter_", currentyr, ".csv"),, skip = 4, header = FALSE)
-
-# Match gives first time it matches
-headers[,match("Height (cm)", headers)] <- paste0("Height (cm)", currentyr - 2)
-headers[,match("Width (cm)", headers)] <- paste0("Width (cm)", currentyr - 2)
-
-headers[,match("Height (cm)", headers)] <- paste0("Height (cm)", currentyr - 1)
-headers[,match("Width (cm)", headers)] <- paste0("Width (cm)", currentyr - 1)
-
-headers[,"Comments" == headers][2] <- paste0("Comments", currentyr)
-
-## remove all white space and special characters
-headersNowhite <- sapply(headers, function(x) gsub(" ", "", x))
-headersNospch <- sapply(headersNowhite, function(x) str_replace_all(x, "[^[:alnum:]]", ""))
-
-colnames(df2enter) <- headersNospch
-
-
-## Use NA to advantage to remove rows without Transect info
-df2enter <- df2enter %>%
-  select(TagIdignoreforupload:Comments) %>%
-  mutate(Transect = as.numeric(as.character(Transect))) %>%
-  filter(!is.na(Transect) & Transect > 0) %>%
-  mutate(across(TagIdignoreforupload:Minis, as.numeric))
-
-str(df2enter)
-head(df2enter)
-```
+######################################################### Work on formating for VLOOKUP
 
 
 ## make edits to columns (same as above) to cut and paste into upload csv
@@ -252,21 +315,33 @@ data2QAQC <- plants2024 %>%
   # left_join(df2enter, by = c("Tag" = "Tag",
   #                            "transect" = "MySQLTransectID")) %>%
 # Keep all rows from df2enter so we have all tag info with X and Y
-  right_join(df2enter, by = c("Tag" = "Tag",
+  full_join(df2enter, by = c("Tag" = "Tag",
                              "transect" = "MySQLTransectID")) %>%
   mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
   select(c(ObjectID.x,  Site, TagIdignoreforupload, Tag, IndividualPlantLocation, 
            transect,  Xcoordm, Ycoordm, Height:ScGl_tag_id, site:transect)) %>%
-  distinct(Tag, Height, Width, Flowering, .keep_all = TRUE)
+  distinct(Tag, Height, Width, Flowering, .keep_all = TRUE) ## To get rid of duplicates from no Tag and five "NEW"
 
 ## Did I run the 'Needed edits' ca. lines 83 on?  Should be 377 for Tag
 plants2024 %>%
   filter(ScGl_tag_id == 528)
 
 data2QAQC %>%
-  filter(is.na(Tag))
+  arrange(transect, Tag ) 
 
-## 15 needed new x and y from data2QAQC  
+
+data2QAQC %>%
+  filter(Tag >= 185 & Tag < 186 & transect == 19)
+
+## Probably the "NEW" rows?? There are five "NEW" at the end of each site, with no tag to merge with, creates duplicates
+data2QAQC %>%
+  filter(is.na(Tag) & !is.na(Height)) 
+## Only one?
+data2QAQC %>%
+  filter(is.na(Tag) & is.na(Height)) %>%
+  summarise(numNew= n())
+
+## 15 needed new x and y from data2QAQC  # Now only one? TagID 2474
 data2QAQC %>%
   filter(is.na(ScGl_tag_id)) %>%
   filter(Height > 0) %>%
@@ -314,32 +389,29 @@ dataWQAQC <- data2QAQC %>%
 dataWQAQC %>%
   filter(is.na(ScGl_tag_id))
 
+dataWQAQC %>%
+  filter(is.na(ScGl_tag_id)) %>%
+  arrange(Site, transect, Tag) %>%
+  write.csv(paste("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_DataEntry/2024_Sclerocactus-glaucus_Dataentry_Survey123-to-php/NEW_", currentyr, ".csv", sep=""))
+
 dataWQAQC_v2 <- dataWQAQC %>%
   filter(ObjectID.x != 158) %>%
   mutate(TagIdignoreforupload = as.character(TagIdignoreforupload)) %>%
   mutate(TagIdignoreforupload = case_when(is.na(ScGl_tag_id) ~ "NEW",
                                           TRUE ~ TagIdignoreforupload))
 
-
+dataWQAQC_v2 %>%
+  filter(TagIdignoreforupload == "NEW")
 
 ```
-objectID 147 needs to be deleted
-ObjectID 75 is the same plant recorded elsewhere    
-   
-   180 = X 0.81, Y 12.5      
-   
-     180: tag 12 cm SW (TagID 437) Years: 2009:2016   
-     180.01: tag 5cm W (TagID 3641) Years: 2021-2022   
-     180.02: tag 9 cm SW (TagID 3642) Years: 2021-2022    
-     ObjectID 69 should be assigned to tag 180.03 NEW
-     
-   280 = X 0.9, Y 12.86 (ObjectID 75)    
-   
-     280.02: tag 30cm S (TagID 467) Years: 2011:2023     
+
 
 
 ## Check that all additional off a tag have same X and Y    
 ```{r}
+
+dataWQAQC_v2 %>%
+  filter(ObjectID.x == 69)
 
 data4csv <- dataWQAQC_v2 %>%
   mutate(BaseTag = trunc(Tag, prec = 0)) %>%
