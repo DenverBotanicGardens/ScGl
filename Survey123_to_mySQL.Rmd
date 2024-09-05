@@ -194,13 +194,19 @@ colnames(df2enter) <- headersNospch
 df2enter <- df2enter %>%
   select(c(TagIdignoreforupload:Ycoordm, IndividualPlantLocation)) %>%
   mutate(Transect = as.numeric(as.character(Transect))) %>%
+  mutate(MySQLTransectID = as.numeric(as.character(MySQLTransectID))) %>%
   filter(!is.na(Transect) & Transect > 0) %>%
-  # mutate(across(TagIdignoreforupload:Ycoordm, as.numeric)) %>%
+  mutate(across(TagIdignoreforupload:Ycoordm, as.numeric)) %>%
   ## need to remove the NEW rows
   filter(!is.na(TagIdignoreforupload))
 
 str(df2enter)
 head(df2enter)
+
+## Some have X and Y coordinates but that don't make sense. X_coord = 282 or 257
+df2enter %>%
+  filter(is.na(Xcoordm)) 
+
 ```
 
 
@@ -209,14 +215,13 @@ Check that all columns Height:Comments are filled out for the current year.
 Export only rows that have data from this year (either a Height or a number of Minis)
 
 ```{r}
-## x and y are for the site, not the plant
-data2QAQC <- plants2024 %>%
-  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
-  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  select(c(ObjectID.x, Site, Tag, x, y, Height:ScGl_tag_id, site:transect))
 
 ## There must be 251 new plants or these are in error
 table(plants2024$ScGl_tag_id[is.na(plants2024$ScGl_tag_id)], useNA = "always")
+
+sitesTransID %>%
+  filter(TransectID %in% c(8,119,121))
+
 
 ####################################################################################### TO DO!!!!!!
 ## What was going on with 142/442. It is recorded as tag number 142, should be changed to 442
@@ -235,14 +240,30 @@ plants2024 %>%
 
 # Quality control, some errors in data entry
 ## I assume if there was no ScGl_tag_id that the Tag is new  
-## These don't have X and Y of the tags. Need the data upload csv from the DBG Database for those
-plants2024 %>%
+## These don't have X and Y of the tags. Need the data upload csv from the DBG Database for those; df2enter has info from database, if new, will not have Tag.y and will not have   
+## Some duplicates, why? 
+annualdata2QC <- plants2024 %>%
+  select(Tag:ParentGlobalID) %>%
+  mutate(ScGl_tag_id = as.numeric(as.character(ScGl_tag_id))) %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
   # mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
-  full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload")) %>%
+  full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload", "transect"= "MySQLTransectID")) %>%
   select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
-  arrange(Site,transect,Tag.x) %>%
+  arrange(Site,transect,Tag.x)
+
+nrow(annualdata2QC[duplicated(annualdata2QC),]) +
+nrow(annualdata2QC[!duplicated(annualdata2QC),])
+nrow(annualdata2QC)
+
+annualdata2QC %>%
+  summarise(n = sum(duplicated(.)))
+annualdata2QC %>%
+  summarise(n = sum(!duplicated(.)))
+annualdata2QC <- annualdata2QC %>%
+  filter(!duplicated(.))
+
+annualdata2QC %>%
   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/annualdata2qualitycheck_", currentyr, ".csv", sep=""))
 
 
@@ -256,15 +277,17 @@ data2vlookup <- plants2024 %>%
   # mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
   full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload")) %>%
   select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
-  arrange(Site,transect,Tag.x)
+  arrange(Site,transect,Tag.x) %>%
+  filter(!(is.na(Height) & Tag.x == "" & is.na(X..Minis)))
 
 
-## Should be no rows with no Tag but a height
+## Should be no rows with no Tag but a height, But yes! We do want to add the comments where we saw a dead one. There are multiple duplicates, Why? 
 plants2024 %>%
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  select(c(Tag:ScGl_tag_id, site:transect, Site)) %>%
-  filter(Tag == "" & !is.na(Height))
+  select(c(Tag:ScGl_tag_id, site:transect, Site)) 
+
+## Tag.x are tag numbers entered in Survey123 in 2024, Tag.y are from the database
 
 ```
 
