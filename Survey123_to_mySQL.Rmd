@@ -196,7 +196,8 @@ df2enter <- df2enter %>%
   mutate(Transect = as.numeric(as.character(Transect))) %>%
   mutate(MySQLTransectID = as.numeric(as.character(MySQLTransectID))) %>%
   filter(!is.na(Transect) & Transect > 0) %>%
-  mutate(across(TagIdignoreforupload:Ycoordm, as.numeric)) %>%
+  mutate(TagIdignoreforupload = as.numeric(as.character(TagIdignoreforupload   )))
+  # mutate(across(TagIdignoreforupload:Ycoordm, as.numeric)) %>%
   ## need to remove the NEW rows
   filter(!is.na(TagIdignoreforupload))
 
@@ -207,12 +208,17 @@ head(df2enter)
 df2enter %>%
   filter(is.na(Xcoordm)) 
 
+df2enter %>%
+  filter(Xcoordm > 1)
+
 ```
 
 
 Keep all rows from df2enter to pull the X Y even when the base tag doesn't have data this year. 
 Check that all columns Height:Comments are filled out for the current year.
-Export only rows that have data from this year (either a Height or a number of Minis)
+Export only rows that have data from this year (either a Height or a number of Minis)   
+
+
 
 ```{r}
 
@@ -223,11 +229,13 @@ sitesTransID %>%
   filter(TransectID %in% c(8,119,121))
 
 
-####################################################################################### TO DO!!!!!!
+####################################################################################### Done in 2024_scGl_ToIngest_v2.csv
 ## What was going on with 142/442. It is recorded as tag number 142, should be changed to 442
 # Need to do in the upload csv 
 plants2024 %>%
   filter(Tag == "142/442")
+df2enter %>%
+  filter(Tag == "142")
 
 plants2024 %>%
   filter(is.na(ScGl_tag_id) & is.na(Height)|is.na(ScGl_tag_id) & is.na(X..Minis)) 
@@ -238,16 +246,22 @@ plants2024 %>%
   summarise(NumNew = n())
 
 
+##### change data for tag_id 3543 to 3366 so data goes in there!!!! ############
+plants2024 %>%
+  filter(ScGl_tag_id %in% c(3543,3366))
+plants2024 <- plants2024 %>%
+  filter(!ScGl_tag_id == 3543)
+
+
 # Quality control, some errors in data entry
 ## I assume if there was no ScGl_tag_id that the Tag is new  
 ## These don't have X and Y of the tags. Need the data upload csv from the DBG Database for those; df2enter has info from database, if new, will not have Tag.y and will not have   
 ## Some duplicates, why? 
 annualdata2QC <- plants2024 %>%
   select(Tag:ParentGlobalID) %>%
-  mutate(ScGl_tag_id = as.numeric(as.character(ScGl_tag_id))) %>%
+  # mutate(ScGl_tag_id = as.numeric(as.character(ScGl_tag_id))) %>% ## then numeric here and 
   left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  # mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
   full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload", "transect"= "MySQLTransectID")) %>%
   select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
   arrange(Site,transect,Tag.x)
@@ -271,21 +285,17 @@ annualdata2QC %>%
 
 ### Data to vlookup enter into the uploadable csv
 ## Make fixes to this! Then save and add to the document
-data2vlookup <- plants2024 %>%
-  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
-  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  # mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
-  full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload")) %>%
-  select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
-  arrange(Site,transect,Tag.x) %>%
-  filter(!(is.na(Height) & Tag.x == "" & is.na(X..Minis)))
+## But maybe keep all the height with NA, we did record dead and spines
+data2vlookup <- annualdata2QC %>%
+  filter(!(is.na(Height) & Tag.x == "" & is.na(X..Minis) & is.na(Comments)))
 
 
 ## Should be no rows with no Tag but a height, But yes! We do want to add the comments where we saw a dead one. There are multiple duplicates, Why? 
-plants2024 %>%
-  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
-  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  select(c(Tag:ScGl_tag_id, site:transect, Site)) 
+data2vlookup %>%
+  filter(is.na(Height) & !is.na(Comments)) %>%
+  write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/EditsNotesfromComments", currentyr, ".csv", sep=""))
+
+  
 
 ## Tag.x are tag numbers entered in Survey123 in 2024, Tag.y are from the database
 
