@@ -258,23 +258,13 @@ plants2024 <- plants2024 %>%
 ## These don't have X and Y of the tags. Need the data upload csv from the DBG Database for those; df2enter has info from database, if new, will not have Tag.y and will not have   
 ## Some duplicates, why? 
 annualdata2QC <- plants2024 %>%
-  select(Tag:ParentGlobalID) %>%
+  select(c(ObjectID,Tag:ParentGlobalID)) %>%
   # mutate(ScGl_tag_id = as.numeric(as.character(ScGl_tag_id))) %>% ## then numeric here and 
-  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
+  left_join(demo2024[,-1], by = c("ParentGlobalID" = "GlobalID")) %>%  # Don't want ObjectID from demo2024
   left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
   full_join(df2enter, by = c("ScGl_tag_id"="TagIdignoreforupload", "transect"= "MySQLTransectID")) %>%
-  select(c(Tag.x,Tag.y,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
-  arrange(Site,transect,Tag.x)
-
-nrow(annualdata2QC[duplicated(annualdata2QC),]) +
-nrow(annualdata2QC[!duplicated(annualdata2QC),])
-nrow(annualdata2QC)
-
-annualdata2QC %>%
-  summarise(n = sum(duplicated(.)))
-annualdata2QC %>%
-  summarise(n = sum(!duplicated(.)))
-annualdata2QC <- annualdata2QC %>%
+  select(c(Tag.x,Tag.y,ObjectID,Height:ScGl_tag_id, site:transect, Site:IndividualPlantLocation)) %>%
+  arrange(Site,transect,Tag.x) %>%
   filter(!duplicated(.))
 
 annualdata2QC %>%
@@ -303,131 +293,11 @@ data2vlookup %>%
 
 
 
-# 62 are Either NEW or errors
-With data2QAQC I have a few duplicates!    
-There are 254 without duplicates    
-There are 198 without duplicates and only having tag information   
-There are 187 that have height info but no ID (new??)   
-
-Some with X and Y coordinates must be new tags. 
-```{r}
-data2QAQC %>%
-  filter(is.na(ScGl_tag_id)) %>%
-  # filter(Tag != "" & !is.na(Tag)) %>%
-  filter(Height > 0) %>%
-  distinct(ObjectID.x, .keep_all = TRUE) 
-# %>%
-#   summarize(n= n())
-
-## 15 new ones? Or 15 needing x and y
-data2QAQC %>%
-  filter(is.na(ScGl_tag_id)) %>%
-  filter(Height > 0) %>%
-  distinct(ObjectID.x, .keep_all = TRUE) %>%
-  # filter(grepl("Y ", Comments))
-  filter(grepl(paste(c("Y ", "y ", "X ", "x "), collapse = "|"),
-              Comments))
-
-
-## Need to pull these out to replace the X and Y data
-
-
-```
-
-
 Notes:
 ObjectID.x == 312; tag 762 is at Pond (id = 7); says X 23, Y 4.63. X is wrong. Should it be 0.23? 
     1171 X 0.44, Y 5.19. 
 
-
-## Match formatting for the annual data  
-## Setting to NULL acts to delete the column 
-```{r}
-toupload <- plants2024 %>%
-  mutate(year = currentyr) %>%
-  mutate(old_tag_id = NA) %>% 
-  mutate(old_tag_id_2 = NA,
-         old_pond_tag_id = NA,
-         old_pond_transect_id = NA,
-         duplicate_tag_id = NA,
-         duplicate_tag_id_2 = NA) %>%
-  select(c(ScGl_tag_id, year, Height, Width, Flowering, Browsing, X..Minis, Photo.Number, Comments, 
-           old_tag_id:duplicate_tag_id_2))
-
-## Make all NAs NULL - that's not so easy to do!
-# toupload %>%
-#   left_join()
-#   write.csv(  file = paste("C:/Users/deprengm/OneDrive - Denver Botanic Gardens/P drive/hackathon/ScGl/datasets/annualdata2upload_", currentyr, ".csv", sep=""))
-
-## Need to remove any tag information out of comments and move to location in tags
-
-```
-
-
-Quality control for the Individual plant location information task in the spreadsheet and the X and Y. I'm going to make a data frame with the old location information, the as is comments, and the proposed location information. I will attempt to automate the extraction of tag information from the comments and X and Y updates from the comments. 
-
-```{r}
-
-
-
-```
-
-######################################################### Work on formating for VLOOKUP
-
-
 ## make edits to columns (same as above) to cut and paste into upload csv
-
-```{r}
-
-data2QAQC <- plants2024 %>%
-  mutate(Tag = as.numeric(Tag)) %>%
-  left_join(demo2024, by = c("ParentGlobalID" = "GlobalID")) %>%
-  left_join(sitesTransID, by = c("transect" = "TransectID")) %>%
-  # left_join(df2enter, by = c("Tag" = "Tag",
-  #                            "transect" = "MySQLTransectID")) %>%
-# Keep all rows from df2enter so we have all tag info with X and Y
-  full_join(df2enter, by = c("Tag" = "Tag",
-                             "transect" = "MySQLTransectID")) %>%
-  mutate(ScGl_tag_id = as.numeric(ScGl_tag_id)) %>%
-  select(c(ObjectID.x,  Site, TagIdignoreforupload, Tag, IndividualPlantLocation, 
-           transect,  Xcoordm, Ycoordm, Height:ScGl_tag_id, site:transect)) %>%
-  distinct(Tag, Height, Width, Flowering, .keep_all = TRUE) ## To get rid of duplicates from no Tag and five "NEW"
-
-## Did I run the 'Needed edits' ca. lines 83 on?  Should be 377 for Tag
-plants2024 %>%
-  filter(ScGl_tag_id == 528)
-
-data2QAQC %>%
-  arrange(transect, Tag ) 
-
-
-data2QAQC %>%
-  filter(Tag >= 185 & Tag < 186 & transect == 19)
-
-## Probably the "NEW" rows?? There are five "NEW" at the end of each site, with no tag to merge with, creates duplicates
-data2QAQC %>%
-  filter(is.na(Tag) & !is.na(Height)) 
-## Only one?
-data2QAQC %>%
-  filter(is.na(Tag) & is.na(Height)) %>%
-  summarise(numNew= n())
-
-## 15 needed new x and y from data2QAQC  # Now only one? TagID 2474
-data2QAQC %>%
-  filter(is.na(ScGl_tag_id)) %>%
-  filter(Height > 0) %>%
-  distinct(ObjectID.x, .keep_all = TRUE) %>%
-  filter(grepl(paste(c("Y ", "y ", "X ", "x "), collapse = "|"),
-              Comments.x))
-
-## plants2024$ScGl_tag_id  missing from some, don't know why; 21 like this; 20 after deleting ObjectID 1183, a duplicate measurement
-# A tagID in the database but that didn't connect in the Survey123   
-## These all look good
-data2QAQC %>%
-  filter(is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload)) %>%
-  arrange(TagIdignoreforupload)
-
-```
 
 Tags that have a tagID in the database but no matching Scgl_tag_id in Survey123  
 3723 is in twice with different Height and widths, maybe accidentally measured it twice: keep first ObjectID 1164 and delete 1183    
@@ -436,43 +306,49 @@ Tags that have a tagID in the database but no matching Scgl_tag_id in Survey123
 Assign ScGl_tag_id when it occurs in TagIdignoreforupload      
 ```{r}
 ## Tag number not recorded for one plant in transect 77 at Bridgeport 
-data2QAQC <- data2QAQC %>%
-  mutate(Ycoordm = case_when(ObjectID.x == 844 ~ ((30.37 + 42.20)/2),
-                             TRUE ~ Ycoordm))
-data2QAQC <- data2QAQC %>%
-  mutate(Xcoordm = case_when(ObjectID.x == 844 ~ 0.5,
-                             TRUE ~ Xcoordm))
 
-data2QAQC <- data2QAQC %>%
-  mutate(Comments.x = case_when(ObjectID.x == 844 ~ "Tag and XY not recorded, between 30.37 and 42.20, Cactus on West side of rock.",
-                             TRUE ~ Comments.x))
+# ObjectID 844 has disappeared! 
+annualdata2QC %>%
+  filter(Tag.x == 762)
 
-## No data recorded for ObjectID 158
-data2QAQC <- data2QAQC %>%
-  filter(ObjectID.x != 158)
+## Added directly to 2023_ScGl_ToIngest_v3
+# data2QAQC <- data2QAQC %>%
+#   mutate(Ycoordm = case_when(ObjectID.x == 844 ~ ((30.37 + 42.20)/2),
+#                              TRUE ~ Ycoordm))
+# data2QAQC <- data2QAQC %>%
+#   mutate(Xcoordm = case_when(ObjectID.x == 844 ~ 0.5,
+#                              TRUE ~ Xcoordm))
+# 
+# data2QAQC <- data2QAQC %>%
+#   mutate(Comments.x = case_when(ObjectID.x == 844 ~ "Tag and XY not recorded, between 30.37 and 42.20, Cactus on West side of rock.",
+#                              TRUE ~ Comments.x))
+# 
+# ## No data recorded for ObjectID 158
+# data2QAQC <- data2QAQC %>%
+#   filter(ObjectID.x != 158)
+# 
+# ## Assign ScGl_tag_id 
+# dataWQAQC <- data2QAQC %>%
+#   mutate(ScGl_tag_id = case_when( (is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload)) ~ TagIdignoreforupload,
+#                                   TRUE ~ ScGl_tag_id))
+# 
+# ## New seedlings or new to us measurements
+# dataWQAQC %>%
+#   filter(is.na(ScGl_tag_id))
+# 
+# dataWQAQC %>%
+#   filter(is.na(ScGl_tag_id)) %>%
+#   arrange(Site, transect, Tag) %>%
+#   write.csv(paste("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_DataEntry/2024_Sclerocactus-glaucus_Dataentry_Survey123-to-php/NEW_", currentyr, ".csv", sep=""))
 
-## Assign ScGl_tag_id 
-dataWQAQC <- data2QAQC %>%
-  mutate(ScGl_tag_id = case_when( (is.na(ScGl_tag_id) & !is.na(TagIdignoreforupload)) ~ TagIdignoreforupload,
-                                  TRUE ~ ScGl_tag_id))
-
-## New seedlings or new to us measurements
-dataWQAQC %>%
-  filter(is.na(ScGl_tag_id))
-
-dataWQAQC %>%
-  filter(is.na(ScGl_tag_id)) %>%
-  arrange(Site, transect, Tag) %>%
-  write.csv(paste("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_DataEntry/2024_Sclerocactus-glaucus_Dataentry_Survey123-to-php/NEW_", currentyr, ".csv", sep=""))
-
-dataWQAQC_v2 <- dataWQAQC %>%
-  filter(ObjectID.x != 158) %>%
-  mutate(TagIdignoreforupload = as.character(TagIdignoreforupload)) %>%
-  mutate(TagIdignoreforupload = case_when(is.na(ScGl_tag_id) ~ "NEW",
-                                          TRUE ~ TagIdignoreforupload))
-
-dataWQAQC_v2 %>%
-  filter(TagIdignoreforupload == "NEW")
+# dataWQAQC_v2 <- dataWQAQC %>%
+#   filter(ObjectID.x != 158) %>%
+#   mutate(TagIdignoreforupload = as.character(TagIdignoreforupload)) %>%
+#   mutate(TagIdignoreforupload = case_when(is.na(ScGl_tag_id) ~ "NEW",
+#                                           TRUE ~ TagIdignoreforupload))
+# 
+# dataWQAQC_v2 %>%
+#   filter(TagIdignoreforupload == "NEW")
 
 ```
 
@@ -628,16 +504,6 @@ dataWQAQC_v2 %>%
 ```
 
 
-# NEW plants to cut and paste into input sheet  
-```{r}
-
-dataWQAQC_v2 %>% 
-  
-
-```
-
-
-
 New:
 368.12 - 368.13 (should be 368.11 and 368.12) transect 18
 376.01-376.02 trans 18
@@ -650,6 +516,8 @@ Duplicates:
 ScGl_tag_id 2254 and 2476 for 628.01; 2476 no more data with it ** Deleted from MySQL database **
 
             
+
+
 
 
 
