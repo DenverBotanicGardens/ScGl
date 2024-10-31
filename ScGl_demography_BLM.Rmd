@@ -92,6 +92,9 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
 
+## Number of ScGl counted in 2023
+nrow(sg[sg$Year == currentYr & sg$Width.cm. > 0,]) + sum(sg$Minis[sg$Year == currentYr], na.rm = TRUE)
+
 ## Didn't get to Fram or Powerline in 2023
 sg <- sg %>%
   filter(!(Site %in% c("Fram","Powerline") & Year == 2023))
@@ -420,7 +423,7 @@ Add baseline for each facet
 baselineScGl <- 0.27
 baselineScDa <- 0.68
 
-baselineDF <- data.frame(NS = c("S. dawsonii","S. glaucus"), 
+baselineDF <- data.frame(NS = c("S. dawsoniae","S. glaucus"), 
                          Y = c(baselineScDa,baselineScGl))
 
 plot1 <- filter(sg_sum, !grepl("old", Site)) %>%
@@ -447,8 +450,8 @@ sg_density <- sg_sum %>%
   # filter(!(Site == Fram))
 
 sg_density %>%
-  filter(Year == 2023) %>%
-  write.csv(file = paste("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2023_Sclerocactus-glaucus_AnnualReport/density_",currentYr,".csv", sep=""), row.names = FALSE)
+  filter(Year == currentYr) %>%
+  write.csv(file = paste("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/density_",currentYr,".csv", sep=""), row.names = FALSE)
 
 plot2 <- filter(sg_density, !grepl("old", Site)) %>%
       ggplot(  aes(Year, Change.Density, color = Site))+
@@ -487,16 +490,14 @@ sg_density %>%
 
 sg_density %>%
   group_by(NS) %>%
-  dplyr::summarise(Change = 
-                     mean((Density[Year == currentYr] - Density[Year == currentYr-1])/Density[Year == currentYr-1]))
-sg_density %>%
-  group_by(NS) %>%
-  dplyr::summarise(Change = 
-                     sd((Density[Year == currentYr] - Density[Year == currentYr-1])/Density[Year == currentYr-1]))
+  filter(Year == currentYr) %>%
+  dplyr::summarise(MeanChange = mean(Change.Density),
+                   SDChange = sd(Change.Density),
+                   VarChange = var(Change.Density))
+
 ```
 
 ```{r}
-# ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"density_corrected.jpg", sep=""),
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"density.jpg", sep=""),
 
   plot1 + plot3 + plot_layout(widths = c(2,5)),
@@ -506,263 +507,6 @@ width = 305, height = 200, units = 'mm', dpi=300)
 
 ```
 
-Mark-recapture with missing surveys   
-Simple open Jolly-Seber  
-```{r}
-
-table(sg$SiteSame,sg$Year)
-table(sg$Site, sg$Year)
-
-## Need to get rid of duplicates! Old and new design
-sg.newold <- sg %>%
-  distinct(SiteSame, Tag, Year, .keep_all = TRUE)
-  
-table(sg.newold$Site, sg.newold$Year)
-  
-table(sg.newold$SiteSame)
-
-sg.JS <- sg.newold %>%
-  mutate(SiteSame = droplevels(SiteSame)) %>%
-  mutate(NS = gsub(" ", "", NS)) %>%
-  mutate(NS = gsub("\\.","",NS)) %>%
-  mutate(Site = gsub(" ", "", SiteSame)) %>%
-  mutate(Site = gsub("-", "", Site)) %>%
-  mutate(NS = as.factor(NS)) %>%
-  mutate(capture = if_else(Width.cm. > 0, "1", "0")) %>%
-  tidyr::complete(nesting(Site,Transect,Tag, Year, NS), fill = list(capture = "0")) %>%
-  arrange(Year, .by_group = TRUE) %>%
-  pivot_wider(names_from = Year, values_from = capture, id_cols = c(Site, Transect, Tag, NS), 
-              names_prefix = "Year", values_fill = "0") %>%
-  unite(ch, Year2008:Year2023, sep="") %>%
-  filter(grepl("1",ch))
-
-dmPlot <- model.matrix(~ -1 + Site, sg.JS)
-# dmSpecies <- model.matrix(~ -1 + Site + NS, sg.JS)
-# ## Add S.dawsonii column
-# dmSpecies <- dmSpecies %>%
-#   as.data.frame(.) %>%
-#   mutate(NSSdawsonii = if_else(NSSglaucus == 0, 1, 0))
-
-sg.JSPlot <- sg.JS %>%
-  # dplyr::select(ch, NS) %>%
-  dplyr::select(ch, NS) %>%
-  # bind_cols(dmSpecies) %>%
-  bind_cols(dmPlot) %>%
-  mutate(SiteTJunction = paste(SiteTJunction, ";", sep = ""))
-  # mutate(NSSdawsonii =  paste(NSSdawsonii, ";", sep = ""))
-
-sg.JSPlot %>%
-  write.table(file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"CJS_scgl.inp", sep=""), 
-              sep = "   ", quote=FALSE, col.names = FALSE, row.names = FALSE)
-
-```
-
-
-
-```{r}
-# 1. Goodness of fit test for most parameterized, general model
-
-plotdf <- sg.JS %>%
-  distinct(Site) %>%
-  mutate(Site = as.factor(Site))
-speciesdf <- sg.JS %>%
-  distinct(Site,NS) %>%
-  mutate(NS = as.factor(NS)) 
-
-scgl.inp <- convert.inp(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"CJS_scgl.inp", sep=""),
-                        # group.df = speciesdf,
-                        group.df = plotdf,
-                        covariates = "NS",
-                        use.comments = FALSE)
-
-scglproc <- process.data(scgl.inp, model = "Pradrec", groups = c("Site","NS"), begin.time = 2008)
-scglddl <- make.design.data(scglproc)
-
-## Fix p to zero when no survey
-pindex <- scglddl$p
-## Just the expanded new version of Atwell Gulch
-p.SSR <- pindex %>%
-  mutate(time = as.numeric(as.character(time))) %>%
-  filter(group %in% c("AtwellGulch","TJuction","OilPad","Pond")) %>%
-  filter(time < 2012)
-
-p.Bridgeport <- pindex %>%
-  mutate(time = as.numeric(as.character(time))) %>%
-  filter(group %in% c("Bridgeport")) %>%
-  filter(time < 2011)
-
-p.Fram <- pindex %>%
-  mutate(time = as.numeric(as.character(time))) %>%
-  filter(group %in% c("Fram")) %>%
-  filter(time < 2013 | time %in% c(2015,2023))
-
-p.2015 <- pindex %>%
-  mutate(time = as.numeric(as.character(time))) %>%
-  filter(group %in% c("Pond","Fram")) %>%
-  filter(time == 2015)
-
-## No Powerline (fence) or Fram (wet roads) in 2023
-p.2023 <- pindex %>%
-  mutate(time = as.numeric(as.character(time))) %>%
-  filter(group %in% c("Fram","Powerline")) %>%
-  filter(time == 2023)
-
-p.indices <- c(p.SSR$par.index,p.Bridgeport$par.index,p.Fram$par.index,p.2015$par.index,p.2023$par.index)
-p.values <- rep(0, length(p.indices))
-```
-
-"LinkBarkRan"   
-Link-Barker Survival and Recruitment with Random Effect    
-    Assumptions:
-       1. can enter on any occasion. Saturated model computed with parameter estimated as number of individuals with an encounter history divided by all individuals encountered
-       2. Tags are not lost, read properly
-       3. sampling instantaneous   
-       4. Survival probabilities same for marked and unmarked individuals
-       5. Study area remains constant
-       6. Conditions on the individual being seen somewhere in the experiment
-Parameters: 
-sigmaphi: individual heterogeneity         
-Phi: survival     
-sigmap: individual heterogeneity of p    
-p: detection    
-sigmaf: individual heterogeneity of f      
-f: net recruitment probability (the per capita number of new between i and i+1)   
-
-
-```{r}
-run.scgl <- function(){
-  Phi.dot = list(formula =  ~ 1)
-  Phi.time = list(formula =  ~ time)
-  Phi.Plot = list(formula =  ~ Site)  ## so each plot is offset
-  Phi.timePlot = list(formula =  ~ time + Site)
-  
-  p.dot = list(formula =  ~ 1, fixed = list(index = p.indices, value = p.values))
-
-  f.dot = list(formula =  ~ 1)
-  f.time = list(formula = ~ time)
-  f.Plot = list(formula = ~ Site)
-  f.timePlot = list(formula = ~ time + Site)
-  
-  scgl.model.list <- create.model.list("Pradrec")
-  
-  scgl.results <- mark.wrapper(scgl.model.list, data = scglproc, ddl = scglddl)
-  
-  return(scgl.results)
-}
-
-scgl.models <- run.scgl()
-save(scgl.models, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"PradelScGl.Rdata", sep=""))
-
-
-## Estimate constant population growth rate across each study site but setting apparent survival constant.  Constant survival
-
-scgl.constant <- mark(data = scglproc, ddl = scglddl, model = "Pradrec",
-                      model.parameters = list(p = list(formula = ~ Site, fixed = list(index = p.indices, value = p.values)),
-                                              Phi = list(formula = ~ Site),
-                                              f = list(formula = ~ time + Site)),
-                      begin.time = 2008,
-                      groups = "Site")
-
-summary(scgl.constant)
-
-estimates <- scgl.constant$results$real %>%
-  mutate(params = row.names(.)) %>%
-  separate(params, into = c("Parameter","group","age","time"))
-
-estimates %>%
-  filter(Parameter == "p")
-
-  
-
-scgl.constant$results$derived$`Lambda Population Change`
-
-## lambda = f + survival, estimate with all values within the range of uncertainty for f and Phi
-# skip the first year, estimates are crazy for per capita recruitment
-x <- unique(estimates$group)[1]
-sitelambdas <- do.call(rbind, lapply(unique(estimates$group), function(x){
-  group <- estimates[estimates$group == x,]
-  Phirange <- seq(from = group$lcl[group$Parameter == "Phi"],
-                  to = group$ucl[group$Parameter == "Phi"], length.out = 10)
-  frange <- c()
-  for(yr in 2:14){
-    frange <- cbind(frange, fvalues = seq(from = group$lcl[group$Parameter == "f"][yr],
-                                          to = group$ucl[group$Parameter == "f"][yr], length.out = 10))
-  }
-  frange <- data.frame(frange)
-  colnames(frange) <- paste("Year",2009:2021, sep="")
-  # For each year, need all combinations of 
-  combos <- do.call(rbind,lapply(1:nrow(frange), function(yr) {
-    out <- data.frame(group = x, Year = yr)
-    params <- expand.grid(Phirange, frange[,yr])
-    colnames(params) <- c("Phi","f")
-    params$lambda <- params$Phi + params$f
-    data.frame(out,params)
-  }))
-  }))
-
-SiteSpecies <- sg %>%
-  distinct(Site, NS) %>%
-  mutate(Site = gsub(" ", "", Site)) %>%
-  mutate(Site = gsub("-", "", Site)) 
-
-Fig2b <- sitelambdas %>%
-  mutate(group = sub("g","",group)) %>%
-  left_join(SiteSpecies, by = c("group" = "Site")) %>%
-  group_by(group, NS) %>%
-  dplyr::summarise(hdilwl = HDInterval::hdi(lambda)[1],
-                   hdiupl = HDInterval::hdi(lambda)[2],
-                   median = median(lambda)) %>%
-  ggplot(  aes(group, median))+
-    geom_point()+
-    geom_errorbar(aes(ymin = hdilwl, ymax = hdiupl), width = 0.5)+
-    theme_bw() +
-    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
-    theme(strip.text = element_text(face = "italic")) +
-    facet_wrap(~NS, scales = "free_x") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-    ylab(expression(lambda))+
-    xlab("")+
-    ggtitle("b)")
-
-## See far below for Fig2a, count based growth rate
-    
-```
-
-```{r}
-library(bayestestR)
-
-params <- scgl.models$Phi.timePlot.p.dot.f.timePlot$results$real %>%
-  mutate(params = row.names(.)) %>%
-  tidyr::separate(params, into = c("parameter","group","age","time")) %>%
-  filter(parameter == "Phi") %>%
-  dplyr::select(parameter,group,time)
-
-SpeciesSites <- sg %>%
-  distinct(SiteSame, NS) %>%
-  mutate(Site = gsub(" ", "", SiteSame)) %>%
-  mutate(Site = gsub("-", "", Site)) 
-  
-## May want to exclude the first and last
-scgl.models$Phi.Plot.p.dot.f.Plot$results$derived$`log(Lambda) Population Change` %>%
-  bind_cols(params) %>%
-  distinct(estimate,se,lcl,ucl) 
-
-scgl.models$Phi.Plot.p.dot.f.Plot$results$derived$`Lambda Population Change` %>%
-  bind_cols(params) %>%
-  distinct(estimate,se,lcl,ucl)
-
-
-scgl.models$Phi.timePlot.p.dot.f.timePlot$results$real %>%
-  mutate(params = row.names(.)) %>%
-  tidyr::separate(params, into = c("parameter","group","age","time")) %>%
-  group_by(parameter, group) %>%
-  mutate(estimate = if_else(parameter == "f", log(estimate), estimate)) %>%
-  dplyr::summarise(median = median(estimate),
-                   HDIucl = bayestestR::hdi(estimate)$CI_high,
-                   HDIlcl = bayestestR::hdi(estimate)$CI_low) %>%
-  print(n=21)
-
-```
 
 
 Summary tables pre and post
@@ -1111,7 +855,8 @@ Put into scgl instead so only one copy of everything climate
 Max temp   
 16 years 2000:currentYr
 Min temp   
-16 years 2000:currentYr
+16 years 2000:currentYr  
+Only update last year's provisional and this year's
 ```{r, eval=FALSE}
 
 m.ppt <- prism_archive_subset("ppt", "monthly", years = 1986:currentYr)
@@ -1123,7 +868,7 @@ m.ppt2 <- lapply(m.ppt, function(x){
 })
 
 
-m.scalevalue_tmax <- lapply(prism_archive_subset("scalevalue_tmax","monthly",years = 1986:currentYr), function(x){
+m.tmax <- lapply(prism_archive_subset("tmax","monthly",years = 1986:currentYr), function(x){
   x_rast <- pd_to_file(x)
   rastertemps <- raster(x_rast)
   data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]),
@@ -1136,53 +881,43 @@ m.tmin <- lapply(prism_archive_subset("tmin","monthly",years = 1986:currentYr), 
   data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]),
              date = x, Site = latlong$Site)
 })
-```
 
-PRISM_ppt_stable_4kmM3_201512_bil
-
-# Combine climate data from library(prism)   
-
-Strip off the last bit after the last underscore    
-
-     scgl.temps$date <- sapply(scgl.temps$date, function(x){
-       unlist(strsplit(x, "_\\s*(?=[^_]+$)", perl=TRUE))[[1]]
-       })  
-       
-```{r, eval=FALSE}
 scgl.climate <- rbind(do.call(rbind, m.tmin), 
-                    do.call(rbind, m.scalevalue_tmax),
+                    do.call(rbind, m.tmax),
                     do.call(rbind, m.ppt2))
 
 save(scgl.climate, file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
 ```
-
-
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
 
 ###### Load once made
 ```{r}
 load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"climate.Rdata", sep=""))
 
-
-scgl.climate$NS <- "S. dawsonii"
-southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
-scgl.climate$NS[scgl.climate$Site %in% southsites] <- "S. glaucus"
+scgl.climate <- scgl.climate %>%
+  mutate(NS = case_when(Site %in% c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram") ~ "S. glaucus",
+                        TRUE ~ "S. dawsoniae")) %>%
+  filter(!grepl("provisional_4kmM3_2023", date))
 
 scgl.climate.monthly <- scgl.climate %>%
   mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-10,nchar(date)-6)),
          Month = as.numeric(substr(date, (nchar(date)+1)-6, nchar(date)-4)),
          # Make previous 12 months match year (previous to May survey)
          Prev12 = ifelse(Month > 5, Year+1, Year)) %>%
+  filter(Prev12 <= currentYr) %>%
   #extract the climate variable name from the prism long name
   separate(date, sep = "_", into = c(NA,"Variable",NA,NA,NA,NA)) %>%
-  # mutate(season = "winter") %>%
   mutate(season = case_when(Month %in% c(1,2,12) ~ "winter",
                             Month>5 & Month<9 ~ "summer",
                             Month>8 & Month<12 ~ "fall",
                             Month>2 & Month<6 ~ "spring"))
 
+
 scgl.c <- scgl.climate.monthly %>%
-  pivot_wider(names_from = Variable, values_from = data)
+  pivot_wider(names_from = Variable, values_from = data) 
 
 scgl.climate.season.ppt <- scgl.climate.monthly %>%
   filter(Variable == "ppt") %>%
@@ -1211,8 +946,6 @@ scgl.annual.temp <- scgl.climate.monthly %>%
 
 scgl.annual <- scgl.annual.ppt %>%
   bind_rows(scgl.annual.temp)
-# do.call(rbind, list(as.data.frame(scgl.annual.ppt),
-#                     as.data.frame(scgl.annual.temp)))
 
 scgl.annual %>%
   filter(Prev12 < (currentYr + 1)) %>%
@@ -2374,6 +2107,384 @@ ggheight/ggwidth,
   
 
 ```
+
+
+
+####################################################################################################################
+Mark-recapture with missing surveys   
+Simple open Jolly-Seber  
+```{r}
+
+scgl.season.wide.NameMatch <- as.data.frame(scgl.season.wide) %>%
+  mutate(Site = gsub(" ", "", Site)) %>%
+  mutate(Site = gsub("-", "", Site)) %>%
+  mutate(Prev12 = as.factor(Prev12)) %>%
+  mutate(Site = as.factor(Site))
+  
+table(scgl.season.wide.NameMatch$Site)  
+
+table(sg$SiteSame,sg$Year)
+table(sg$Site, sg$Year)
+
+## Need to get rid of duplicates! Old and new design
+sg.newold <- sg %>%
+  distinct(SiteSame, Tag, Year, .keep_all = TRUE)
+  
+table(sg.newold$Site, sg.newold$Year)
+  
+table(sg.newold$SiteSame)
+
+### Update with current year!!
+sg.JS <- sg.newold %>%
+  mutate(SiteSame = droplevels(SiteSame)) %>%
+  mutate(NS = gsub(" ", "", NS)) %>%
+  mutate(NS = gsub("\\.","",NS)) %>%
+  mutate(Site = gsub(" ", "", SiteSame)) %>%
+  mutate(Site = gsub("-", "", Site)) %>%
+  mutate(NS = as.factor(NS)) %>%
+  mutate(capture = if_else(Width.cm. > 0, "1", "0")) %>%
+  tidyr::complete(nesting(Site,Transect,Tag, Year, NS), fill = list(capture = "0")) %>%
+  arrange(Year, .by_group = TRUE) %>%
+  pivot_wider(names_from = Year, values_from = capture, id_cols = c(Site, Transect, Tag, NS), 
+              names_prefix = "Year", values_fill = "0") %>%
+  ############ UPDATE ##################
+  unite(ch, Year2008:Year2024, sep="") %>%
+  filter(grepl("1",ch))
+
+dmPlot <- model.matrix(~ -1 + Site, sg.JS)
+
+sg.JSPlot <- sg.JS %>%
+  dplyr::select(ch) %>%
+  bind_cols(dmPlot) %>%
+  mutate(SiteTJunction = paste(SiteTJunction, ";", sep = ""))
+
+sg.JSPlot %>%
+  write.table(file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"CJS_scgl.inp", sep=""), 
+              sep = "   ", 
+              col.names = FALSE, 
+              row.names = FALSE)
+
+```
+
+
+
+```{r}
+# 1. Goodness of fit test for most parameterized, general model
+
+## Actually by site
+plotdf <- sg.JS %>%
+  distinct(Site) %>%
+  mutate(Site = as.factor(Site))
+
+scgl.inp <- convert.inp(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"CJS_scgl.inp", sep=""),
+                        group.df = plotdf,
+                        covariates = NULL, ## These are individual continuous covariates
+                        use.comments = FALSE)
+
+scglproc <- process.data(scgl.inp, model = "Pradrec", groups = c("Site"), begin.time = 2008)
+scglddl <- make.design.data(scglproc)
+
+## Fix p to zero when no survey
+pindex <- scglddl$p
+## Just the expanded new version of Atwell Gulch
+p.SSR <- pindex %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("AtwellGulch","TJuction","OilPad","Pond")) %>%
+  filter(time < 2012)
+
+p.Bridgeport <- pindex %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Bridgeport")) %>%
+  filter(time < 2011)
+
+p.Fram <- pindex %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Fram")) %>%
+  filter(time < 2013 | time %in% c(2015,2023))
+
+p.2015 <- pindex %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Pond","Fram")) %>%
+  filter(time == 2015)
+
+## No Powerline (fence) or Fram (wet roads) in 2023
+p.2023 <- pindex %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Fram","Powerline")) %>%
+  filter(time == 2023)
+
+p.indices <- c(p.SSR$par.index,p.Bridgeport$par.index,p.Fram$par.index,p.2015$par.index,p.2023$par.index)
+p.values <- rep(0, length(p.indices))
+
+### Add species 
+scglddl$Phi$Species <- ifelse(scglddl$Phi$Site %in% c("AtwellGulch","OilPad","Pond","PyramidRock","TJunction"), 
+                          "ScDa",
+                          "ScGl")
+scglddl$Phi$Species <- as.factor(scglddl$Phi$Species)
+
+scglddl$p$Species <- ifelse(scglddl$p$Site %in% c("AtwellGulch","OilPad","Pond","PyramidRock","TJunction"), 
+                          "ScDa",
+                          "ScGl")
+scglddl$p$Species <- as.factor(scglddl$p$Species)
+
+scglddl$f$Species <- ifelse(scglddl$f$Site %in% c("AtwellGulch","OilPad","Pond","PyramidRock","TJunction"), 
+                          "ScDa",
+                          "ScGl")
+scglddl$f$Species <- as.factor(scglddl$f$Species)
+
+### Add climate
+names(scgl.season.wide.NameMatch)
+
+scglddl$Phi <- scglddl$Phi %>%
+  left_join(scgl.season.wide.NameMatch, join_by("Site" == "Site", "time" == "Prev12"))
+
+scglddl$f <- scglddl$f %>%
+  left_join(scgl.season.wide.NameMatch, join_by("Site" == "Site", "time" == "Prev12"))
+
+scglddl$p <- scglddl$p %>%
+  left_join(scgl.season.wide.NameMatch, join_by("Site" == "Site", "time" == "Prev12"))
+
+```
+
+"LinkBarkRan"   
+Link-Barker Survival and Recruitment with Random Effect    
+    Assumptions:
+       1. can enter on any occasion. Saturated model computed with parameter estimated as number of individuals with an encounter history divided by all individuals encountered
+       2. Tags are not lost, read properly
+       3. sampling instantaneous   
+       4. Survival probabilities same for marked and unmarked individuals
+       5. Study area remains constant
+       6. Conditions on the individual being seen somewhere in the experiment
+Parameters: 
+sigmaphi: individual heterogeneity         
+Phi: survival     
+sigmap: individual heterogeneity of p    
+p: detection    
+sigmaf: individual heterogeneity of f      
+f: net recruitment probability (the per capita number of new between i and i+1)   
+
+
+```{r}
+run.scgl <- function(){
+  Phi.dot = list(formula =  ~ 1)
+  Phi.species = list(formula = ~ Species)
+  Phi.Time = list(formula =  ~ Time) ## Trend?
+  Phi.Plot = list(formula =  ~ Site)  ## so each plot is offset
+  Phi.pptfall = list(formula =  ~ ppt_fall)
+  Phi.pptspring = list(formula =  ~ ppt_spring)
+  Phi.pptsummer = list(formula =  ~ ppt_summer)
+  Phi.pptwinter = list(formula =  ~ ppt_winter)
+  Phi.tmaxfall = list(formula =  ~ tmax_fall)
+  Phi.tmaxspring = list(formula =  ~ tmax_spring)
+  Phi.tmaxsummer = list(formula =  ~ tmax_summer)
+  Phi.tmaxwinter = list(formula =  ~ tmax_winter)
+  Phi.tminfall = list(formula =  ~ tmin_fall)
+  Phi.tminspring = list(formula =  ~ tmin_spring)
+  Phi.tminsummer = list(formula =  ~ tmin_summer)
+  Phi.tminwinter = list(formula =  ~ tmin_winter)
+  
+  p.dot = list(formula =  ~ 1, fixed = list(index = p.indices, value = p.values))
+
+  f.dot = list(formula =  ~ 1)
+  f.time = list(formula = ~ Time)
+  f.Plot = list(formula = ~ Site)
+  f.species = list(formula = ~ Species)
+  f.pptfall = list(formula =  ~ ppt_fall)
+  f.pptspring = list(formula =  ~ ppt_spring)
+  f.pptsummer = list(formula =  ~ ppt_summer)
+  f.pptwinter = list(formula =  ~ ppt_winter)
+  f.tmaxfall = list(formula =  ~ tmax_fall)
+  f.tmaxspring = list(formula =  ~ tmax_spring)
+  f.tmaxsummer = list(formula =  ~ tmax_summer)
+  f.tmaxwinter = list(formula =  ~ tmax_winter)
+  f.tminfall = list(formula =  ~ tmin_fall)
+  f.tminspring = list(formula =  ~ tmin_spring)
+  f.tminsummer = list(formula =  ~ tmin_summer)
+  f.tminwinter = list(formula =  ~ tmin_winter)
+  
+  scgl.model.list <- create.model.list("Pradrec")
+  
+  scgl.results <- mark.wrapper(scgl.model.list, data = scglproc, ddl = scglddl)
+  
+  return(scgl.results)
+}
+
+scgl.models <- run.scgl()
+save(scgl.models, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"PradelScGl.Rdata", sep=""))
+```
+
+```{r}
+
+scgl.models$model.table
+
+Phi.table <- get.real(scgl.models$Phi.Plot.p.dot.f.time, "Phi", se = TRUE)
+
+Phi.table %>%
+  group_by(Site) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(Site, estimates)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  theme_bw()
+
+f.table <- get.real(scgl.models$Phi.Plot.p.dot.f.time, "f", se = TRUE)
+
+f.table %>%
+  group_by(Time) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(Time, estimates)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  theme_bw()
+
+## Lambda == Phi + f
+Phi.table %>%
+  left_join(f.table, by = c(#"all.diff.index","par.index",
+    "fixed","note","group","age","time","Age","Time","Site")) %>%
+  mutate(Lambda = estimate.x + estimate.y) %>%
+group_by(Time, Site) %>%
+  summarise(estimates = mean(Lambda)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(Time, estimates, color = Site)) +
+  geom_point() +
+  # geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  theme_bw() +
+  geom_line()
+
+```
+
+
+
+```{r}
+
+## Estimate constant population growth rate across each study site but setting apparent survival constant.  Constant survival
+
+scgl.constant <- mark(data = scglproc, ddl = scglddl, model = "Pradrec",
+                      model.parameters = list(p = list(formula = ~ Site, fixed = list(index = p.indices, value = p.values)),
+                                              Phi = list(formula = ~ Site),
+                                              f = list(formula = ~ time + Site)),
+                      begin.time = 2008,
+                      groups = "Site")
+
+summary(scgl.constant)
+
+estimates <- scgl.constant$results$real %>%
+  mutate(params = row.names(.)) %>%
+  separate(params, into = c("Parameter","group","age","time"))
+
+estimates %>%
+  filter(Parameter == "p")
+
+  
+
+scgl.constant$results$derived$`Lambda Population Change`
+
+## lambda = f + survival, estimate with all values within the range of uncertainty for f and Phi
+# skip the first year, estimates are crazy for per capita recruitment
+x <- unique(estimates$group)[1]
+sitelambdas <- do.call(rbind, lapply(unique(estimates$group), function(x){
+  group <- estimates[estimates$group == x,]
+  Phirange <- seq(from = group$lcl[group$Parameter == "Phi"],
+                  to = group$ucl[group$Parameter == "Phi"], length.out = 10)
+  frange <- c()
+  for(yr in 2:14){
+    frange <- cbind(frange, fvalues = seq(from = group$lcl[group$Parameter == "f"][yr],
+                                          to = group$ucl[group$Parameter == "f"][yr], length.out = 10))
+  }
+  frange <- data.frame(frange)
+  colnames(frange) <- paste("Year",2009:2021, sep="")
+  # For each year, need all combinations of 
+  combos <- do.call(rbind,lapply(1:nrow(frange), function(yr) {
+    out <- data.frame(group = x, Year = yr)
+    params <- expand.grid(Phirange, frange[,yr])
+    colnames(params) <- c("Phi","f")
+    params$lambda <- params$Phi + params$f
+    data.frame(out,params)
+  }))
+  }))
+
+SiteSpecies <- sg %>%
+  distinct(Site, NS) %>%
+  mutate(Site = gsub(" ", "", Site)) %>%
+  mutate(Site = gsub("-", "", Site)) 
+
+Fig2b <- sitelambdas %>%
+  mutate(group = sub("g","",group)) %>%
+  left_join(SiteSpecies, by = c("group" = "Site")) %>%
+  group_by(group, NS) %>%
+  dplyr::summarise(hdilwl = HDInterval::hdi(lambda)[1],
+                   hdiupl = HDInterval::hdi(lambda)[2],
+                   median = median(lambda)) %>%
+  ggplot(  aes(group, median))+
+    geom_point()+
+    geom_errorbar(aes(ymin = hdilwl, ymax = hdiupl), width = 0.5)+
+    theme_bw() +
+    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+    theme(strip.text = element_text(face = "italic")) +
+    facet_wrap(~NS, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    ylab(expression(lambda))+
+    xlab("")+
+    ggtitle("b)")
+
+## See far below for Fig2a, count based growth rate
+    
+```
+
+```{r}
+library(bayestestR)
+
+params <- scgl.models$Phi.timePlot.p.dot.f.timePlot$results$real %>%
+  mutate(params = row.names(.)) %>%
+  tidyr::separate(params, into = c("parameter","group","age","time")) %>%
+  filter(parameter == "Phi") %>%
+  dplyr::select(parameter,group,time)
+
+SpeciesSites <- sg %>%
+  distinct(SiteSame, NS) %>%
+  mutate(Site = gsub(" ", "", SiteSame)) %>%
+  mutate(Site = gsub("-", "", Site)) 
+  
+## May want to exclude the first and last
+scgl.models$Phi.Plot.p.dot.f.Plot$results$derived$`log(Lambda) Population Change` %>%
+  bind_cols(params) %>%
+  distinct(estimate,se,lcl,ucl) 
+
+scgl.models$Phi.Plot.p.dot.f.Plot$results$derived$`Lambda Population Change` %>%
+  bind_cols(params) %>%
+  distinct(estimate,se,lcl,ucl)
+
+
+scgl.models$Phi.timePlot.p.dot.f.timePlot$results$real %>%
+  mutate(params = row.names(.)) %>%
+  tidyr::separate(params, into = c("parameter","group","age","time")) %>%
+  group_by(parameter, group) %>%
+  mutate(estimate = if_else(parameter == "f", log(estimate), estimate)) %>%
+  dplyr::summarise(median = median(estimate),
+                   HDIucl = bayestestR::hdi(estimate)$CI_high,
+                   HDIlcl = bayestestR::hdi(estimate)$CI_low) %>%
+  print(n=21)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
