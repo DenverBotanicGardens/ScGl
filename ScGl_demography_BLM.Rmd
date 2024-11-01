@@ -222,7 +222,7 @@ sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
 # Assign genetic regions; now new species, still have not seen the publication 2022
-sg$NS <- "S. dawsonii"
+sg$NS <- "S. dawsoniae"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
 sg$NS[sg$Site %in% southsites] <- "S. glaucus"
 
@@ -250,7 +250,7 @@ sg$SiteSame[sg$Site %in% unique(grep(paste("T-",collapse="|"),
 sg_summary08$SiteSame <- sg_summary08$Site
 
 # Assign genetic regions
-sg_summary08$NS <- "S. dawsonii"
+sg_summary08$NS <- "S. dawsoniae"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
 sg_summary08$NS[sg_summary08$Site %in% southsites] <- "S. glaucus"
 
@@ -291,7 +291,7 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 Merge for size changes year to year by location
 ```{r}
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg$NS <- "S. dawsonii"
+sg$NS <- "S. dawsoniae"
 sg$NS[sg$SiteSame %in% grep(paste(southsites,collapse="|"),
                                                 sg$SiteSame, value=TRUE)] <- "S. glaucus"
 
@@ -432,7 +432,6 @@ plot1 <- filter(sg_sum, !grepl("old", Site)) %>%
     geom_line()+
     theme_bw()+
     ggtitle("a)")+
-    xlim(c(2008, 2024))+
     ylab(expression("Density ( plants/m"^{2}~")")) +
     scale_color_brewer(palette = "Set3")+ #, guide = "none")+
     facet_wrap(~NS, nrow = 2, scales = "free")+
@@ -768,7 +767,7 @@ sg_sum %>%
   dplyr::summarise(MeanRep = mean(PR), SDRep = stats::sd(PR), 
                    SE = sd(PR)/sqrt(length(PR)),
                     CI = sd(PR)/sqrt(length(PR)) * (qt(0.95/2 + 0.5, length(PR)-1))) %>%
-  mutate(Group = "all") %>%
+  mutate(Group = "all") 
 
 sg_sum <- sg_sum %>%
   mutate(PRep = Rep/X)
@@ -1005,20 +1004,11 @@ spring: March-May (3-5)
 
 # Results: Reproduction
 ```{r}
-sg_season <- merge(sg, scgl.season.wide, by.x = c("Year","Site","NS"), by.y = c("Prev12","Site","NS"))
-sg_annual <- merge(sg, scgl.annual.wide, by.x = c("Year","Site","NS"), by.y = c("Prev12","Site","NS"))
-scgl_season <- merge(sg_sum, scgl.season.wide, 
-                     by.x = c("Year","Site","NS"), by.y = c("Prev12","Site","NS")) %>%
-  filter(!is.na(medianH))
+sg_season <- sg %>%
+  left_join(scgl.season.wide, join_by("Year" == "Prev12", "Site" == "Site", "NS" == "NS"))
+sg_annual <- sg %>%
+  left_join(scgl.annual.wide, join_by("Year" == "Prev12", "Site" == "Site", "NS" == "NS"))
 
-
-#Reproductive individuals with average width of plants
-#See also "#Reproduction" below; should match this
-summary(lm(PRep~medianW * NS, data=scgl_season))
-ggplot(scgl_season, aes(medianW, PRep, color = NS)) +
-  geom_point()+
-  stat_smooth(method = "lm") +
-  theme_bw()
 
 summary(glm(Fl~Width.cm. * NS, data = sg_season, family = binomial(link = "logit")))
 ggplot(sg_season, aes(Width.cm., Fl, color = NS))+
@@ -1035,19 +1025,10 @@ ggplot(sg_season, aes(Width.cm., Fl, color = NS))+
 
 # AICc climate and width on Reproduction Y/N
 ```{r}
-head(sg_season)
-head(sg_annual)
-
 sg_season_scaled <- sg_season %>%
   dplyr::mutate(across(ppt_fall:tmin_winter, scale)) %>%
   mutate(Br = as.factor(Br),
          NS = as.factor(NS))
-
-## Alredy scaled: scalevalue_ppt, scalevalue_tmax, and tmin
-# sg_annual_scaled <- sg_annual %>%
-#   dplyr::mutate(across(ppt:tmin, scale)) %>%
-#   mutate(Br = as.factor(Br),
-#          NS = as.factor(NS))
 
 ## If browsed, need to be larger to flower
 brflowered <- sg_season %>%
@@ -1150,7 +1131,7 @@ ggplot(sg_annual_scaled_merged, aes(scalevalue_ppt, surv, color = Br.x))+
   theme_light()+
   scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
 
-ggplot(sg_annual_scaled_merged, aes(scalevalue_scalevalue_tmax, surv, color = Br.x))+
+ggplot(sg_annual_scaled_merged, aes(scalevalue_tmax, surv, color = Br.x))+
   geom_point(pch="|")+
   geom_smooth(method = "glm", 
     method.args = list(family = "binomial"), 
@@ -1224,7 +1205,7 @@ p1a <- sg_annual_scaled_merged %>%
                                 "2" = "> mean min temp")),
                     scalevalue_pptbin = as_labeller(c("1" = "<= mean scalevalue_ppt", "2" = "> mean scalevalue_ppt")),
                     NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
-                                       "S. dawsonii" = expression(italic(S.~dawsonii))))))+
+                                       "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
     theme_light()+
     scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
                          labels = c("Unbrowsed","Browsed"))+
@@ -1242,19 +1223,19 @@ p1 <- sg_annual_scaled_merged %>%
   dplyr::mutate(tempbin = cut(scalevalue_tmin, 
                               breaks = c(min(scalevalue_tmin)-0.1, mean(scalevalue_tmin), max(scalevalue_tmin)+0.1),
                               labels = FALSE)) %>%
-  dplyr::mutate(pptbin = cut(ppt, 
-                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+  dplyr::mutate(pptbin = cut(scalevalue_ppt, 
+                              breaks = c(min(scalevalue_ppt)-0.1, mean(scalevalue_ppt), max(scalevalue_ppt)+0.1),
                               labels = FALSE)) %>%
-  ggplot(  aes(ppt,surv, color = as.factor(tempbin)))+
-     geom_point(pch = "|")+ ## mimic a rug plot
-      geom_smooth(method = "glm",
-                  method.args = list(family = "binomial"), se=TRUE)+
+ggplot(  aes(scalevalue_ppt,surv, color = as.factor(tempbin)))+
+  geom_point(pch = "|")+ ## mimic a rug plot
+  geom_smooth(method = "glm",
+              method.args = list(family = "binomial"), se=TRUE)+
   facet_wrap(~NS)+
-    theme_light()+
-    scale_color_manual("Temperature", values = c("deepskyblue","deeppink4"),  # Minimum\nTemperature
-                         labels = c("1" = "<= mean\nmin temp", "2" = "> mean\nmin temp"))+
-    ylab("Survival")+
-    xlab("Precipitation")+
+  theme_light()+
+  scale_color_manual("Temperature", values = c("deepskyblue","deeppink4"),  # Minimum\nTemperature
+                     labels = c("1" = "<= mean\nmin temp", "2" = "> mean\nmin temp"))+
+  ylab("Survival")+
+  xlab("Precipitation")+
   ggtitle("b)")
 
 p2 <- sg_annual_scaled_merged %>%
@@ -1262,8 +1243,8 @@ p2 <- sg_annual_scaled_merged %>%
   dplyr::mutate(tempbin = cut(scalevalue_tmin, 
                               breaks = c(min(scalevalue_tmin)-0.1, mean(scalevalue_tmin), max(scalevalue_tmin)+0.1),
                               labels = FALSE)) %>%
-  dplyr::mutate(pptbin = cut(ppt, 
-                              breaks = c(min(ppt)-0.1, mean(ppt), max(ppt)+0.1),
+ dplyr::mutate(pptbin = cut(scalevalue_ppt, 
+                              breaks = c(min(scalevalue_ppt)-0.1, mean(scalevalue_ppt), max(scalevalue_ppt)+0.1),
                               labels = FALSE)) %>%
   ggplot(  aes(scalevalue_tmin,surv, color = as.factor(pptbin)))+
      geom_point(pch = "|")+ ## mimic a rug plot
@@ -1349,7 +1330,7 @@ sg_annual %>%
   filter(Width.cm. != 0) %>% # dead
   group_by(NS) %>%
   # based on the minimum size when the species typically can become reproductive
-  mutate(SizeClass = ifelse(NS == "S. dawsonii",
+  mutate(SizeClass = ifelse(NS == "S. dawsoniae",
                             cut(Width.cm., breaks=c(0,3.04,max(Width.cm.))),
                             cut(Width.cm., breaks=c(0,2.28,max(Width.cm.))))) %>%
   filter(SizeClass == 2) %>%
@@ -1382,7 +1363,7 @@ sg_annual %>%
       facet_grid(NS~Br, labeller = labeller(Br = as_labeller(c("0" = "No browse/damage",
                                                        "1" = "Browse/damage")),
                       NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
-                                         "S. dawsonii" = expression(italic(S.~dawsonii))))))+
+                                         "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
       theme_light()+
       # scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"))+
       scale_color_manual("Min Temp", values = c("deepskyblue","deeppink4"),
@@ -1412,7 +1393,7 @@ flpl1 <- sg_annual %>%
                                 "2" = "> mean min temp")),
                     pptbin = as_labeller(c("1" = "<= mean ppt", "2" = "> mean ppt")),
                     NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
-                                       "S. dawsonii" = expression(italic(S.~dawsonii))))))+
+                                       "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
     theme_light()+
     scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
                          labels = c("Unbrowsed","Browsed"))+
@@ -1466,71 +1447,10 @@ flp2 <- sg_annual %>%
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5_ProbofReproductive.jpg", sep=""),
        flpl1 / (flp1 + flp2), width = 300, height = 200, units = 'mm', dpi=300)
 
-# sjPlot::plot_model(lm1, type = "est")
-# sjplot1 <- sjPlot::plot_model(lm1, type = "pred",
-#                               title = "",
-#                             # axis.labels = c("Size (width cm)","Probability of Reproduction"),
-#                               # mdrt.values = "meansd",
-#                    terms = c("Width.cm.[all]","Br[all]","ppt[meansd]","scalevalue_tmin[meansd]"))
-# 
-# sjplot1
 ```
 
 # What describes reproduction
 ### Is percent reproductive explained by climate variables?   
-Figure 5 (was figure 4 before adding survival interaction plots)   
-```{r, eval=FALSE}
-# +ppt.spring +scalevalue_tmax.spring +ppt.summer+ ppt.winter+ scalevalue_tmax.winter
-
-# lm10 <- glm(Prepro~medianW*data.ppt,
-#             family = "binomial", sg_sum, weights = X)
-# lm11 <- glm(Prepro~medianW*data.ppt*data.scalevalue_tmax,
-#             family = "binomial", sg_sum, weights = X)
-# lm12 <- glm(Prepro~medianW*data.scalevalue_tmin,
-#             family = "binomial", sg_sum, weights = X)
-# lm13 <- glm(Prepro~medianW*data.scalevalue_tmin*data.ppt,
-#             family = "binomial", sg_sum, weights = X)
-#   # lm1 <- glm(Prepro~medianW*data.scalevalue_tmin*data.scalevalue_tmax*data.ppt,
-#   #          family = "binomial", sg_sum, weights = X)
-# lm2 <- glm(Prepro~medianW*data.scalevalue_tmax, 
-#            family = "binomial",sg_sum, weights = X)
-# lm3 <- glm(Prepro~NS*medianW*data.ppt,
-#             family = "binomial", sg_sum, weights = X)
-# 
-# #######################################################
-# lm4 <- glm(Prepro~NS*medianW*data.scalevalue_tmax*data.ppt,
-#             family = "binomial", sg_sum, weights = X)
-# lm6 <- glm(Prepro~NS*medianW*data.scalevalue_tmin*data.ppt,
-#             family = "binomial", sg_sum, weights = X)
-# #######################################################
-# 
-# lm5 <- glm(Prepro~NS*medianW*data.scalevalue_tmin,
-#             family = "binomial", sg_sum, weights = X)
-#   # lm7 <- glm(Prepro~NS*medianW*data.scalevalue_tmin*data.scalevalue_tmax*data.ppt,
-#   #          family = "binomial", sg_sum, weights = X)
-# lm8 <- glm(Prepro~NS*medianW*data.scalevalue_tmax, 
-#            family = "binomial",sg_sum, weights = X)
-# 
-# # lm1,lm7,
-# lm.list <- list(lm2,lm3,lm4,lm5,lm6,lm8, lm10,lm11,lm12,lm13)
-# lm.names <- as.character(unlist(lapply(lm.list,formula)))
-# (lm.results <- aictab(lm.list, modnames=lm.names))
-# print(evidence(aic.table = lm.results),
-#       digits = 2)
-# #evidence ratio 
-# for(i in 2:length(lm.list)){
-#   print(exp(0.5*lm.results$Delta_AICc[i]))
-# }
-# 
-# # more percent reproductive with avg width
-# ### Best are 4 and 6
-# effectsize::standardize(lm6) %>% summary()
-# effectsize::standardize(lm4) %>% summary()
-# 
-# sjPlot::plot_model(lm6, type = "eff", show.data = T) 
-## meansd : mean value +/- one SD
-# "int" for continuous variables the min and max are chosen as grouping levels
-```
 
 ```{r}
 
@@ -1595,15 +1515,7 @@ levels(p1[[8]]$data$facet) <- gsub(pattern = "data.ppt",
                                           replacement = "ppt",
                                           levels(p1[[8]]$data$facet) )
 
-# Fig4_a_reproduction <- p1[[8]]+
-#   # ggtitle("Predicted probablities of % reproduction")+
-#   ggtitle("a)")+
-#   scale_colour_discrete("Size")+
-#   xlab("Region")+
-#   ylab("% reproduction")+
-#   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1))
-## For other competitive model lm4
-## Change facet order to mean-SD, mean, mean+SD
+
 for(i in 1:3){
   p2[[11]][[i]]$data$facet <- factor(p2[[11]][[i]]$data$facet,
                                       levels = c(levels(p2[[11]][[i]]$data$facet)[2],
@@ -1705,59 +1617,6 @@ width = 330, height = 210, units = 'mm', dpi=300)
 
 
 
-```{r}
-
-# Facet order
-p2[[9]]$data$facet <- factor(p2[[9]]$data$facet,
-                                    levels = c(levels(p2[[9]]$data$facet)[2],
-                                               levels(p2[[9]]$data$facet)[1],
-                                               levels(p2[[9]]$data$facet)[3]))
-## Change facet labels
-levels(p2[[9]]$data$facet) <- gsub(pattern = "data.ppt", 
-                                          replacement = "ppt",
-                                          levels(p2[[9]]$data$facet) )
-
-Fig4_b_reproduction_lm4 <- p2[[9]]+
-  # ggtitle("Predicted probablities of % reproduction")+
-  ggtitle("c)")+
-  scale_colour_discrete("Max Temp")+
-  xlab("Region")+
-  ylab("% reproduction")
-
-p2[[8]]$data$facet <- factor(p2[[8]]$data$facet,
-                                    levels = c(levels(p2[[8]]$data$facet)[2],
-                                               levels(p2[[8]]$data$facet)[1],
-                                               levels(p2[[8]]$data$facet)[3]))
-  ## Change facet labels
-levels(p2[[8]]$data$facet) <- gsub(pattern = "data.ppt", 
-                                          replacement = "ppt",
-                                          levels(p2[[8]]$data$facet) )
-
-Fig4_a_reproduction_lm4 <- p2[[8]]+
-  # ggtitle("Predicted probablities of % reproduction")+
-  ggtitle("c)")+
-  scale_colour_discrete("Size")+
-  xlab("Region")+
-  ylab("% reproduction")+
-  theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1))
-
-
-sjPlot::plot_model(lm6, type = "est", show.values = T, transform = NULL)
-sjPlot::plot_model(lm4, type = "est", show.values = TRUE, transform = NULL)
-
-## Change names of coefficients in Predictors column
-sjPlot::tab_model(lm6, transform = NULL,   # estimates on linear scale
-                  # pred.labels = c("Intercept", "size", "min temp","ppt",
-                  #                 "region:size","region:min temp","size:Max Temp","ppt:max temp",
-                  #                 "size:ppt:max temp"),
-                  string.ci = "CI (95%)",
-                  string.p = "p-value",
-                  show.reflvl = TRUE)  # show reference level for categorical (none here)
-
-```
-
-
-
 Figure 3a Number of Sclerocactus glaucus
 ```{r Figure remove pond}
 
@@ -1770,7 +1629,7 @@ Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
   ylab("Individuals per square meter") +
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
   theme_bw()+
-  scale_x_continuous(breaks = seq(2008, currentYr, 4))+
+  scale_x_continuous(breaks = seq(2008, currentYr, 5))+
   scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#7171C6",
                                 "#C67171","#C5C1AA","#8E8E38",
@@ -1790,45 +1649,6 @@ ggplot(sg_sum, aes(Density, SiteSame, fill = NS))+
 write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/ScGl_density.csv", sep=""))
 ```
 
-
-
-####Figure 6: The plot design for four ScGl sites were changed in 2012...   
-```{r}
-# old and new
-oldnew <- c("Oil","Pond","T-","Atwell")
-
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig6.jpg", sep=""),
-
-ggplot(sg_sum[sg_sum$Site %in% unique(grep(paste(oldnew,collapse="|"),
-                   sg_sum$Site, value=TRUE)),], aes(Year,X,colour=Site))+
-  geom_point()+
-  geom_line()+
-  ylab("Total individuals") +
-  facet_wrap(~SiteSame)+
-  theme_bw()+
-  scale_x_continuous(breaks = seq(2009, currentYr, 2)),
-
- width=200, height=125, units="mm", dpi=300)
-
-
-```
-
-#Reproduction   
-
-Density dependence? 
-```{r}
-## t = y, t+1 = x
-sg_lagged <- subset(merge(sg_sum, sg_sum, by = c("Site")), Year.x == Year.y + 1)
-
-## Really want growth rate on Y as a function of density
-ggplot(sg_lagged, aes(X.y, X.x))+
-  geom_point()+
-  stat_smooth()
-
-```
-
-
-
 ### Figure 3b
 ```{r}
 Fig3b <- ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
@@ -1838,7 +1658,7 @@ Fig3b <- ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
   facet_wrap(~NS + SiteSame, ncol =5)+
   ylab("Average volume")+
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
-  scale_x_continuous(breaks = seq(2008, currentYr, 4))+
+  scale_x_continuous(breaks = seq(2008, currentYr, 5))+
   scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#7171C6",
                                 "#C67171","#C5C1AA","#8E8E38",
@@ -1896,7 +1716,7 @@ Fig3c <- ggplot(sgminis, aes(Year, TotMinis.x,colour= Site))+
   facet_wrap(~NS + SiteSame, ncol =5)+ # , scales = "free_y"
   ylab("Total seedlings (< 0.5cm width)")+
   theme(axis.text.x = element_text(angle = -90, vjust = .5, hjust = 1)) +
-  scale_x_continuous(breaks = seq(2008, currentYr, 4))+
+  scale_x_continuous(breaks = seq(2008, currentYr, 5))+
   scale_color_manual(values = c("#C67171","#C5C1AA","#8E8E38",
                                 "#71C671","#388E8E","#7D9EC0","#7171C6",
                                 "#C67171","#C5C1AA","#8E8E38",
@@ -1944,6 +1764,12 @@ interaction.plot(sg_sum$Year, factor(sg_sum$Site),
 #PVA count based
 
 ```{r}
+## Does the count skip years with no data? Yes!
+sg_sum %>%
+  filter(Site == "Powerline")
+sg_sum %>%
+  filter(Site == "Pond")
+
 all.count <- lapply(unique(sg_sum$Site), function(x){
   CountPVA(sg_sum$Year[sg_sum$Site == x],sg_sum$X[sg_sum$Site == x])
   })
@@ -1986,7 +1812,7 @@ plot.currentYr <- fit.currentYr %>%
 ```{r}
 
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-plot.currentYr$NS <- "S. dawsonii"
+plot.currentYr$NS <- "S. dawsoniae"
 plot.currentYr$NS[plot.currentYr$Site %in% grep(paste(southsites,collapse="|"),
                                                 plot.currentYr$Site, value=TRUE)] <- "S. glaucus"
 
@@ -2031,28 +1857,34 @@ Fig2a <- ggplot(plot.countlambda, aes(Site, fit))+
   guides(colour= "none", shape= "none", size = "none")+
   ylab(expression(lambda))+
   facet_grid(~NS, scales="free")+
-  theme(strip.text = element_text(face = "italic"))+
-  ggtitle("a)")
+  theme(strip.text = element_text(face = "italic")) #+
+  #ggtitle("a)")
 
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig2ab.jpg", sep=""),
-       Fig2a/Fig2b,
-width=200, height=250, units="mm", dpi=300)
+       # Fig2a/Fig2b,   ### Fig2b as the Pradel lambda model probably biased because can't assume same survival of young and old
+       Fig2a,   
+# width=200, height=250, units="mm", dpi=300)
+width = 200, height = 150, units = "mm", dpi = 300)
 
 ```
 
 Discussion, lambda patterns
 ```{r}
 SiteSpecies <- sg %>%
-  distinct(Site, NS)
+  distinct(Site, NS) %>%
+  mutate(NS = as.factor(NS))
 
 fit.currentYr %>%
   left_join(SiteSpecies) %>%
   filter(RangeEnd %in% c(2022, currentYr)) %>%
   group_by(NS) %>%
-  dplyr::summarise(mean = mean(fit),
+  dplyr::summarise(mean = median(fit),
                    sd = sd(fit),
-                   hdi = )
+                   hdilwr = hdi(fit)[1],
+                   hdiupr = hdi(fit)[2],
+                   meanlwr = median(lwr),
+                   meanupr = median(upr))
 
 fit.currentYr[fit.currentYr$lwr>1,]
 fit.currentYr[fit.currentYr$upr<1,]
@@ -2075,7 +1907,7 @@ head(sg.xy)
 sg.xy[is.na(sg.xy$Tag),]
 
 southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg.xy$NS <- "S. dawsonii"
+sg.xy$NS <- "S. dawsoniae"
 sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
                                                 sg.xy$Site, value=TRUE)] <- "S. glaucus"
 ```
@@ -2263,6 +2095,98 @@ p: detection
 sigmaf: individual heterogeneity of f      
 f: net recruitment probability (the per capita number of new between i and i+1)   
 
+```{r}
+
+
+
+
+```
+
+
+### Try Pradlambda  
+```{r}
+scglproclambda <- process.data(scgl.inp, model = "Pradlambda", groups = c("Site"), begin.time = 2008)
+scglddllambda <- make.design.data(scglproclambda)
+
+## Fix p to zero when no survey
+pindexlambda <- scglddllambda$p
+## Just the expanded new version of Atwell Gulch
+p.SSRlambda <- pindexlambda %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("AtwellGulch","TJuction","OilPad","Pond")) %>%
+  filter(time < 2012)
+
+p.Bridgeportlambda <- pindexlambda %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Bridgeport")) %>%
+  filter(time < 2011)
+
+p.Framlambda <- pindexlambda %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Fram")) %>%
+  filter(time < 2013 | time %in% c(2015,2023))
+
+p.2015lambda <- pindexlambda %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Pond","Fram")) %>%
+  filter(time == 2015)
+
+## No Powerline (fence) or Fram (wet roads) in 2023
+p.2023lambda <- pindexlambda %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  filter(group %in% c("Fram","Powerline")) %>%
+  filter(time == 2023)
+
+p.indiceslambda <- c(p.SSRlambda$par.index,p.Bridgeportlambda$par.index,
+               p.Framlambda$par.index,p.2015lambda$par.index,p.2023lambda$par.index)
+p.valueslambda <- rep(0, length(p.indiceslambda))
+
+```
+
+```{r}
+scgl.constantLambda <- mark(data = scglproclambda, ddl = scglddllambda,
+                            model = "Pradlambda",
+                            model.parameters = list(p = list(formula = ~ 1, 
+                                                             fixed = list(index = p.indices, value = p.values)),
+                                                    Phi = list(formula = ~ time),
+                                                    Lambda = list(formula = ~ Site)),
+                            begin.time = 2008,
+                            groups = "Site")
+
+SiteSpecies <- sg %>%
+  distinct(Site, NS) %>%
+  mutate(Site1 = Site) %>%
+  mutate(Site1 = gsub(" ", "", Site1)) %>%
+  mutate(Site1 = gsub("-", "", Site1)) %>%
+  rename("Site"= "Site1", "SiteLabel" = "Site")
+
+lambda.table <- get.real(scgl.constantLambda, "Lambda", se = TRUE)
+lambda.table %>%
+  filter(fixed != "Fixed") %>%
+  left_join(SiteSpecies) %>%
+  group_by(Site, NS, SiteLabel) %>%
+  summarise(lambda = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  # filter(lambda != 0) %>%
+ggplot(  aes(SiteLabel, lambda)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  theme_bw() +
+    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+    theme(strip.text = element_text(face = "italic")) +
+    facet_wrap(~NS, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    ylab(expression(lambda))+
+    xlab("")+
+    ggtitle("b)")
+  
+
+
+```
+
+
+
 
 ```{r}
 run.scgl <- function(){
@@ -2370,70 +2294,63 @@ scgl.models$Phi.Plot.p.dot.f.time$results$derived
 ## Estimate constant population growth rate across each study site but setting apparent survival constant.  Constant survival
 
 scgl.constant <- mark(data = scglproc, ddl = scglddl, model = "Pradrec",
-                      model.parameters = list(p = list(formula = ~ Site, fixed = list(index = p.indices, value = p.values)),
-                                              Phi = list(formula = ~ Site),
-                                              f = list(formula = ~ time*Site)),
+                      model.parameters = list(p = list(formula = ~ Species, 
+                                                       fixed = list(index = p.indices, value = p.values)),
+                                              Phi = list(formula = ~ Site*Species*time),
+                                              f = list(formula = ~ time*Site*Species)),
                       begin.time = 2008,
                       groups = "Site")
 
 summary(scgl.constant)
 
-estimates <- scgl.constant$results$real %>%
-  mutate(params = row.names(.)) %>%
-  separate(params, into = c("Parameter","group","age","time"))
+nrow(scgl.constant$results$real) ## 303
+scgl.constant$results$real %>%
+  filter(fixed != "Fixed") %>%
+  summarise(n = n())## 302
+nrow(scgl.constant$results$derived$`log(Lambda) Population Change`) ## 150
 
-estimates %>%
-  filter(Parameter == "p")
 
-## Shouldn't these match?! this isn't right
-nrow(scgl.constant$results$derived$`Lambda Population Change`) ## 150
-nrow(estimates)  ## 171
+
+Phi.table <- get.real(scgl.constant, "Phi", se = TRUE)
+nrow(Phi.table) ## 150
+Phi.table %>%
+  filter(fixed != "Fixed") %>%
+  group_by(Site)
+  summarise(Survival = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(Survival != 0) %>%
+ggplot(  aes(Site, Survival)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  theme_bw()
+
 
 ## lambda = f + survival, estimate with all values within the range of uncertainty for f and Phi
 # skip the first year, estimates are crazy for per capita recruitment
 # x <- unique(estimates$group)[1]
-sitelambdas <- do.call(rbind, lapply(unique(estimates$group), function(x){
-  group <- estimates[estimates$group == x,]
-  Phirange <- seq(from = group$lcl[group$Parameter == "Phi"],
-                  to = group$ucl[group$Parameter == "Phi"], length.out = 10)
-  frange <- c()
-  for(yr in 2:14){
-    frange <- cbind(frange, fvalues = seq(from = group$lcl[group$Parameter == "f"][yr],
-                                          to = group$ucl[group$Parameter == "f"][yr], length.out = 10))
-  }
-  frange <- data.frame(frange)
-  colnames(frange) <- paste("Year",2009:2021, sep="")
-  # For each year, need all combinations of 
-  combos <- do.call(rbind,lapply(1:nrow(frange), function(yr) {
-    out <- data.frame(group = x, Year = yr)
-    params <- expand.grid(Phirange, frange[,yr])
-    colnames(params) <- c("Phi","f")
-    params$lambda <- params$Phi + params$f
-    data.frame(out,params)
-  }))
-  }))
 
 SiteSpecies <- sg %>%
   distinct(Site, NS) %>%
   mutate(Site = gsub(" ", "", Site)) %>%
   mutate(Site = gsub("-", "", Site)) 
 
-Fig2b <- sitelambdas %>%
-  mutate(group = sub("g","",group)) %>%
-  left_join(SiteSpecies, by = c("group" = "Site")) %>%
+Fig2b <- scgl.constant$results$derived$`log(Lambda) Population Change` %>%
+  bind_cols(Phi.table[,c("group","age","time","Time","Site")]) %>%
+  left_join(SiteSpecies) %>%
   group_by(group, NS) %>%
-  dplyr::summarise(hdilwl = HDInterval::hdi(lambda)[1],
-                   hdiupl = HDInterval::hdi(lambda)[2],
-                   median = median(lambda)) %>%
-  ggplot(  aes(group, median))+
+  dplyr::summarise(hdilwl = HDInterval::hdi(estimate)[1],
+                   hdiupl = HDInterval::hdi(estimate)[2],
+                   median = median(estimate)) %>%
+  ggplot(  aes(group, median, color = NS))+
     geom_point()+
     geom_errorbar(aes(ymin = hdilwl, ymax = hdiupl), width = 0.5)+
     theme_bw() +
-    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+    geom_hline(yintercept = 0, color = "grey50", linetype = "dashed")+
     theme(strip.text = element_text(face = "italic")) +
     facet_wrap(~NS, scales = "free_x") +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-    ylab(expression(lambda))+
+    ylab(expression(log(lambda)))+
     xlab("")+
     ggtitle("b)")
 
