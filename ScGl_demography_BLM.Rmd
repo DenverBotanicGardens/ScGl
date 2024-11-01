@@ -2355,7 +2355,11 @@ ggplot(  aes(Time, estimates, color = Site)) +
   geom_point() +
   # geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
   theme_bw() +
-  geom_line()
+  geom_line() +
+  ylab(expression(lambda))
+
+nrow(scgl.models$Phi.Plot.p.dot.f.time$results$beta)
+scgl.models$Phi.Plot.p.dot.f.time$results$derived
 
 ```
 
@@ -2368,7 +2372,7 @@ ggplot(  aes(Time, estimates, color = Site)) +
 scgl.constant <- mark(data = scglproc, ddl = scglddl, model = "Pradrec",
                       model.parameters = list(p = list(formula = ~ Site, fixed = list(index = p.indices, value = p.values)),
                                               Phi = list(formula = ~ Site),
-                                              f = list(formula = ~ time + Site)),
+                                              f = list(formula = ~ time*Site)),
                       begin.time = 2008,
                       groups = "Site")
 
@@ -2381,13 +2385,13 @@ estimates <- scgl.constant$results$real %>%
 estimates %>%
   filter(Parameter == "p")
 
-  
-
-scgl.constant$results$derived$`Lambda Population Change`
+## Shouldn't these match?! this isn't right
+nrow(scgl.constant$results$derived$`Lambda Population Change`) ## 150
+nrow(estimates)  ## 171
 
 ## lambda = f + survival, estimate with all values within the range of uncertainty for f and Phi
 # skip the first year, estimates are crazy for per capita recruitment
-x <- unique(estimates$group)[1]
+# x <- unique(estimates$group)[1]
 sitelambdas <- do.call(rbind, lapply(unique(estimates$group), function(x){
   group <- estimates[estimates$group == x,]
   Phirange <- seq(from = group$lcl[group$Parameter == "Phi"],
