@@ -1802,6 +1802,21 @@ last.fit <- do.call(rbind,lapply(Fit.list, function(x){
 
 
 fit.currentYr <- data.frame(Site = rownames(last.fit), last.fit)
+
+fit.currentYr %>%
+  mutate(Species = case_when(Site %in% c("Bridgeport","Escalante Canyon",
+                                         "Picnic Site","Powerline","Fram") ~ "S. glaucus",
+                             grepl("old", Site) ~ NA,
+                             TRUE ~ "S. dawsoniae")) %>%
+  filter(!is.na(Species)) %>%
+  mutate(Species = factor(Species)) %>%
+ggplot(   aes(Site, fit))+
+  geom_point()+
+  geom_errorbar(aes(ymin = lwr, ymax = upr))+
+  theme_bw() +
+  facet_wrap(~Species, scales = "free_x")+
+  geom_hline(yintercept = 1, linetype = "dotted")
+
 plot.currentYr <- fit.currentYr %>%
   pivot_longer(cols = c(2,5:7), names_to = "variable", values_to = "value")
 
@@ -2153,7 +2168,8 @@ run.scgl <- function(){
   sigmaphi.tminsummer = list(formula =  ~ tmin_summer)
   sigmaphi.tminwinter = list(formula =  ~ tmin_winter)
   
-  p.dot = list(formula =  ~ 1, fixed = list(index = p.indicesLinkBarkRan, value = p.valuesLinkBarkRan))
+  p.dot = list(formula =  ~ 1, 
+               fixed = list(index = p.indicesLinkBarkRan, value = p.valuesLinkBarkRan))
 
   f.dot = list(formula =  ~ 1)
   f.time = list(formula = ~ Time)
@@ -2181,10 +2197,10 @@ run.scgl <- function(){
 }
 
 scgl.LinkBarkRan <- run.scgl()
-save(scgl.LinkBarkRan, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"LinkBarkRan.Rdata", sep=""))
+save(scgl.LinkBarkRan, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"1102_LinkBarkRan.Rdata", sep=""))
 
 ```
-
+#################################################
 
 
 
@@ -2330,44 +2346,18 @@ scgl.lambda$model.table
 ```
 
 
+# Pradrec
+############# Recruitment ###############################
 ## Can't have time varying covariates (climate) in a Pradel model! 
 ```{r}
+start.time <- Sys.Date()
 run.scgl <- function(){
   Phi.dot = list(formula =  ~ 1)
-  Phi.species = list(formula = ~ Species)
-  Phi.Time = list(formula =  ~ Time) ## Trend?
-  Phi.Plot = list(formula =  ~ Site)  ## so each plot is offset
-  Phi.pptfall = list(formula =  ~ ppt_fall)
-  Phi.pptspring = list(formula =  ~ ppt_spring)
-  Phi.pptsummer = list(formula =  ~ ppt_summer)
-  Phi.pptwinter = list(formula =  ~ ppt_winter)
-  Phi.tmaxfall = list(formula =  ~ tmax_fall)
-  Phi.tmaxspring = list(formula =  ~ tmax_spring)
-  Phi.tmaxsummer = list(formula =  ~ tmax_summer)
-  Phi.tmaxwinter = list(formula =  ~ tmax_winter)
-  Phi.tminfall = list(formula =  ~ tmin_fall)
-  Phi.tminspring = list(formula =  ~ tmin_spring)
-  Phi.tminsummer = list(formula =  ~ tmin_summer)
-  Phi.tminwinter = list(formula =  ~ tmin_winter)
   
   p.dot = list(formula =  ~ 1, fixed = list(index = p.indices, value = p.values))
+  p.Site = list(formula =  ~ Site, fixed = list(index = p.indices, value = p.values))
 
   f.dot = list(formula =  ~ 1)
-  f.time = list(formula = ~ Time)
-  f.Plot = list(formula = ~ Site)
-  f.species = list(formula = ~ Species)
-  f.pptfall = list(formula =  ~ ppt_fall)
-  f.pptspring = list(formula =  ~ ppt_spring)
-  f.pptsummer = list(formula =  ~ ppt_summer)
-  f.pptwinter = list(formula =  ~ ppt_winter)
-  f.tmaxfall = list(formula =  ~ tmax_fall)
-  f.tmaxspring = list(formula =  ~ tmax_spring)
-  f.tmaxsummer = list(formula =  ~ tmax_summer)
-  f.tmaxwinter = list(formula =  ~ tmax_winter)
-  f.tminfall = list(formula =  ~ tmin_fall)
-  f.tminspring = list(formula =  ~ tmin_spring)
-  f.tminsummer = list(formula =  ~ tmin_summer)
-  f.tminwinter = list(formula =  ~ tmin_winter)
   
   scgl.model.list <- create.model.list("Pradrec")
   
@@ -2376,13 +2366,16 @@ run.scgl <- function(){
   return(scgl.results)
 }
 
-scgl.models <- run.scgl()
-save(scgl.models, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"PradelScGl.Rdata", sep=""))
+endtime <- Sys.Date()
+scgl.modelsDetection <- run.scgl()
+save(scgl.modelsDetection, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,
+                               "_Sclerocactus-glaucus_AnnualReport/",
+                               start.time,"to",endtime,"PradelScGl.Rdata", sep=""))
 ```
 
 ```{r}
 
-scgl.models$model.table
+scgl.modelsDetection$model.table
 
 Phi.table <- get.real(scgl.models$Phi.Plot.p.dot.f.time, "Phi", se = TRUE)
 
@@ -2431,6 +2424,35 @@ scgl.models$Phi.Plot.p.dot.f.time$results$derived
 ```
 
 
+# With the best model for detection (same or differs among sites) get annual recruitment and survival 
+```{r}
+start.time <- Sys.Date()
+run.scgl <- function(){
+  Phi.dot = list(formula =  ~ 1)
+  Phi.species = list(formula = ~ Species)
+  Phi.Time = list(formula =  ~ Time) ## Trend?
+  Phi.Plot = list(formula =  ~ Site)  ## so each plot is offset
+  
+  p.Site = list(formula =  ~ Site, fixed = list(index = p.indices, value = p.values))
+
+  f.dot = list(formula =  ~ 1)
+  f.time = list(formula = ~ Time)
+  f.Plot = list(formula = ~ Site)
+  f.species = list(formula = ~ Species)
+  
+  scgl.model.list <- create.model.list("Pradrec")
+  
+  scgl.results <- mark.wrapper(scgl.model.list, data = scglproc, ddl = scglddl)
+  
+  return(scgl.results)
+}
+
+endtime <- Sys.Date()
+scgl.models.rec <- run.scgl()
+save(scgl.models.rec, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,
+                               "_Sclerocactus-glaucus_AnnualReport/",
+                               start.time,"to",endtime,"PradrecDetectionSiteScGl.Rdata", sep=""))
+```
 
 
 
