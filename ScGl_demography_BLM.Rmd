@@ -92,6 +92,15 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
 
+sg %>%
+  filter(Width.cm. > 20)
+
+## Wrong, remove
+sg <- sg %>%
+  mutate(Width.cm. = case_when(Width.cm. > 20 ~ NA,
+                               TRUE ~ Width.cm.))
+
+
 ## Number of ScGl counted in 2023
 nrow(sg[sg$Year == currentYr & sg$Width.cm. > 0,]) + sum(sg$Minis[sg$Year == currentYr], na.rm = TRUE)
 
@@ -140,7 +149,7 @@ scgl08 <- read.delim(paste(userpath, "Denver Botanic Gardens/Conservation - Gene
 sg_summary08 <- scgl08 %>%
   dplyr::select(Year:SumOfMinis) %>% # exclude monthly climate data
   group_by(SiteName, Year) %>%
-  rename(Site = SiteName) %>%
+  dplyr::rename(Site = SiteName) %>%
   dplyr::summarise(X = sum(CountofHeight),
                    Rep = sum(SumFlowered),
                    Brs = sum(SumBrowsed),
@@ -173,16 +182,33 @@ table(sg$Year, sg$Site)
 
 
  
-Starting in 2019 we use the photoNumber column to track the number of flowers per plant
+Starting in 2019 we use the photoNumber column to track the number of flowers per plant  
+
+Plot dodge for each year by site
 ```{r}
+library(stringi)
 
-sg$FlNum <- ifelse(sg$Year >= 2019, as.numeric(sg$PhotoNumber), NA)
+sg <- sg %>%
+  mutate(FlNum = case_when(Year >= 2019 ~ as.numeric(stri_extract_first_regex(PhotoNumber, "[0-9]+")),
+                   TRUE ~ as.numeric(NA))) 
+# sg$FlNum <- ifelse(sg$Year >= 2019, as.numeric(sg$PhotoNumber), NA)
 
-ggplot(sg[sg$Year > 2018,], aes(FlNum, Site, fill = Site, group = Site))+
+sg %>%
+  filter(Year > 2018) %>%
+ggplot(   aes(FlNum, Site, fill = Site, group = Site))+
   geom_point(position = position_jitterdodge())+
   geom_boxplot()+ 
-  # scale_y_discrete(labels = label_wrap(3))+
+  scale_y_discrete(labels = label_wrap(3))+
   facet_wrap(~Year)
+
+sg %>%
+  filter(Year > 2018) %>%
+  mutate(Year = as.factor(Year)) %>%
+ggplot(   aes(Year, FlNum, fill = Site))+
+  geom_boxplot(position = position_dodge(width = 0.5), outlier.shape = NA)+ 
+  # geom_point(position = position_jitterdodge(dodge.width = 0.5))+
+  scale_fill_discrete(guide = "none")
+
 
 ```
 
@@ -227,23 +253,15 @@ southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram"
 sg$NS[sg$Site %in% southsites] <- "S. glaucus"
 
 
-
-sg$SiteSame <- sg$Site
-sg$SiteSame[sg$Site %in% unique(grep(paste("Atwell",collapse="|"),
-                                        sg$Site,
-                                        value=TRUE))] <- "Atwell Gulch"
-
-sg$SiteSame[sg$Site %in% unique(grep(paste("Pond",collapse="|"),
-                                        sg$Site,
-                                        value=TRUE))] <- "Pond"
-
-sg$SiteSame[sg$Site %in% unique(grep(paste("Oil",collapse="|"),
-                                        sg$Site,
-                                        value=TRUE))] <- "Oil Pad"
-
-sg$SiteSame[sg$Site %in% unique(grep(paste("T-",collapse="|"),
-                                        sg$Site,
-                                        value=TRUE))] <- "T-Junction"
+## 
+sg <- sg %>%
+  mutate(SiteSame = case_when(grepl("Atwell", Site) ~ "Atwell Gulch",
+                              grepl("Pond", Site) ~ "Pond",
+                              grepl("Oil", Site) ~ "Oil Pad",
+                              grepl("T-", Site) ~ "T-Junction",
+                              grepl("Bridgeport", Site) ~ "Bridgeport",
+                              TRUE ~ Site)) %>%
+  mutate(SiteSame = as.factor(SiteSame))
 
 
 ## 2008 has Escalante Canyon, Picnic Site, Powerline, and Pyramid Rock
@@ -262,7 +280,7 @@ atwell.old$Site <- "Atwell Gulch (old)"
 
 ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
   geom_point(position = position_dodge(width = 0.05), pch="|",size = 2)+
-  facet_wrap(~ Transect, nrow = 2)+
+  facet_wrap(~ Transect, nrow = 2, scales = "free_x")+
   theme_bw()
 
 #Add back Atwell duplicated for old and new
@@ -302,16 +320,34 @@ sg %>%
 
 
 sg.new <- sg %>%
-  dplyr::select(Site:Y.coord.m., Width.cm.:Minis, SiteSame, NS) %>%
+  dplyr::select(Site:Y.coord.m.,Height.cm., Width.cm.:Minis, SiteSame, NS) %>%
   filter(!grepl("old",Site)) 
 
+
+### Why am I getting many to many relationships in the left_join?
+sg.new %>%
+  distinct(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m., Year, .keep_all = TRUE) %>%
+  group_by(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m., Year) %>%
+  summarise(n = n()) %>%
+  filter(n > 1) %>%
+  arrange(Y.coord.m., Year)
+
+sg.new %>%
+  filter(Tag %in% c(706, 738, 79))
+
+# To get year to year transitions, .x and .y
+## Should be many to many because all years and then filter to just year.x is last year.y
 sg.merged <- sg.new %>%
+  distinct(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m., Year, .keep_all = TRUE) %>%
   group_by(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m.) %>%
   left_join(sg.new, by = c("Site","SiteSame","NS","Tag","Transect",
                            "X.coord.m.","Y.coord.m.")) %>%
   dplyr::select(Site:Y.coord.m., Width.cm..x:Minis.x, Year.y, Width.cm..y:Minis.y) %>%
+  ## To keep year .x is current, .y is next year
   filter(Year.x == Year.y-1) %>%
   filter(Width.cm..x != 0) %>%
+  filter(Width.cm..x < 20) %>%
+  filter(Width.cm..y < 20) %>%
   mutate(surv = ifelse(Width.cm..y ==0, 0,1))
 
 ggplot(sg.merged, aes(Width.cm..x, surv, color = as.factor(Br.x)))+
@@ -325,7 +361,8 @@ ggplot(sg.merged, aes(Width.cm..x, Width.cm..y, colour = as.factor(Transect)))+
   geom_point()+
   stat_smooth(se=FALSE)+
   facet_wrap(~NS)+
-  scale_color_discrete(guide = "none")
+  scale_color_discrete(guide = "none") +
+  geom_abline(slope = 1, intercept = 0)
 
 save(sg.merged,  file=paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_Projects/2022_DoakPortfolioEffectNSFProposal/",currentYr,"sgSizeMerged.Rdata", sep=""))
 ```
@@ -630,6 +667,15 @@ tableoutNS %>%
   dplyr::summarise(mean = mean(PercRepro),
                    sd = sd(PercRepro))
 
+tableoutNS %>%
+  mutate(PercRepro = gsub("%","",PercRepro)) %>%
+  mutate(PercRepro = as.numeric(PercRepro)) %>%
+  mutate(PercRepro = PercRepro/100) %>%
+  group_by(Site) %>%
+  dplyr::summarise(mean = mean(PercRepro),
+                   sd = sd(PercRepro)) %>%
+  arrange(mean)
+
 ### For 2008-2015 to compare the old and new designs
 ## Summary for each year and pre or post; average of the mean size and average of the SDs
 write.table(tablesummaryout, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/Table2_yearlysummary.csv", sep=""),
@@ -677,7 +723,8 @@ ggplot(sg[which(sg$Width.cm. > 0 & !duplicated(sg[,c("Tag","SiteSame")])),], aes
   ylim(c(0,17))+
   geom_point(position = position_jitterdodge(jitter.height = 0))+
   facet_wrap(~NS,nrow = 2, scales = "free")+
-  scale_x_discrete(labels = label_wrap(5))
+  scale_x_discrete(labels = label_wrap(5)) +
+  theme_bw()
 
 ## all sites
 ### Double counting the Atwell Gulch ones and some Pond, Oil Pad, and T-Junction ones
@@ -914,7 +961,7 @@ scgl.climate.monthly <- scgl.climate %>%
                             Month>8 & Month<12 ~ "fall",
                             Month>2 & Month<6 ~ "spring"))
 
-
+## More tmax and tmin than ppt. 
 scgl.c <- scgl.climate.monthly %>%
   pivot_wider(names_from = Variable, values_from = data) 
 
@@ -1149,36 +1196,49 @@ ggplot(sg_annual_scaled_merged, aes(scalevalue_tmin, surv, color = Br.x))+
   theme_light()+
   scale_color_manual("Browsed", values = c("dodgerblue3","goldenrod2"))
 
+sg_annual_scaled_merged %>%
+  filter(Br.x == 0) %>%
+ggplot(    aes(scalevalue_tmin, surv, color = NS))+
+  geom_point(pch="|")+
+  geom_smooth(method = "glm", 
+    method.args = list(family = "binomial"), 
+    se = TRUE)+
+  xlab("Minimum temperature (scaled and centered)")+
+  theme_light()+
+  scale_color_manual("Species", values = c("dodgerblue3","goldenrod2"))
+
 ```
 
 
 ```{r}
 
 ## The effect of browsing is strongly correlated with width (-0,939) from the correlation of fixed effects. 
-lm1 <- glmer(surv~ Width.cm..x * Br.x + scalevalue_ppt + scalevalue_tmin + (1|NS), data = sg_annual_scaled_merged,
-             family = binomial) 
-lm2 <- glmer(surv~ Width.cm..x * Br.x + (1|NS), data = sg_annual_scaled_merged,
-             family = binomial) 
-lm3 <- glmer(surv~ (Width.cm..x + Br.x + scalevalue_tmin)^2 + (1|NS), data = sg_annual_scaled_merged,
-             family = binomial) 
-lm4 <- glmer(surv~ Width.cm..x + Br.x + scalevalue_ppt + (1|NS), data = sg_annual_scaled_merged,
-             family = binomial) 
-lm5 <- glmer(surv~ Width.cm..x + Br.x + scalevalue_ppt + scalevalue_tmin +
-             (1|NS), data = sg_annual_scaled_merged,
-             family = binomial) 
+lm1 <- glmer(surv~ Width.cm..x #* Br.x 
+          + scalevalue_ppt + scalevalue_tmin + (1|NS), data = sg_annual_scaled_merged,
+             family = binomial)
+# lm2 <- glmer(surv~ Width.cm..x * Br.x + (1|NS), data = sg_annual_scaled_merged,
+#              family = binomial) 
+# lm3 <- glmer(surv~ (Width.cm..x + Br.x + scalevalue_tmin)^2 + (1|NS), data = sg_annual_scaled_merged,
+#              family = binomial) 
+# lm4 <- glmer(surv~ Width.cm..x + Br.x + scalevalue_ppt + (1|NS), data = sg_annual_scaled_merged,
+#              family = binomial) 
+# lm5 <- glmer(surv~ Width.cm..x + Br.x + scalevalue_ppt + scalevalue_tmin +
+#              (1|NS), data = sg_annual_scaled_merged,
+#              family = binomial) 
 lm6 <- glmer(surv~ Width.cm..x + scalevalue_ppt + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)  
 lm7 <- glmer(surv~ Width.cm..x + scalevalue_tmin + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)  
-lm8 <- glmer(surv~ Br.x + scalevalue_ppt + (1|NS), data = sg_annual_scaled_merged,
-             family = binomial) 
+# lm8 <- glmer(surv~ Br.x + scalevalue_ppt + (1|NS), data = sg_annual_scaled_merged,
+#              family = binomial) 
 lm9 <- glmer(surv ~ Width.cm..x + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)
 lm10 <- glmer(surv ~ 1 + (1|NS), data = sg_annual_scaled_merged,
              family = binomial)
 
-lm.list <- list(lm1,lm2, #lm3, 
-                lm4, lm5, lm6, # lm7, 
+lm.list <- list(lm1,# lm2, #lm3, 
+                #lm4, lm5, 
+  lm6, lm7, 
                 lm9, lm10) #, lm10)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
@@ -1209,6 +1269,33 @@ p1a <- sg_annual_scaled_merged %>%
     theme_light()+
     scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
                          labels = c("Unbrowsed","Browsed"))+
+    ylab("Survival")+
+    xlab("Size (width cm)")+
+  ggtitle("a)")
+
+p1a_woBr <- sg_annual_scaled_merged %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(scalevalue_tmin, 
+                              breaks = c(min(scalevalue_tmin)-0.1, mean(scalevalue_tmin), max(scalevalue_tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(scalevalue_pptbin = cut(scalevalue_ppt, 
+                              breaks = c(min(scalevalue_ppt)-0.1, mean(scalevalue_ppt), max(scalevalue_ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(Width.cm..x,surv, color = NS))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+  facet_grid(scalevalue_pptbin ~ tempbin, 
+               labeller = labeller(tempbin = as_labeller(c("1" = "<= mean min temp",
+                                "2" = "> mean min temp")),
+         scalevalue_pptbin = as_labeller(c("1" = "<= mean ppt", "2" = "> mean ppt")),
+                    # NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
+                    #                    "S. dawsoniae" = expression(italic(S.~dawsoniae))))
+         ))+
+    theme_light()+
+    scale_color_manual("Species", values = c("deepskyblue","deeppink4"),
+                         # labels = c("Unbrowsed","Browsed")
+                       )+
     ylab("Survival")+
     xlab("Size (width cm)")+
   ggtitle("a)")
@@ -1259,42 +1346,59 @@ p2 <- sg_annual_scaled_merged %>%
   ggtitle("c)")
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4_SurvBrscalevalue_tminPPT.jpg", sep=""),
-       p1a  /(p1 + p2), width = 300, height = 200, units = 'mm', dpi=300) 
+       p1a_woBr  /(p1 + p2), width = 300, height = 200, units = 'mm', dpi=300) 
      
 ```
 
 
+How many are browsed? Can I ignore browsing as a factor? Yes, only 190 browsed for 12145 records
+```{r}
+
+sg_annual_scaled_merged %>%
+  group_by( Br.x) %>%
+  summarise(n = n()) 
+
+190/12145 ## 0.02 2 percent browsed over the course of the study
+
+
+```
 
 Annual instead of seasonal
+#### FIX THIS!!!!!!
 ```{r}
 ## If used weights should be scaled such that sum(weights) corresponds to number of independent observations
 sg_annual <- sg_annual %>%
   mutate(Br = as.factor(Br))
 
-lm1 <- glmer(Fl~ Width.cm. * Br + scalevalue_ppt +scalevalue_tmin + (1|NS), data = sg_annual,
+lm1 <- glmer(Fl~ Width.cm. #* Br 
+            + scalevalue_ppt +scalevalue_tmin + (1|NS), data = sg_annual,
              family = binomial) 
-lm2 <- glmer(Fl~ Width.cm. * Br + (1|NS), data = sg_annual,
+lm2 <- glmer(Fl~ Width.cm. #* Br 
+            + (1|NS), data = sg_annual,
              family = binomial) 
-lm3 <- glmer(Fl~ (Width.cm. + Br + scalevalue_tmin)^2 + (1|NS), data = sg_annual,
+lm3 <- glmer(Fl~ (Width.cm. + # Br + 
+                    scalevalue_tmin)^2 + (1|NS), data = sg_annual,
              family = binomial) 
-lm4 <- glmer(Fl~ Width.cm. + Br + scalevalue_ppt + (1|NS), data = sg_annual,
+lm4 <- glmer(Fl~ Width.cm. + #Br + 
+               scalevalue_ppt + (1|NS), data = sg_annual,
              family = binomial) 
-lm5 <- glmer(Fl~ Width.cm. + Br + scalevalue_ppt + scalevalue_tmin +
-             (1|NS), data = sg_annual,
-             family = binomial)
+# lm5 <- glmer(Fl~ Width.cm. + # Br + 
+#                scalevalue_ppt + scalevalue_tmin, data = sg_annual,
+#              family = binomial)
 lm6 <- glmer(Fl~ Width.cm. + scalevalue_ppt + (1|NS), data = sg_annual,
              family = binomial)  
 lm7 <- glmer(Fl~ Width.cm. + scalevalue_tmin + (1|NS), data = sg_annual,
              family = binomial)  
-lm8 <- glmer(Fl~ (Width.cm. + Br + scalevalue_ppt)^2 + (1|NS), data = sg_annual,
-             family = binomial)
+# lm8 <- glmer(Fl~ (Width.cm. + # Br + 
+#                     scalevalue_ppt)^2 + (1|NS), data = sg_annual,
+#              family = binomial)
 lm9 <- glmer(Fl ~ Width.cm. + (1|NS), data = sg_annual,
              family = binomial)
 lm10 <- glmer(Fl ~ 1 + (1|NS), data = sg_annual,
              family = binomial)
 
-lm.list <- list(lm1,lm2, #lm3, 
-                lm4, lm5, lm6, lm7, lm9) #, lm10)
+lm.list <- list(lm1,#lm2, #lm3, lm4, lm5,
+                 lm7, lm9) # lm6) #, lm10)
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
 #evidence ratio 
@@ -1304,25 +1408,14 @@ for(i in 2:length(lm.list)){
 
 # more percent reproductive with avg width
 summary(lm1)
-# sjPlot::plot_model(lm1, type = "est", show.data = T)
 
-sg_annual %>%
-  mutate(Br = as.numeric(Br)-1) %>%
-  filter(!is.na(Fl)) %>%
-ggplot( aes(Width.cm., Br, colour = as.factor(Fl)))+
-  geom_point()+ 
-  geom_smooth(method = "glm", 
-    method.args = list(family = "binomial"), 
-    se = FALSE)
 
 sg_annual %>%
   filter(!is.na(Fl)) %>%
-ggplot(aes(Width.cm., Fl, colour = as.factor(Br)))+
+ggplot(aes(Width.cm., Fl, colour = NS))+
   geom_point() +
   geom_smooth(method = "glm", 
-    method.args = list(family = "binomial"), 
-    se = FALSE) +
-  facet_wrap(~ NS)
+    method.args = list(family = "binomial"), se = FALSE)
 
 sg_annual %>%
   filter(!is.na(Fl)) %>%
@@ -1334,19 +1427,18 @@ sg_annual %>%
                             cut(Width.cm., breaks=c(0,3.04,max(Width.cm.))),
                             cut(Width.cm., breaks=c(0,2.28,max(Width.cm.))))) %>%
   filter(SizeClass == 2) %>%
-ggplot(aes(scalevalue_tmin, Fl, colour = Br))+
+ggplot(aes(scalevalue_tmin, Fl, colour = NS))+
   geom_point(pch="|") +
   geom_smooth(method = "glm", 
     method.args = list(family = "binomial"), 
     se = TRUE)+
-  facet_grid(~NS, scales = "free")+
   theme_light()+
-  scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"))+
+  scale_color_manual("Species", values = c("deepskyblue","deeppink4"))+
   ylab("Probability of Reproduction")+
   xlab("Minimum annual temperature")
 
-scalevalue_tminlabs <- c("0" = "No browse/damage",
-              "1" = "Browse/damage")
+# scalevalue_tminlabs <- c("0" = "No browse/damage",
+#               "1" = "Browse/damage")
 
 sg_annual %>%
   filter(!is.na(Fl)) %>% # not dead
@@ -1360,12 +1452,11 @@ sg_annual %>%
       geom_point(pch = "|")+ ## mimic a rug plot
       geom_smooth(method = "glm",
                   method.args = list(family = "binomial"), se=TRUE)+
-      facet_grid(NS~Br, labeller = labeller(Br = as_labeller(c("0" = "No browse/damage",
+      facet_grid(NS~tempbin, labeller = labeller(Br = as_labeller(c("0" = "No browse/damage",
                                                        "1" = "Browse/damage")),
                       NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
                                          "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
       theme_light()+
-      # scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"))+
       scale_color_manual("Min Temp", values = c("deepskyblue","deeppink4"),
                          labels = c("< mean","> mean"))+
   ylab("Probability of Reproduction")+
@@ -1384,7 +1475,7 @@ flpl1 <- sg_annual %>%
   dplyr::mutate(pptbin = cut(scalevalue_ppt, 
                               breaks = c(min(scalevalue_ppt)-0.1, mean(scalevalue_ppt), max(scalevalue_ppt)+0.1),
                               labels = FALSE)) %>%
-  ggplot(  aes(Width.cm.,Fl, color = as.factor(Br)))+
+  ggplot(  aes(Width.cm.,Fl, color = NS))+
      geom_point(pch = "|")+ ## mimic a rug plot
       geom_smooth(method = "glm",
                   method.args = list(family = "binomial"), se=TRUE)+
@@ -1395,7 +1486,7 @@ flpl1 <- sg_annual %>%
                     NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
                                        "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
     theme_light()+
-    scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
+    scale_color_manual("Species", values = c("deepskyblue","deeppink4"),
                          labels = c("Unbrowsed","Browsed"))+
     ylab("Probability of Reproduction")+
     xlab("Size (width cm)")+
@@ -1815,7 +1906,9 @@ ggplot(   aes(Site, fit))+
   geom_errorbar(aes(ymin = lwr, ymax = upr))+
   theme_bw() +
   facet_wrap(~Species, scales = "free_x")+
-  geom_hline(yintercept = 1, linetype = "dotted")
+  geom_hline(yintercept = 1, linetype = "dotted")+
+  ylab(expression(lambda))+
+  xlab("")
 
 plot.currentYr <- fit.currentYr %>%
   pivot_longer(cols = c(2,5:7), names_to = "variable", values_to = "value")
@@ -1923,6 +2016,7 @@ ggheight/ggwidth,
        width=200, height=230,units='mm', dpi=300)
   
 
+
 ```
 
 
@@ -1965,7 +2059,7 @@ sg.JS <- sg.newold %>%
   pivot_wider(names_from = Year, values_from = capture, id_cols = c(Site, Transect, Tag, NS), 
               names_prefix = "Year", values_fill = "0") %>%
   ############ UPDATE ##################
-  unite(ch, Year2008:Year2024, sep="") %>%
+  unite(ch, Year2008:Year2025, sep="") %>%
   filter(grepl("1",ch))
 
 dmPlot <- model.matrix(~ -1 + Site, sg.JS)
@@ -2008,6 +2102,10 @@ p.SSR <- pindex %>%
   mutate(time = as.numeric(as.character(time))) %>%
   filter(group %in% c("AtwellGulch","TJuction","OilPad","Pond")) %>%
   filter(time < 2012)
+
+## Should the old versions be out?
+pindex %>%
+  filter(grepl("old", group))
 
 p.Bridgeport <- pindex %>%
   mutate(time = as.numeric(as.character(time))) %>%
@@ -2249,7 +2347,7 @@ p.valueslambda <- rep(0, length(p.indiceslambda))
 ```{r}
 scgl.constantLambda <- mark(data = scglproclambda, ddl = scglddllambda,
                             model = "Pradlambda",
-                            model.parameters = list(p = list(formula = ~ 1, 
+                            model.parameters = list(p = list(formula = ~ Site, 
                                                              fixed = list(index = p.indices, value = p.values)),
                                                     Phi = list(formula = ~ time),
                                                     Lambda = list(formula = ~ Site)),
@@ -2283,6 +2381,16 @@ ggplot(  aes(SiteLabel, lambda)) +
     ylab(expression(lambda))+
     xlab("")+
     ggtitle("b)")
+
+## Demography: survival
+lambda.table %>%
+  filter(fixed != "Fixed") %>%
+  left_join(SiteSpecies) %>%
+  group_by(NS) %>%
+  summarise(lambda = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) 
+
 ```
   
 #Figure 2: Lambda and 95% CI for each
@@ -2324,12 +2432,13 @@ run.lambda <- function(){
   Phi.dot = list(formula =  ~ 1)
   Phi.Plot = list(formula =  ~ Site)  
   
-  p.dot = list(formula =  ~ 1, 
+  p.Site = list(formula =  ~ Site, 
                fixed = list(index = p.indices, value = p.values))
 
   Lambda.dot = list(formula =  ~ 1)
   Lambda.time = list(formula = ~ Time)
   Lambda.Plot = list(formula = ~ Site)
+  Lambda.Plottime = list(formula = ~ Site*time)
   Lambda.species = list(formula = ~ Species)
   
   scgl.model.list <- create.model.list("Pradlambda")
@@ -2344,6 +2453,37 @@ save(scgl.lambda, file = paste(userpath, "Denver Botanic Gardens/Conservation - 
 
 scgl.lambda$model.table
 ```
+
+```{r}
+load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"PradlambdaScGl.Rdata", sep=""))
+
+scgl.lambda$model.table
+
+
+lambda.table <- get.real(scgl.lambda$Phi.dot.p.Site.Lambda.time, "Lambda", se = TRUE)
+lambda.table %>%
+  filter(fixed != "Fixed") %>%
+  left_join(SiteSpecies) %>%
+  group_by(Site, NS, SiteLabel, time) %>%
+  summarise(lambda = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  # filter(lambda != 0) %>%
+ggplot(  aes(time, lambda, color = SiteLabel)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.5) + #,position = position_dodge(width = 0.9)) +
+  theme_bw() +
+    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+    theme(strip.text = element_text(face = "italic")) +
+    facet_wrap(~NS, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    ylab(expression(lambda))+
+    xlab("")
+
+
+```
+
 
 
 # Pradrec
@@ -2374,12 +2514,12 @@ save(scgl.modelsDetection, file = paste(userpath, "Denver Botanic Gardens/Conser
 ```
 
 ```{r}
-
+load("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2024_Sclerocactus-glaucus_AnnualReport/2024-11-04to2024-11-04PradelScGl.Rdata")
 scgl.modelsDetection$model.table
 
-Phi.table <- get.real(scgl.models$Phi.Plot.p.dot.f.time, "Phi", se = TRUE)
+p.table <- get.real(scgl.modelsDetection$Phi.dot.p.Site.f.dot, "p", se = TRUE)
 
-Phi.table %>%
+p.table %>%
   group_by(Site) %>%
   summarise(estimates = mean(estimate),
             lcl = mean(lcl),
@@ -2390,37 +2530,14 @@ ggplot(  aes(Site, estimates)) +
   geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
   theme_bw()
 
-f.table <- get.real(scgl.models$Phi.Plot.p.dot.f.time, "f", se = TRUE)
-
-f.table %>%
-  group_by(Time) %>%
+p.table %>%
+  group_by(Site) %>%
   summarise(estimates = mean(estimate),
             lcl = mean(lcl),
             ucl = mean(ucl)) %>%
   filter(estimates != 0) %>%
-ggplot(  aes(Time, estimates)) +
-  geom_point(position = position_dodge(width = 0.9)) +
-  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
-  theme_bw()
-
-## Lambda == Phi + f
-Phi.table %>%
-  left_join(f.table, by = c(#"all.diff.index","par.index",
-    "fixed","note","group","age","time","Age","Time","Site")) %>%
-  mutate(Lambda = estimate.x + estimate.y) %>%
-group_by(Time, Site) %>%
-  summarise(estimates = mean(Lambda)) %>%
-  filter(estimates != 0) %>%
-ggplot(  aes(Time, estimates, color = Site)) +
-  geom_point() +
-  # geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
-  theme_bw() +
-  geom_line() +
-  ylab(expression(lambda))
-
-nrow(scgl.models$Phi.Plot.p.dot.f.time$results$beta)
-scgl.models$Phi.Plot.p.dot.f.time$results$derived
-
+  distinct() %>%
+  arrange(estimates)
 ```
 
 
@@ -2431,13 +2548,19 @@ run.scgl <- function(){
   Phi.dot = list(formula =  ~ 1)
   Phi.species = list(formula = ~ Species)
   Phi.Time = list(formula =  ~ Time) ## Trend?
+  Phi.time = list(formula =  ~ time) ## Trend?
   Phi.Plot = list(formula =  ~ Site)  ## so each plot is offset
+  Phi.PlotTime = list(formula =  ~ Site*Time)  ## so each plot is offset
+  Phi.Plottime = list(formula =  ~ Site*time)  ## so each plot is offset
   
   p.Site = list(formula =  ~ Site, fixed = list(index = p.indices, value = p.values))
 
   f.dot = list(formula =  ~ 1)
-  f.time = list(formula = ~ Time)
+  f.Time = list(formula = ~ Time)
+  f.time = list(formula = ~ time)
   f.Plot = list(formula = ~ Site)
+  f.PlotTime = list(formula = ~ Site*Time)
+  f.Plottime = list(formula = ~ Site*time)
   f.species = list(formula = ~ Species)
   
   scgl.model.list <- create.model.list("Pradrec")
@@ -2454,7 +2577,111 @@ save(scgl.models.rec, file = paste(userpath, "Denver Botanic Gardens/Conservatio
                                start.time,"to",endtime,"PradrecDetectionSiteScGl.Rdata", sep=""))
 ```
 
+### Update to this year!
+```{r}
 
+load("C:/Users/deprengm/Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2024_Sclerocactus-glaucus_AnnualReport/2024-11-04to2024-11-04PradrecDetectionSiteScGl.Rdata")
+
+scgl.models.rec$model.table
+
+
+### A trend not as good as the next one!
+Phi.table <- get.real(scgl.models.rec$Phi.PlotTime.p.Site.f.PlotTime, "Phi", se = TRUE)
+
+Phi.table %>%
+  mutate(Species = case_when(group %in% c("Bridgeport", "EscalanteCanyon","Fram",
+                                          "PicnicSite", "Powerline") ~ "S. glaucus",
+                             TRUE ~ "S. dawsoniae")) %>%
+  group_by(Site,Time,time,Species) %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(time, estimates,color = Site)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  geom_line(position = position_dodge(width = 0.9)) + 
+  theme_bw() +
+  facet_wrap(~Species) +
+  ylab(expression(Phi: survival))
+
+Phi.table %>%
+  mutate(Species = case_when(group %in% c("Bridgeport", "EscalanteCanyon","Fram",
+                                          "PicnicSite", "Powerline") ~ "S. glaucus",
+                             TRUE ~ "S. dawsoniae")) %>%
+  group_by(Species) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) 
+  
+
+f.table <- get.real(scgl.models.rec$Phi.PlotTime.p.Site.f.PlotTime, "f", se = TRUE)
+
+f.table %>%
+  mutate(Species = case_when(group %in% c("Bridgeport", "EscalanteCanyon","Fram",
+                                          "PicnicSite", "Powerline") ~ "S. glaucus",
+                             TRUE ~ "S. dawsoniae")) %>%
+  group_by(Site,Time,time,Species) %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(time, estimates, color = Site)) +
+  geom_point(position = position_dodge(width = 0.2)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.2)) +
+  theme_bw()+
+  facet_wrap(~Species, scales = "free_y") +
+  geom_line(position = position_dodge(width = 0.2)) + 
+  ylab("f: recruitment")
+
+
+## Different every year
+### WINNING MODEL ###
+############################################################################################
+Phi.table <- get.real(scgl.models.rec$Phi.Plottime.p.Site.f.Plottime, "Phi", se = TRUE)
+
+Phi.table %>%
+  mutate(Species = case_when(group %in% c("Bridgeport", "EscalanteCanyon","Fram",
+                                          "PicnicSite", "Powerline") ~ "S. glaucus",
+                             TRUE ~ "S. dawsoniae")) %>%
+  group_by(Site,Time,time,Species) %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(time, estimates,color = Site)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  geom_line(position = position_dodge(width = 0.9)) + 
+  theme_bw() +
+  facet_wrap(~Species) +
+  ylab(expression(Phi: survival))
+
+f.table <- get.real(scgl.models.rec$Phi.Plottime.p.Site.f.Plottime, "f", se = TRUE)
+
+f.table %>%
+  mutate(Species = case_when(group %in% c("Bridgeport", "EscalanteCanyon","Fram",
+                                          "PicnicSite", "Powerline") ~ "S. glaucus",
+                             TRUE ~ "S. dawsoniae")) %>%
+  group_by(Site,Time,time,Species) %>%
+  mutate(time = as.numeric(as.character(time))) %>%
+  summarise(estimates = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  filter(estimates != 0) %>%
+ggplot(  aes(Time, estimates, color = Site)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  # geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.9,position = position_dodge(width = 0.9)) +
+  theme_bw()+
+  facet_wrap(~Species, scales = "free_y") +
+  geom_line(position = position_dodge(width = 0.9)) + 
+  ylab("f: recruitment")
+
+
+```
 
 
 
@@ -2466,12 +2693,23 @@ save(scgl.models.rec, file = paste(userpath, "Denver Botanic Gardens/Conservatio
 
 summary(lm(Height.cm..x ~ Height.cm..y*NS, data=sg.xy[sg.xy$Height.cm..x != 0 & 
                                                         sg.xy$Height.cm..y != 0,]))
-0.930089 + 0.004730
-0.927771 + 0.004654
-summary(lm(Width.cm..x ~ Width.cm..y*NS, data=sg.xy[sg.xy$Width.cm..x != 0 & 
-                                                        sg.xy$Width.cm..y != 0,]))
-0.956704 + -0.069552 
-0.955013 + -0.063365
+summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy[sg.xy$Height.cm..x != 0 & 
+                                                        sg.xy$Height.cm..y != 0 &
+                                                     sg.xy$NS == "S. dawsoniae",]))
+
+summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy[sg.xy$Width.cm..x != 0 & 
+                                                        sg.xy$Width.cm..y != 0 &
+                                                     sg.xy$NS == "S. dawsoniae",]))
+
+
+
+## S glaucus
+summary(lm(Height.cm..x ~ Height.cm..y, data=sg.xy[sg.xy$Height.cm..x != 0 & 
+                                                        sg.xy$Height.cm..y != 0 &
+                                                     sg.xy$NS == "S. glaucus",]))
+summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy[sg.xy$Width.cm..x != 0 & 
+                                                        sg.xy$Width.cm..y != 0 &
+                                                     sg.xy$NS == "S. glaucus",]))
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Figure6HeigthWidthScGlScDa.jpg", sep=""),
 sg.xy %>%
