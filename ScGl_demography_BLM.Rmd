@@ -218,7 +218,8 @@ sg %>%
   filter(FlNum > 0) %>%
   filter(!is.na(FlNum)) %>%
   filter(!grepl("old", Site)) %>% 
-  mutate(NS = case_when(Site %in% c("Atwell Gulch_108","Atwell Gulch_165", "Pond","Oil Pad","Pyramid Rock", "T-Junction") ~ "SCDA",
+  mutate(NS = case_when(Site %in% c("Atwell Gulch_108","Atwell Gulch_165", "Pond",
+                                    "Oil Pad","Pyramid Rock", "T-Junction") ~ "SCDA",
                         TRUE ~ "SCGL")) %>%
 ggplot(   aes(Width.cm., log(FlNum), color = NS))+
   stat_smooth(method = "glm") +
@@ -260,8 +261,8 @@ Keep Atwell old and new
 Fram no data in 2015
 ```{r}
 #Road T-East
-sg <- sg[grep("Road T-East", sg$Site, invert=TRUE),]
-
+sg <- sg %>%
+  filter(!grepl("T-East", Site))
 
 #No "old" 2016 on
 sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
@@ -270,9 +271,12 @@ sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
 # Assign genetic regions; now new species, still have not seen the publication 2022
-sg$NS <- "S. dawsoniae"
-southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
-sg$NS[sg$Site %in% southsites] <- "S. glaucus"
+sg <- sg %>%
+  mutate(NS = case_when(grepl("Bridgeport", Site) ~ "S. glaucus",
+                        grepl("Escalante", Site) ~ "S. glaucus",
+                        grepl("Picnic", Site) ~ "S. glaucus",
+                        Site %in% c("Powerline","Fram") ~ "S. glaucus",
+                        TRUE ~ "S. dawsoniae"))
 
 
 ## 
@@ -282,6 +286,10 @@ sg <- sg %>%
                               grepl("Oil", Site) ~ "Oil Pad",
                               grepl("T-", Site) ~ "T-Junction",
                               grepl("Bridgeport", Site) ~ "Bridgeport",
+                              grepl("Powerline", Site) ~ "Powerline",
+                              grepl("Pyramid", Site) ~ "Pyramid Rock",
+                              grepl("Picnic", Site) ~ "Picnic Site",
+                              grepl("Escalante", Site) ~ "Escalante Canyon",
                               TRUE ~ Site)) %>%
   mutate(SiteSame = as.factor(SiteSame))
 
@@ -330,12 +338,8 @@ unique(sg$Comments[sg$Site == "Pond" & is.na(sg$Height.cm.)])
 
 Merge for size changes year to year by location
 ```{r}
-southsites <- c("Bridgeport","Escalante","Picnic","Powerline","Fram")
-sg$NS <- "S. dawsoniae"
-sg$NS[sg$SiteSame %in% grep(paste(southsites,collapse="|"),
-                                                sg$SiteSame, value=TRUE)] <- "S. glaucus"
 
-
+table(sg$NS)
 sg %>%
   filter(Width.cm. > 20)
 
@@ -345,17 +349,6 @@ sg.new <- sg %>%
   dplyr::select(Site:Y.coord.m.,Height.cm., Width.cm.:Minis, SiteSame, NS) %>%
   filter(!grepl("old",Site)) 
 
-
-### Why am I getting many to many relationships in the left_join?
-sg.new %>%
-  distinct(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m., Year, .keep_all = TRUE) %>%
-  group_by(Site, SiteSame, NS, Transect, Tag, X.coord.m., Y.coord.m., Year) %>%
-  summarise(n = n()) %>%
-  filter(n > 1) %>%
-  arrange(Y.coord.m., Year)
-
-sg.new %>%
-  filter(Tag %in% c(706, 738, 79))
 
 # To get year to year transitions, .x and .y
 ## Should be many to many because all years and then filter to just year.x is last year.y
@@ -436,11 +429,9 @@ Combine 2008 (with no height or width data) and remaining years
 
 ## Now sg_summary has a lower and upper HDI where sg_summary08 only has SD for height and width. 
 sg_summary08 <- sg_summary08 %>%
-  dplyr::mutate(# dplyr::rename(Height95HDIlwr = sdH),
-                # dplyr::rename(Width95HDIlwr = sdW),
-                Height95HDIupr = NA, Width95HDIupr = NA) %>%
-  # select(Site:Height95HDIlwr,Height95HDIupr,avgW:Width95HDIlwr, Width95HDIupr, avgVol:sdVol )
+  dplyr::mutate(Height95HDIupr = NA, Width95HDIupr = NA) %>%
   dplyr::select(Site:sdH, Height95HDIupr, avgW:sdW, Width95HDIupr, avgVol:sdVol)
+
 names(sg_summary08) <- names(sg_summary)
 sg_sum <- do.call(rbind, list(sg_summary08,sg_summary, atwell_summary))
 ```
