@@ -91,6 +91,7 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
+str(sg)
 
 sg %>%
   filter(Width.cm. > 20)
@@ -101,23 +102,39 @@ sg <- sg %>%
                                TRUE ~ Width.cm.))
 
 
-## Number of ScGl counted in 2023
+## Number of ScGl counted in currentYr
 nrow(sg[sg$Year == currentYr & sg$Width.cm. > 0,]) + sum(sg$Minis[sg$Year == currentYr], na.rm = TRUE)
 
 ## Didn't get to Fram or Powerline in 2023
 sg <- sg %>%
   filter(!(Site %in% c("Fram","Powerline") & Year == 2023))
 
-table(sg$Site,sg$Year)
+table(sg$Site,sg$Year) ## Three individual records that aren't assigned sites!
 sg[which(sg$Width.cm. > 15),]
-sg$Width.cm.[which(sg$Width.cm. > 18)] <- sg$Width.cm.[which(sg$Width.cm. > 18)]/10
+# sg$Width.cm.[which(sg$Width.cm. > 18)] <- sg$Width.cm.[which(sg$Width.cm. > 18)]/10
 
 
 #Remove rows where Site is blank, if any
 sg[which(sg$Site == ""),]
 if(nrow(sg[-which(sg$Site == ""),])>0){
   sg <- sg[-which(sg$Site == ""),]
-  }
+}
+
+## Don't remove, assign correctly! In MySQL phpMyAdmin
+#   ScGl_data_id Site Year Tag Transect X.coord.m. Y.coord.m. Degrees Direction Height.cm. Width.cm. Fl Br Minis PhotoNumber       Comments
+# 1        30747      2024  NA                  NA         NA      NA        NA        4.0       6.9  y  n    NA           5 tag is 70cm S.
+# 2        30748      2024  NA                  NA         NA      NA        NA        1.8       1.3  n  n     1             tag is 68cm S.
+# 3        32153      2025  NA                  NA         NA      NA        NA        1.5       1.9  n  n    NA                           
+#### 32153 could be tag 77.05 in tran ID 3, transect 2, pyramid rock?? that was new, existing tag was 1183 in Pyramid Rock
+## 1 tag id: 4158 - tag ID missing
+## 2 tag id: 4159 
+## 3 tag id 3984 tag number	1183 match (ID 2, transect 1 Pyramid rock) 
+## OR tag id 165969 , the largest number that's in there is 4387
+## Has tag ids 3902, 3667, and the 165969
+# sg <- sg %>%
+#   mutate(Tag = case_when(ScGl_data_id == 30747 ~ 414.06,
+#                          ScGl_data_id == 30748 ~ 414.07,
+#                          ))
 
 # Vol calculated at pi*r^2*h
 sg$Vol <- pi*((sg$Width.cm./2)^2)*sg$Height.cm.
@@ -242,15 +259,19 @@ Atwell Gulch old is everything with a Y less than 30
 Atwell Gulch new is everything Atwell Gulch    
 Rename Sites for Atwell old and new
 ```{r}
-# Add a level to the Site factor field
+# Add a level to the Site factor field, adding Atwell Gulch and Atwell Gulch old but keeping _108 and _165 new and old
 sg$Site <- factor(sg$Site, 
                   levels = c("Atwell Gulch", "Atwell Gulch (old)",levels(sg$Site)))
 
-# Rename all Atwell Gulch
-sg[grep("Atwell", sg$Site),"Site"] <- "Atwell Gulch"
+# Rename all Atwell Gulch in the Site column
+sg[grep("Atwell", sg$Site), "Site"] <- "Atwell Gulch"
 
+## Are the X and Y swapped? No, the X should be *0.01? 
 sg[sg$X.coord.m. > 1.1 & !is.na(sg$X.coord.m.) & sg$Site == "Atwell Gulch",]
-sg$X.coord.m.[sg$Tag == 251 & sg$Site == "Atwell Gulch"] <- 0
+sg[sg$X.coord.m. > 1.1 & !is.na(sg$X.coord.m.) ,] ## Some Fram that are crazy, then oil pad old , so only do Atwell Gulch
+sg <- sg %>%
+  mutate(X.coord.m. = case_when((X.coord.m. > 1.1 & !is.na(X.coord.m.) & Site == "Atwell Gulch") ~ X.coord.m.* 0.01,
+                                TRUE ~ X.coord.m.))
 
 ```
 
@@ -270,16 +291,20 @@ sg <- sg[-intersect(grep("old", sg$Site),which(sg$Year>2015)),]
 #No Pond in 2015╣
 sg <- sg[-intersect(grep("Pond", sg$Site), which(sg$Year==2015)),]
 
-# Assign genetic regions; now new species, still have not seen the publication 2022
+# Assign genetic regions; now new species, still have not seen the publication 2022; Mcglaughlin & Naibauer 2024 NOVON  
+## Here everything is Atwell Gulch, need to add a copy of (old) with Y <= 30 later
 sg <- sg %>%
   mutate(NS = case_when(grepl("Bridgeport", Site) ~ "S. glaucus",
                         grepl("Escalante", Site) ~ "S. glaucus",
                         grepl("Picnic", Site) ~ "S. glaucus",
                         Site %in% c("Powerline","Fram") ~ "S. glaucus",
-                        TRUE ~ "S. dawsoniae"))
+                        TRUE ~ "S. dawsoniae")) %>%
+  mutate(Site = droplevels(Site))
 
 
-## 
+table(sg$Site, sg$NS)
+
+## Add Site Same for linking climate data
 sg <- sg %>%
   mutate(SiteSame = case_when(grepl("Atwell", Site) ~ "Atwell Gulch",
                               grepl("Pond", Site) ~ "Pond",
@@ -302,6 +327,8 @@ sg_summary08$NS <- "S. dawsoniae"
 southsites <- c("Bridgeport","Escalante Canyon","Picnic Site","Powerline","Fram")
 sg_summary08$NS[sg_summary08$Site %in% southsites] <- "S. glaucus"
 
+table(sg_summary08$Site, sg_summary08$NS)
+
 # One copy of all Atwell Gulch 2012 on for new (after three transects were extended)
 atwell.new <- sg[intersect(grep("Atwell",sg$Site),which(sg$Year>2011)),]
 # One copy of all Atwell Gulch for all years but transects not extended
@@ -309,9 +336,30 @@ atwell.old <- sg[intersect(grep("Atwell",sg$Site),which(sg$Y.coord.m.<30)),]
 atwell.old$Site <- "Atwell Gulch (old)"
 
 ggplot(atwell.old, aes(X.coord.m., Y.coord.m., color = as.factor(Year)))+
-  geom_point(position = position_dodge(width = 0.05), pch="|",size = 2)+
+  geom_point(position = position_dodge(width = 0.04), pch="|",size = 2)+
   facet_wrap(~ Transect, nrow = 2, scales = "free_x")+
   theme_bw()
+
+# There is no transect 1! There is no 2! In MySQL Transect ID 1 and 2 are bridgeport
+# Transect 1 --> 4.4
+## 138.02 should be transect 4.4 (not 1) 
+## 453.00 also 4.4 (ID 25)
+# Transect 2 --> 9.09
+## 34 is 9.09 
+## 137.01 and 137.02 9.09
+## ...
+table(atwell.old$Transect)
+sg %>%
+  filter(Site == "Atwell Gulch" & Transect %in% c("1","2")) %>%
+  group_by(Tag, Transect) %>%
+  summarize(n = n()) %>%
+  arrange(Transect, Tag) %>%
+  print(n = 25)
+
+sg <- sg %>%
+  mutate(Transect = case_when((Transect == "1" & Site == "Atwell Gulch") ~ "4.4",
+                              (Transect == "2" & Site == "Atwell Gulch") ~ "9.09",
+                              TRUE ~ Transect)) 
 
 #Add back Atwell duplicated for old and new
 sg <- do.call(rbind,list(sg[grep("Atwell", sg$Site, invert = TRUE),],atwell.new,atwell.old))
@@ -544,7 +592,10 @@ sg_density %>%
   filter(Year == currentYr) %>%
   dplyr::summarise(MeanChange = mean(Change.Density),
                    SDChange = sd(Change.Density),
-                   VarChange = var(Change.Density))
+                   VarChange = var(Change.Density)) %>%
+  mutate(PercofBase = MeanChange - 1)
+
+
 
 ```
 
@@ -1114,9 +1165,9 @@ spring: March-May (3-5)
 ## SiteSame gets it down to only >1000 NAs for climate  
 ## GO BACK, must have assigned SCGL and SCDA wrong somewhere!! 
 sg_season <- sg %>%
-  left_join(scgl.season.wide, join_by("Year" == "Prev12", "SiteSame" == "Site")) #, "NS" == "NS"))
+  left_join(scgl.season.wide, join_by("Year" == "Prev12", "SiteSame" == "Site", "NS" == "NS"))
 sg_annual <- sg %>%
-  left_join(scgl.annual.wide, join_by("Year" == "Prev12", "SiteSame" == "Site")) # , "NS" == "NS"))
+  left_join(scgl.annual.wide, join_by("Year" == "Prev12", "SiteSame" == "Site", "NS" == "NS"))
 
 ## Only missing values are previous to 1986
 scgl.season.wide %>%
@@ -1129,8 +1180,16 @@ scgl.annual.wide %>%
 sg_season %>%
   filter(is.na(ppt_fall))
 
+## Only 61 rows missing, all from Powerline (old), tags 38, 39, 43, 51, 58, 183, and 796
 sg_annual %>%
-  filter(is.na(Value_ppt))
+  filter(is.na(Value_ppt)) %>%
+  group_by(Site, Tag, Transect) %>%
+  summarise(n = n())
+
+table(sg_annual$Site, sg_annual$Year)
+sg_annual %>%
+  filter(SiteSame == "Powerline" & Tag == 38)
+## GO back up and remove these from sg 
 
 
 summary(glm(Fl~Width.cm. * NS, data = sg_season, family = binomial(link = "logit")))
