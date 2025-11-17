@@ -96,6 +96,10 @@ str(sg)
 sg %>%
   filter(Width.cm. > 20)
 
+## Gonna say that all the Powerline (old) are just repeats of the Powerline and can remove
+sg <- sg %>%
+  filter(Site != "Powerline (old)")
+
 ## Wrong, remove
 sg <- sg %>%
   mutate(Width.cm. = case_when(Width.cm. > 20 ~ NA,
@@ -1179,18 +1183,6 @@ scgl.annual.wide %>%
 
 sg_season %>%
   filter(is.na(ppt_fall))
-
-## Only 61 rows missing, all from Powerline (old), tags 38, 39, 43, 51, 58, 183, and 796
-sg_annual %>%
-  filter(is.na(Value_ppt)) %>%
-  group_by(Site, Tag, Transect) %>%
-  summarise(n = n())
-
-table(sg_annual$Site, sg_annual$Year)
-sg_annual %>%
-  filter(SiteSame == "Powerline" & Tag == 38)
-## GO back up and remove these from sg 
-
 
 summary(glm(Fl~Width.cm. * NS, data = sg_season, family = binomial(link = "logit")))
 ggplot(sg_season, aes(Width.cm., Fl, color = NS))+
