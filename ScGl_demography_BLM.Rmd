@@ -1192,23 +1192,26 @@ ggplot(sg_season, aes(Width.cm., Fl, color = NS))+
     se = TRUE)+
   theme_bw()
 
+## Got rid of all no climate data, back to good!!
 sg_season %>%
-  filter(is.na(tmin_winter))  ###AAAAh, now have > 8700 rows with no climate data!!!
+  filter(is.na(tmin_winter))  ###AAAAh, now have > 8700 rows with no climate data!!! (in 2025)
 ### Minimum width of reproductive by species  
 sg %>%
   group_by(NS, SiteSame, Year) %>%
   filter(Fl == 1) %>%
   filter(Width.cm. > 1) %>%
-  summarise(minRep = min(Width.cm.)) %>%
+  summarise(minRep = min(Width.cm.),
+            median = median(Width.cm.)) %>%
   group_by(NS) %>%
-  summarise(meanMin = mean(minRep))
+  summarise(meanMin = mean(minRep),
+            meanMedian = mean(median))
   
-## Some seem wrong?!?!
+## Clearly entered wrong, just change them to same as Height for analyses. 
+sg <- sg %>%
+  mutate(Width.cm. = case_when((Fl == 1 & Width.cm. < 1 & Height.cm. > 2) ~ Height.cm.,
+                               TRUE ~ Width.cm.))
 sg %>%
-  filter(Fl == 1 & Width.cm. < 1) %>%
-  arrange(NS, Year)
-  
-
+  filter(ScGl_data_id %in% c(25837, 29838,7463 ))
 ```
 
 
@@ -1399,30 +1402,30 @@ for(i in 2:length(lm.list)){
 }
 
 ### color = Br, x = size, y = prob flower, facet for scalevalue_tmin and scalevalue_ppt ~ NS 
-# p1a <- sg_annual_scaled_merged %>%
-#   group_by(NS) %>%
-#   dplyr::mutate(tempbin = cut(scalevalue_tmin, 
-#                               breaks = c(min(scalevalue_tmin)-0.1, mean(scalevalue_tmin), max(scalevalue_tmin)+0.1),
-#                               labels = FALSE)) %>%
-#   dplyr::mutate(scalevalue_pptbin = cut(scalevalue_ppt, 
-#                               breaks = c(min(scalevalue_ppt)-0.1, mean(scalevalue_ppt), max(scalevalue_ppt)+0.1),
-#                               labels = FALSE)) %>%
-#   ggplot(  aes(Width.cm..x,surv, color = as.factor(Br.x)))+
-#      geom_point(pch = "|")+ ## mimic a rug plot
-#       geom_smooth(method = "glm",
-#                   method.args = list(family = "binomial"), se=TRUE)+
-#     facet_grid(NS~tempbin+scalevalue_pptbin, 
-#                labeller = labeller(tempbin = as_labeller(c("1" = "<= mean min temp",
-#                                 "2" = "> mean min temp")),
-#                     scalevalue_pptbin = as_labeller(c("1" = "<= mean scalevalue_ppt", "2" = "> mean scalevalue_ppt")),
-#                     NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
-#                                        "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
-#     theme_light()+
-#     scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
-#                          labels = c("Unbrowsed","Browsed"))+
-#     ylab("Survival")+
-#     xlab("Size (width cm)")+
-#   ggtitle("a)")
+p1a <- sg_annual_scaled_merged %>%
+  group_by(NS) %>%
+  dplyr::mutate(tempbin = cut(scalevalue_tmin,
+                              breaks = c(min(scalevalue_tmin)-0.1, mean(scalevalue_tmin), max(scalevalue_tmin)+0.1),
+                              labels = FALSE)) %>%
+  dplyr::mutate(scalevalue_pptbin = cut(scalevalue_ppt,
+                              breaks = c(min(scalevalue_ppt)-0.1, mean(scalevalue_ppt), max(scalevalue_ppt)+0.1),
+                              labels = FALSE)) %>%
+  ggplot(  aes(Width.cm..x,surv, color = as.factor(Br.x)))+
+     geom_point(pch = "|")+ ## mimic a rug plot
+      geom_smooth(method = "glm",
+                  method.args = list(family = "binomial"), se=TRUE)+
+    facet_grid(NS~tempbin+scalevalue_pptbin,
+               labeller = labeller(tempbin = as_labeller(c("1" = "<= mean min temp",
+                                "2" = "> mean min temp")),
+                    scalevalue_pptbin = as_labeller(c("1" = "<= mean scalevalue_ppt", "2" = "> mean scalevalue_ppt")),
+                    NS = as_labeller(c("S. glaucus" = expression(italic(S.~glaucus)),
+                                       "S. dawsoniae" = expression(italic(S.~dawsoniae))))))+
+    theme_light()+
+    scale_color_manual("Browse/\nDamage", values = c("deepskyblue","deeppink4"),
+                         labels = c("Unbrowsed","Browsed"))+
+    ylab("Survival")+
+    xlab("Size (width cm)")+
+  ggtitle("a)")
 
 p1a_woBr <- sg_annual_scaled_merged %>%
   group_by(NS) %>%
@@ -1451,7 +1454,7 @@ p1a_woBr <- sg_annual_scaled_merged %>%
     xlab("Size (width cm)")+
   ggtitle("a)")
 
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig_Survival.jpg", sep=""),p1a, width = 200, height = 110, units = 'mm', dpi=300)
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig_Survival.jpg", sep=""),p1a_woBr, width = 200, height = 110, units = 'mm', dpi=300)
 
 
 
@@ -1581,7 +1584,8 @@ lm10 <- glmer(Fl ~ 1 + (1|NS), data = sg_annual_FlAIC,
 # lm6 <- glmer(Fl~ Width.cm. + scalevalue_ppt + (1|NS), data = sg_annual_FlAIC,
 #              family = binomial)  
 
-lm.list <- list(lm1, lm2, lm3, lm4, lm8, lm7, lm10) # lm6 lm9, 
+lm.list <- list(lm1, lm2, lm3, # lm4,
+                lm8, lm7, lm10) # lm6 lm9, 
 lm.names <- as.character(unlist(lapply(lm.list,formula)))
 (lm.results <- aictab(lm.list, modnames=lm.names))
 #evidence ratio 
@@ -1598,15 +1602,16 @@ sg_annual %>%
 ggplot(aes(Width.cm., Fl, colour = NS))+
   geom_point() +
   geom_smooth(method = "glm", 
-    method.args = list(family = "binomial"), se = FALSE)
+    method.args = list(family = "binomial"), se = TRUE)
 
-sg_annual %>%
+Fig5a <- sg_annual %>%
   filter(!is.na(Fl)) %>%
   filter(!is.na(Width.cm.)) %>%
   filter(Width.cm. != 0) %>% # dead
+  filter(Width.cm. > 0.5) %>%
   # group_by(NS) %>%
   # # based on the minimum size when the species typically can become reproductive
-  mutate(SizeClass = cut(Width.cm., breaks = c(0, 0.5, 3.2, max(Width.cm.)) )) %>%
+  mutate(SizeClass = cut(Width.cm., breaks = c(0.5, 3, 6, max(Width.cm.)) )) %>%
   # filter(SizeClass == 2) %>%
 ggplot(aes(scalevalue_tmin, Fl, colour = NS))+
   geom_point(pch="|") +
@@ -1636,7 +1641,7 @@ sg_annual %>%
   dplyr::mutate(tempbin = cut(scalevalue_tmin, 
                               breaks = c(min(scalevalue_tmin)-0.01, mean(scalevalue_tmin), max(scalevalue_tmin)+0.01),
                               labels = FALSE)) %>%
-    ggplot(  aes(Width.cm., Fl, color = as.factor(tempbin)))+
+    ggplot(  aes(Width.cm., Fl, color = NS))+
       geom_point(pch = "|")+ ## mimic a rug plot
       geom_smooth(method = "glm",
                   method.args = list(family = "binomial"), se=TRUE)+
@@ -1646,8 +1651,10 @@ sg_annual %>%
                       #                    "S. dawsoniae" = expression(italic(S.~dawsoniae))))
                       ))+
       theme_light()+
-      scale_color_manual("Min Temp", values = c("deepskyblue","deeppink4"),
-                         labels = c("< mean","> mean"))+
+      scale_color_manual("Species", values = c("deepskyblue","deeppink4")
+                         # ,
+                         # labels = c("< mean","> mean")
+                         )+
   ylab("Probability of Reproduction")+
   xlab("Size (width cm)")
 
