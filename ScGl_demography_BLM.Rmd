@@ -1302,10 +1302,21 @@ sg_annual %>%
 
 Survival - need merge year to year like what I made for Dan Doak but add a survived or not
 ```{r}
-sg_annual_scaled_merged <- sg_annual %>%
-  group_by(Site, SiteSame, NS, Transect, Tag, Year) %>%
-  left_join(sg.new, by = c("Site","SiteSame","NS","Tag","Transect")) %>%
-  dplyr::select(Year.x:Transect, Width.cm..x:Minis.x, FlNum:Year.y, Width.cm..y:Minis.y) %>%
+
+## Here, the climate are the 12 months previous to Year.x, need it to be to Year.y
+# sg_annual_scaled_merged <- sg_annual %>%
+#   group_by(Site, SiteSame, NS, Transect, Tag, Year) %>%
+#   left_join(sg.new, by = c("Site","SiteSame","NS","Tag","Transect")) %>%
+#   dplyr::select(Year.x:Transect, Width.cm..x:Minis.x, FlNum:Year.y, Width.cm..y:Minis.y) %>%
+#   filter(Year.x == Year.y-1) %>%
+#   filter(Width.cm..x != 0) %>%
+#   mutate(surv = ifelse(Width.cm..y ==0, 0,1))%>%
+#   mutate(Br.x = as.factor(Br.x))
+
+sg_annual_scaled_merged <- sg.new %>%
+  # group_by(Site, SiteSame, NS, Transect, Tag, Year) %>%
+  left_join(sg_annual, by = c("Site","SiteSame","NS","Tag","Transect")) %>%
+  dplyr::select(NS,Year.x:Transect, Width.cm..x:Minis.x, Year.y, Width.cm..y, Value_ppt:scalevalue_tmin) %>%
   filter(Year.x == Year.y-1) %>%
   filter(Width.cm..x != 0) %>%
   mutate(surv = ifelse(Width.cm..y ==0, 0,1))%>%
@@ -1364,6 +1375,7 @@ ggplot(    aes(scalevalue_tmin, surv, color = NS))+
 
 
 So few browsed, took that out of the analyses. 
+Is the weather for the months before Year.y as it should be? - No, I think it's for two years before! 
 ```{r}
 
 ## The effect of browsing is strongly correlated with width (-0,939) from the correlation of fixed effects. 
@@ -1503,7 +1515,7 @@ ggplot(  aes(scalevalue_ppt,surv, color = as.factor(tempbin)))+
               method.args = list(family = "binomial"), se=TRUE)+
   facet_wrap(~NS)+
   theme_light()+
-  scale_color_manual("Temperature", values = c("deepskyblue","deeppink4"),  # Minimum\nTemperature
+  scale_color_manual("Temperature", values = c("blue","red"),  # Minimum\nTemperature
                      labels = c("1" = "<= mean\nmin temp", "2" = "> mean\nmin temp"))+
   ylab("Survival")+
   xlab("Precipitation")+
@@ -1523,14 +1535,14 @@ p2 <- sg_annual_scaled_merged %>%
                   method.args = list(family = "binomial"), se=TRUE)+
   facet_wrap(~NS)+
     theme_light()+
-    scale_color_manual("Precipitation", values = c("deepskyblue","deeppink4"),
+    scale_color_manual("Precipitation", values = c("brown","darkgreen"),
                          labels = c("1" = "<= mean\nppt", "2" = "> mean\nppt"))+
     ylab("Survival")+
     xlab("Minimum Temperature")+
   ggtitle("c)")
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig4_SurvBrscalevalue_tminPPT.jpg", sep=""),
-       p1a_woBr  /(p1 + p2), width = 300, height = 200, units = 'mm', dpi=300) 
+       p1a_woBr  + (p1 / p2), width = 300, height = 160, units = 'mm', dpi=300) 
      
 ```
 
@@ -2634,8 +2646,11 @@ ggplot(  aes(#time,
     ylab(expression(lambda))+
     xlab("")
 
-
-get.real(scgl.lambda$Phi.Plot.p.Site.Lambda.Plot, "Phi", se = TRUE) %>%
+## In detection corrected estimates of survival and recruitment, where detection, recruitment, and survival differed by site...
+get.real(scgl.lambda$Phi.species.p.Site.Lambda.Plot, "Phi", se = TRUE) %>%
+  filter(fixed != "Fixed") %>%
+  left_join(SiteSpecies) %>%
+  distinct(estimate, lcl, ucl, NS)
   
 
 ```
