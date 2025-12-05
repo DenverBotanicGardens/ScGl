@@ -916,7 +916,7 @@ AIC for reproduction below after loading climate
 
 Climate directly from PRISM   
 ### update only the previous year each year  
-```{r}
+```{r, eval=FALSE}
 #devtools::install_github("ropensci/prism")
 
 prism_set_dl_dir("Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
@@ -1604,7 +1604,7 @@ ggplot(aes(Width.cm., Fl, colour = NS))+
   geom_smooth(method = "glm", 
     method.args = list(family = "binomial"), se = TRUE)
 
-Fig5a <- sg_annual %>%
+Fig5b <- sg_annual %>%
   filter(!is.na(Fl)) %>%
   filter(!is.na(Width.cm.)) %>%
   filter(Width.cm. != 0) %>% # dead
@@ -1622,7 +1622,12 @@ ggplot(aes(scalevalue_tmin, Fl, colour = NS))+
   scale_color_manual("Species", values = c("deepskyblue","deeppink4"))+
   ylab("Probability of Reproduction")+
   xlab("Minimum annual temperature") +
-  facet_wrap(~ SizeClass)
+  facet_wrap(~ SizeClass)+
+  ggtitle("b)")
+# labeller = labeller(SizeClass = as_labeller(c("(0,5.3]" = "< 3 cm width", 
+#                                                            "3 - 6 cm width",
+#                                                             "> 6 cm width"))))
+  
 
 # scalevalue_tminlabs <- c("0" = "No browse/damage",
 #               "1" = "Browse/damage")
@@ -1633,13 +1638,15 @@ sg_annual %>%
   summarise(n = n())
   
 
-sg_annual %>%
+Fig5a <- sg_annual %>%
   filter(!is.na(Fl)) %>% # not dead
   filter(!is.na(Width.cm.)) %>%
   filter(Width.cm. > 1) %>% # dead
   # group_by(NS) %>%
   dplyr::mutate(tempbin = cut(scalevalue_tmin, 
-                              breaks = c(min(scalevalue_tmin)-0.01, mean(scalevalue_tmin), max(scalevalue_tmin)+0.01),
+                              # breaks = c(min(scalevalue_tmin)-0.01, -0.5, 0, 0.5, max(scalevalue_tmin)+0.01),
+                              breaks = c(min(scalevalue_tmin)-0.01, median(scalevalue_tmin),
+                                         max(scalevalue_tmin)+0.01),
                               labels = FALSE)) %>%
     ggplot(  aes(Width.cm., Fl, color = NS))+
       geom_point(pch = "|")+ ## mimic a rug plot
@@ -1656,7 +1663,8 @@ sg_annual %>%
                          # labels = c("< mean","> mean")
                          )+
   ylab("Probability of Reproduction")+
-  xlab("Size (width cm)")
+  xlab("Size (width cm)")+
+  ggtitle("a)")
 
 
 ### color = Br, x = size, y = prob flower, facet for scalevalue_tmin and ppt ~ NS 
@@ -1736,173 +1744,7 @@ flp2 <- sg_annual %>%
   ggtitle("c)")
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5_ProbofReproductive.jpg", sep=""),
-       flpl1 / (flp1 + flp2), width = 300, height = 200, units = 'mm', dpi=300)
-
-```
-
-# What describes reproduction
-### Is percent reproductive explained by climate variables?   
-
-```{r}
-
-sjPlot::set_theme(base = theme_bw())
-
-
-p2 <- sjPlot::plot_model(lm4, type = "int", mdrt.values = "meansd")
- # sjPlot::plot_model(lm4, type = "int",  mdrt.values = "meansd")
-                    # terms = c("medianW [all]", "data.ppt [meansd]","data.scalevalue_tmax [meansd]")) 
-p1 <- sjPlot::plot_model(lm6, type = "int", mdrt.values = "meansd")
-## Change facet order to mean-SD, mean, mean+SD
-for(i in 1:3){
-  p1[[11]][[i]]$data$facet <- factor(p1[[11]][[i]]$data$facet,
-                                      levels = c(levels(p1[[11]][[i]]$data$facet)[2],
-                                                 levels(p1[[11]][[i]]$data$facet)[1],
-                                                 levels(p1[[11]][[i]]$data$facet)[3]))
-  ## Change facet labels
-  levels(p1[[11]][[i]]$data$facet) <- gsub(pattern = "data.scalevalue_tmin", 
-                                            replacement = "Min Temp",
-                                            levels(p1[[11]][[i]]$data$facet) )
-}
-
-p1[[11]][[1]]$labels$title <- gsub("Prepro", "\n% reproduction", p1[[11]][[1]]$labels$title)
-
-for(i in 1:3){
-  p1[[11]][[i]]$labels$subtitle <- gsub("data.ppt","ppt", p1[[11]][[i]]$labels$subtitle)
-}
-
-p1[[11]][[1]]$labels$y <- "Probability of Reproduction"
-for(i in 2:3){
-  p1[[11]][[i]]$labels$y <- ""
-}
-
-
-# No size but region, ppt, and scalevalue_tmin
-# Facet order
-p1[[9]]$data$facet <- factor(p1[[9]]$data$facet,
-                                    levels = c(levels(p1[[9]]$data$facet)[2],
-                                               levels(p1[[9]]$data$facet)[1],
-                                               levels(p1[[9]]$data$facet)[3]))
-## Change facet labels
-levels(p1[[9]]$data$facet) <- gsub(pattern = "data.ppt", 
-                                          replacement = "ppt",
-                                          levels(p1[[9]]$data$facet) )
-
-p2[[9]]$data$facet <- factor(p2[[9]]$data$facet,
-                                    levels = c(levels(p2[[9]]$data$facet)[2],
-                                               levels(p2[[9]]$data$facet)[1],
-                                               levels(p2[[9]]$data$facet)[3]))
-## Change facet labels
-levels(p2[[9]]$data$facet) <- gsub(pattern = "data.ppt", 
-                                          replacement = "ppt",
-                                          levels(p2[[9]]$data$facet) )
-
-
-p1[[8]]$data$facet <- factor(p1[[8]]$data$facet,
-                                    levels = c(levels(p1[[8]]$data$facet)[2],
-                                               levels(p1[[8]]$data$facet)[1],
-                                               levels(p1[[8]]$data$facet)[3]))
-## Change facet labels
-levels(p1[[8]]$data$facet) <- gsub(pattern = "data.ppt", 
-                                          replacement = "ppt",
-                                          levels(p1[[8]]$data$facet) )
-
-
-for(i in 1:3){
-  p2[[11]][[i]]$data$facet <- factor(p2[[11]][[i]]$data$facet,
-                                      levels = c(levels(p2[[11]][[i]]$data$facet)[2],
-                                                 levels(p2[[11]][[i]]$data$facet)[1],
-                                                 levels(p2[[11]][[i]]$data$facet)[3]))
-## Change facet labels
-  levels(p2[[11]][[i]]$data$facet) <- gsub(pattern = "data.scalevalue_tmax", 
-                                            replacement = "Max Temp",
-                                            levels(p2[[11]][[i]]$data$facet) )
-}
-
-p2[[11]][[1]]$labels$title <- gsub("Prepro", "\n% reproduction", p2[[11]][[1]]$labels$title)
-
-for(i in 1:3){
-  p2[[11]][[i]]$labels$subtitle <- gsub("data.ppt","ppt", p2[[11]][[i]]$labels$subtitle)
-}
-
-p2[[11]][[1]]$labels$y <- "Probability of Reproduction"
-for(i in 2:3){
-  p2[[11]][[i]]$labels$y <- ""
-}
-
-  
-```
-
-```{r, eval=FALSE}
-## Break it down into parts lm6 tmin
-p1[[11]]$labels$colour <- "Size"
-p2[[11]]$labels$colour <- "Size"
-
-Fig4_b_reproduction <- p1[[9]]+
-  # ggtitle("Predicted probablities of % reproduction")+
-  ggtitle("c)")+
-  scale_colour_discrete("Min Temp")+
-  xlab("Region")+
-  ylab("% reproduction")+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-Fig5_repro_max <- p2[[9]]+
-  scale_colour_discrete("Max Temp")+
-  xlab("Region")+
-  ggtitle("d)")+
-  ylab("% reproduction")+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-
-
-all2 <- p1[[11]][[1]]+
-  ylab("")+
-  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p1[[11]][[1]]$labels$subtitle))+
-  ggtitle("")+
-  ylim(c(0.2,0.84))+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-all1 <- p1[[11]][[2]]+
-  ylab("% reproductive")+
-  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p1[[11]][[2]]$labels$subtitle))+
-  ggtitle("a)")+
-  ylim(c(0.2,0.84))+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-all3 <- p1[[11]][[3]]+
-  ylab("")+
-  xlab("")+
-  ylim(c(0.2,0.84))+
-  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p1[[11]][[3]]$labels$subtitle))+
-  # scale_color_discrete("Size")+
-  ggtitle("")+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-all2max <- p2[[11]][[1]]+
-  ylab("")+
-  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p2[[11]][[1]]$labels$subtitle))+
-  ggtitle("")+
-  ylim(c(0.2,0.81))+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-all1max <- p2[[11]][[2]]+
-  ylab("% reproductive")+
-  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p2[[11]][[2]]$labels$subtitle))+
-  ggtitle("b)")+
-  ylim(c(0.2,0.81))+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-all3max <- p2[[11]][[3]]+
-  ylab("")+
-  xlab("Region")+
-  labs(title = "", subtitle = gsub("ppt","Annual precipitation",p2[[11]][[3]]$labels$subtitle))+
-  # scale_color_discrete("Size")+╜
-  ggtitle("")+
-  ylim(c(0.2,0.81))+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-
-ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig5_percReproductive.jpg", sep=""),
-       (all1 + all2 + all3)/
-        (all1max + all2max + all3max)/
-         (Fig4_b_reproduction  + Fig5_repro_max),
-       # Fig4_a_reproduction/Fig4_b_reproduction/Fig4_b_reproduction_lm4,
-width = 330, height = 210, units = 'mm', dpi=300)
+       Fig5a + Fig5b, width = 300, height = 125, units = 'mm', dpi=300)
 
 ```
 
@@ -1911,7 +1753,13 @@ width = 330, height = 210, units = 'mm', dpi=300)
 Figure 3a Number of Sclerocactus glaucus
 ```{r Figure remove pond}
 
-Fig3a <- ggplot(sg_sum,aes(Year, X/area, colour = Site)) +
+
+
+Fig3a <- sg_sum %>%
+  filter(!(Site %in% c("Bridgeport (old)", "Escalante Canyon (old)",
+                       "Picnic Site (old)", "Road T-West (old)", "Pyramid Rock (old)"))) %>%
+  mutate(Site = as.factor(Site)) %>%
+ggplot(   aes(Year, X/area, colour = Site)) +
   geom_line() +
   geom_point() +
   ggtitle("a)")+
@@ -1942,7 +1790,11 @@ write.csv(sg_sum, paste(userpath, "Denver Botanic Gardens/Conservation - General
 
 ### Figure 3b
 ```{r}
-Fig3b <- ggplot(sg_sum,aes(Year,avgVol,colour=Site))+
+Fig3b <- sg_sum %>%
+  filter(!(Site %in% c("Bridgeport (old)", "Escalante Canyon (old)",
+                       "Picnic Site (old)", "Road T-West (old)", "Pyramid Rock (old)"))) %>%
+  mutate(Site = as.factor(Site)) %>%
+ggplot(   aes(Year,avgVol,colour=Site))+
   geom_line()+
   geom_point()+
   ggtitle("b)")+
@@ -2000,7 +1852,11 @@ ggplot(sg[sg$Minis>0,], aes(Year, Minis, colour = Site, group = Year))+
 
 ##FIGURE 3c
 ```{r}
-Fig3c <- ggplot(sgminis, aes(Year, TotMinis.x,colour= Site))+
+Fig3c <- sgminis %>%
+  filter(!(Site %in% c("Bridgeport (old)", "Escalante Canyon (old)",
+                       "Picnic Site (old)", "Road T-West (old)", "Pyramid Rock (old)"))) %>%
+  mutate(Site = as.factor(Site)) %>%
+ggplot(     aes(Year, TotMinis.x,colour= Site))+
   geom_line()+
   geom_point()+
   ggtitle("c)")+
@@ -2016,7 +1872,7 @@ Fig3c <- ggplot(sgminis, aes(Year, TotMinis.x,colour= Site))+
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Fig3.jpg", sep=""),
 Fig3a/Fig3b/Fig3c,
-width=250, height=350, units="mm", dpi=300)
+width=275, height=325, units="mm", dpi=300)
 
 ```
 
@@ -2193,7 +2049,11 @@ sg.xy$NS[sg.xy$Site %in% grep(paste(southsites,collapse="|"),
 ```{r}
 
 
-ggheight <- ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
+ggheight <- sg.xy %>%
+  filter(!grepl("old", Site)) %>%
+  filter(Height.cm..x < 30) %>%
+  filter(Height.cm..y < 30) %>%
+ggplot(    aes(colour = Site))+
   stat_smooth(method=glm, aes(y=Height.cm..x, x=Height.cm..y))+
   ggtitle("a)")+
   ylab(expression("Height year"[y]))+
@@ -2202,7 +2062,9 @@ ggheight <- ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = S
   facet_grid(~NS)
 
 
-ggwidth <- ggplot(sg.xy[grep("old",sg.xy$Site,invert = TRUE), ], aes(colour = Site))+
+ggwidth <- sg.xy %>%
+  filter(!grepl("old", Site)) %>%
+ggplot(     aes(colour = Site))+
   stat_smooth(method=glm, aes(y=Width.cm..x, x=Width.cm..y))+
   ggtitle("b)")+
   ylab(expression("Width year"[y]))+
@@ -2378,7 +2240,7 @@ p: detection
 sigmaf: individual heterogeneity of f      
 f: net recruitment probability (the per capita number of new between i and i+1)   
 
-```{r}
+```{r, eval = FALSE}
 
 scglprocLinkBarkRan <- process.data(scgl.inp, model = "LinkBarkRan", groups = c("Site"), begin.time = 2008)
 scglddlLinkBarkRan <- make.design.data(scglprocLinkBarkRan)
@@ -2446,7 +2308,7 @@ scglddlLinkBarkRan$sigmaf <- scglddlLinkBarkRan$sigmaf %>%
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 run.scgl <- function(){
   Phi.dot = list(formula =  ~ 1)
   Phi.species = list(formula = ~ Species)
@@ -2509,6 +2371,26 @@ https://github.com/jlaake/RMark/blob/master/RMark/inst/parameters.txt
 scglproclambda <- process.data(scgl.inp, model = "Pradlambda", groups = c("Site"), begin.time = 2008)
 scglddllambda <- make.design.data(scglproclambda)
 
+SiteSp <- sg %>%
+  distinct(SiteSame, NS) %>%
+  mutate(SiteSame = case_when(grepl("Atwell", SiteSame) ~ "AtwellGulch",
+                              grepl("Escalante", SiteSame) ~ "EscalanteCanyon",
+                              grepl("Oil", SiteSame) ~ "OilPad",
+                              grepl("Picnic", SiteSame) ~ "PicnicSite",
+                              grepl("Pyramid", SiteSame) ~ "PyramidRock",
+                              grepl("Junction", SiteSame) ~ "TJunction",
+                              TRUE ~ SiteSame))
+
+
+scglddllambda$Phi <- scglddllambda$Phi %>%
+  left_join(SiteSp, by = c("Site"="SiteSame"))
+
+scglddllambda$p <- scglddllambda$p %>%
+  left_join(SiteSp, by = c("Site"="SiteSame"))
+  
+scglddllambda$Lambda <- scglddllambda$Lambda %>%
+  left_join(SiteSp, by = c("Site"="SiteSame"))
+
 ## Fix p to zero when no survey
 pindexlambda <- scglddllambda$p
 ## Just the expanded new version of Atwell Gulch
@@ -2543,6 +2425,41 @@ p.indiceslambda <- c(p.SSRlambda$par.index,p.Bridgeportlambda$par.index,
 p.valueslambda <- rep(0, length(p.indiceslambda))
 
 ```
+
+Detection less than perfect at all sites?  
+```{r}
+scgl.detection <- function(){
+  Lambda.site = list(formula = ~ 1)
+  Phi.site = list(formula = ~ 1)
+  p.dot = list(formula = ~ 1,
+               fixed = list(index = p.indices, value = p.values))
+  p.site = list(formula = ~ Site,
+               fixed = list(index = p.indices, value = p.values))
+  p.species = list(formula = ~ NS,
+               fixed = list(index = p.indices, value = p.values))
+  
+  scgl.model.list <- create.model.list("Pradlambda")
+  scgl.results <- mark.wrapper(scgl.model.list,
+                               data = scglproclambda,
+                               ddl = scglddllambda)
+  
+  return(scgl.results)
+} 
+
+
+scgl.model <- scgl.detection()
+save(scgl.model, file = paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"PradlambdaDetection.Rdata", sep=""))
+
+p.table <- get.real(scgl.model$Phi.site.p.site.Lambda.site, "p", se = TRUE)
+p.table %>%
+  distinct(estimate, se, lcl, ucl, group) %>%
+  filter(estimate > 0) %>%
+  arrange(estimate)
+
+
+```
+
+
 
 ```{r}
 scgl.constantLambda <- mark(data = scglproclambda, ddl = scglddllambda,
@@ -2582,7 +2499,17 @@ ggplot(  aes(SiteLabel, lambda)) +
     xlab("")+
     ggtitle("b)")
 
-## Demography: survival
+
+### "In detection corrected estimates of survival and recruitment, where detection, recruitment, and survival differed by site ""
+get.real(scgl.constantLambda, "Phi", se = TRUE) %>%
+  filter(fixed != "Fixed") %>%
+  left_join(SiteSpecies) %>%
+  group_by(NS) %>%
+  summarise(lambda = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) 
+
+## Demography: survival 
 lambda.table %>%
   filter(fixed != "Fixed") %>%
   left_join(SiteSpecies) %>%
@@ -2623,6 +2550,28 @@ ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProject
        Fig2a/Fig2b,   ### Fig2b as the Pradel lambda model probably biased because can't assume same survival of young and old
 width=200, height=200, units="mm", dpi=300)
 
+ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Pradel_BLM-FWS.jpg", sep=""),
+lambda.table %>%
+  filter(fixed != "Fixed") %>%
+  left_join(SiteSpecies) %>%
+  group_by(Site, NS, SiteLabel) %>%
+  summarise(lambda = mean(estimate),
+            lcl = mean(lcl),
+            ucl = mean(ucl)) %>%
+  # filter(lambda != 0) %>%
+ggplot(  aes(SiteLabel, lambda)) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.5) + #,position = position_dodge(width = 0.9)) +
+  theme_bw() +
+    geom_hline(yintercept = 1, color = "grey50", linetype = "dashed")+
+    theme(strip.text = element_text(face = "italic")) +
+    facet_wrap(~NS, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    ylab(expression(lambda))+
+    xlab("")   ,
+
+width=200, height=100, units="mm", dpi=300)
+
 ```
 
 
@@ -2631,6 +2580,7 @@ Pradlambda
 run.lambda <- function(){
   Phi.dot = list(formula =  ~ 1)
   Phi.Plot = list(formula =  ~ Site)  
+  Phi.species = list(formula = ~ NS)
   
   p.Site = list(formula =  ~ Site, 
                fixed = list(index = p.indices, value = p.values))
@@ -2639,7 +2589,7 @@ run.lambda <- function(){
   Lambda.time = list(formula = ~ Time)
   Lambda.Plot = list(formula = ~ Site)
   Lambda.Plottime = list(formula = ~ Site*time)
-  Lambda.species = list(formula = ~ Species)
+  Lambda.species = list(formula = ~ NS)
   
   scgl.model.list <- create.model.list("Pradlambda")
   
@@ -2659,18 +2609,21 @@ load(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsB
 
 scgl.lambda$model.table
 
-
-lambda.table <- get.real(scgl.lambda$Phi.dot.p.Site.Lambda.time, "Lambda", se = TRUE)
+### ????  Phi.Plot.p.Site.Lambda.Plottime doesn't make sense
+lambda.table <- get.real(scgl.lambda$Phi.Plot.p.Site.Lambda.Plot, "Lambda", se = TRUE)
 lambda.table %>%
   filter(fixed != "Fixed") %>%
   left_join(SiteSpecies) %>%
-  group_by(Site, NS, SiteLabel, time) %>%
-  summarise(lambda = mean(estimate),
-            lcl = mean(lcl),
-            ucl = mean(ucl)) %>%
-  mutate(time = as.numeric(as.character(time))) %>%
+  distinct(estimate, lcl, ucl, SiteLabel, NS) %>%
+  # group_by(Site, NS, SiteLabel, time) %>%
+  # summarise(lambda = mean(estimate),
+  #           lcl = mean(lcl),
+  #           ucl = mean(ucl)) %>%
+  # filter(lambda < 2) %>%
+  # mutate(time = as.numeric(as.character(time))) %>%
   # filter(lambda != 0) %>%
-ggplot(  aes(time, lambda, color = SiteLabel)) +
+ggplot(  aes(#time, 
+              SiteLabel, estimate, color = NS)) +
   geom_point(position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.5) + #,position = position_dodge(width = 0.9)) +
   theme_bw() +
@@ -2681,6 +2634,9 @@ ggplot(  aes(time, lambda, color = SiteLabel)) +
     ylab(expression(lambda))+
     xlab("")
 
+
+get.real(scgl.lambda$Phi.Plot.p.Site.Lambda.Plot, "Phi", se = TRUE) %>%
+  
 
 ```
 
@@ -2887,7 +2843,7 @@ ggplot(  aes(Time, estimates, color = Site)) +
 
 
 
-
+# Demography: growth
 # Plant Size
 ```{r}
 
@@ -2912,8 +2868,12 @@ summary(lm(Width.cm..x ~ Width.cm..y, data=sg.xy[sg.xy$Width.cm..x != 0 &
                                                      sg.xy$NS == "S. glaucus",]))
 
 ggsave(paste(userpath, "Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/",currentYr,"_Sclerocactus-glaucus_AnnualReport/",currentYr,"Figure6HeigthWidthScGlScDa.jpg", sep=""),
+       
+       
 sg.xy %>%
   filter(Height.cm..x != 0 & Height.cm..y != 0) %>%
+  filter(Height.cm..x < 30) %>%
+  filter(Height.cm..y < 30) %>%
 ggplot(  aes(Height.cm..y, Height.cm..x, color = NS))+
   geom_point(alpha = 0.5, pch = 16)+
   stat_smooth(method = "lm")+
