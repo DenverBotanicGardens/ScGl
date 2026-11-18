@@ -91,6 +91,8 @@ In 2012 we switched from measuring the height and width individuals under 0.5 cm
 
 sg <- read.csv(paste(userpath,"Denver Botanic Gardens/Conservation - General/AllProjectsBySpecies/Sclerocactus-glaucus/Sclerocactus-glaucus_AnnualReports/2008-currentyr_Sclerocactus_glaucus_R_tables/RawData_scgl_", currentYr, ".csv", sep=""))
 names(sg)
+sg <- sg %>%
+  rename(Tag = Tag.No)
 str(sg)
 
 sg %>%
@@ -916,10 +918,9 @@ AIC for reproduction below after loading climate
 
 Climate directly from PRISM   
 ### update only the previous year each year  
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 #devtools::install_github("ropensci/prism")
-
-prism_set_dl_dir("Q:/Research/All_Projects_by_Species/Astragalus SPECIES/Astragalus_microcymbus/PRISM_asmiclimate")
+prism_set_dl_dir("Q:/Research/All_Projects_by_Species/PRISM_data")
 
 ```
 
