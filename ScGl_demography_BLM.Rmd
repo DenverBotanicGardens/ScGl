@@ -996,7 +996,7 @@ Min temp
 Only update last year's provisional and this year's
 ```{r, eval=FALSE}
 
-m.ppt <- prism_archive_subset("ppt", "monthly", years = 1986:currentYr)
+m.ppt <- prism_archive_subset("ppt", "monthly", years = 1986:currentYr, resolution = "4km")
 m.ppt2 <- lapply(m.ppt, function(x){
   x_rast <- pd_to_file(x)
   rastertemps <- raster(x_rast)
@@ -1005,14 +1005,14 @@ m.ppt2 <- lapply(m.ppt, function(x){
 })
 
 
-m.tmax <- lapply(prism_archive_subset("tmax","monthly",years = 1986:currentYr), function(x){
+m.tmax <- lapply(prism_archive_subset("tmax","monthly",years = 1986:currentYr, resolution = "4km"), function(x){
   x_rast <- pd_to_file(x)
   rastertemps <- raster(x_rast)
   data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]),
              date = x, Site = latlong$Site)
 })
 
-m.tmin <- lapply(prism_archive_subset("tmin","monthly",years = 1986:currentYr), function(x){
+m.tmin <- lapply(prism_archive_subset("tmin","monthly",years = 1986:currentYr, resolution = "4km"), function(x){
   x_rast <- pd_to_file(x)
   rastertemps <- raster(x_rast)
   data.frame(data = raster::extract(rastertemps, latlong[,c("Long","Lat")]),
@@ -1040,8 +1040,8 @@ scgl.climate <- scgl.climate %>%
   filter(!grepl("provisional_4kmM3_2023", date))
 
 scgl.climate.monthly <- scgl.climate %>%
-  mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-10,nchar(date)-6)),
-         Month = as.numeric(substr(date, (nchar(date)+1)-6, nchar(date)-4)),
+  mutate(Year = as.numeric(substr(date,  (nchar(date)+1)-6,nchar(date)-2)),
+         Month = as.numeric(substr(date, (nchar(date)+1)-2, nchar(date))),
          # Make previous 12 months match year (previous to May survey)
          Prev12 = ifelse(Month > 5, Year+1, Year)) %>%
   filter(Prev12 <= currentYr) %>%
@@ -1057,11 +1057,6 @@ scgl.climate.monthly %>%
   group_by(Variable, Site, Year, season) %>%
   summarise(n = n()) %>%
   filter(n > 3)
-
-scgl.climate.monthly %>%
-  filter(Variable == "tmax" & Site == "Atwell Gulch" & Year == 2024) %>%
-  arrange(Month, season)
-## Some repeated months with slightly different values, some the same value. Maybe provisional and updated? 
 
 
 ## More tmax and tmin than ppt. 
